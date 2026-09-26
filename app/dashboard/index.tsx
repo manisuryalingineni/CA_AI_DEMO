@@ -15,6 +15,8 @@ import { StatusBar } from 'expo-status-bar';
 
 import { colors } from '../../src/theme/colors';
 
+
+
 type QuickActionProps = {
   icon: string;
   title: string;
@@ -63,15 +65,23 @@ type FlowStepProps = {
   number: string;
   title: string;
   description: string;
+  onPress?: () => void;
 };
 
 function FlowStep({
   number,
   title,
   description,
+  onPress,
 }: FlowStepProps) {
   return (
-    <Pressable style={styles.flowStep}>
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.flowStep,
+        pressed && styles.quickActionPressed,
+      ]}
+    >
       <View style={styles.flowNumber}>
         <Text style={styles.flowNumberText}>
           {number}
@@ -132,7 +142,7 @@ export default function DashboardScreen() {
 
           <Pressable style={styles.userButton}>
             <Text style={styles.userButtonText}>
-              👤 RS
+              👤 User
             </Text>
           </Pressable>
         </View>
@@ -297,6 +307,7 @@ export default function DashboardScreen() {
               icon="👤"
               title="Customer"
               description="Add customer or walk-in party"
+              onPress={() => router.push('/customers')}
             />
 
             <QuickAction
@@ -375,7 +386,10 @@ export default function DashboardScreen() {
               </Text>
             </View>
 
-            <Pressable style={styles.doNowButton}>
+            <Pressable
+              onPress={() => router.push('/customers')}
+              style={styles.doNowButton}
+            >
               <Text style={styles.doNowText}>
                 Do now
               </Text>
@@ -407,6 +421,7 @@ export default function DashboardScreen() {
               number="1"
               title="Create party"
               description="Customer or vendor"
+              onPress={() => router.push('/customers')}
             />
 
             <FlowStep

@@ -11,17 +11,17 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
-import { useLocalSearchParams, router } from 'expo-router';
+import { router } from 'expo-router';
 
 import { colors } from '../../src/theme/colors';
+import { loadProducts } from '../../src/services/productService';
+
 import type { Product } from '../../src/types/product';
 
 const LOW_STOCK_LIMIT = 10;
 
 export default function ProductsScreen() {
   const { width } = useWindowDimensions();
-  const params = useLocalSearchParams();
-
   const [search, setSearch] = useState('');
   const [products, setProducts] = useState<Product[]>([]);
 
@@ -32,32 +32,28 @@ export default function ProductsScreen() {
    * The database integration will be handled separately.
    */
   React.useEffect(() => {
-    if (!params.product) {
-      return;
-    }
-
-    try {
-      const newProduct = JSON.parse(
-        Array.isArray(params.product)
-          ? params.product[0]
-          : params.product,
-      ) as Product;
-
-      setProducts((currentProducts) => {
-        const alreadyExists = currentProducts.some(
-          (product) => product.id === newProduct.id,
-        );
-
-        if (alreadyExists) {
-          return currentProducts;
+    let isMounted = true;
+  
+    async function loadProductList() {
+      try {
+        const savedProducts = await loadProducts();
+  
+        if (isMounted) {
+          setProducts(savedProducts);
         }
-
-        return [...currentProducts, newProduct];
-      });
-    } catch {
-      // Ignore invalid temporary route data.
+      } catch (error) {
+        console.error('Failed to load products:', error);
+      }
     }
-  }, [params.product]);
+  
+    loadProductList();
+  
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+
 
   const filteredProducts = useMemo(() => {
     const query = search.trim().toLowerCase();

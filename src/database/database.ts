@@ -12,6 +12,32 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
   database = await SQLite.openDatabaseAsync(DATABASE_NAME);
 
   await database.execAsync(`
+    PRAGMA journal_mode = WAL;
+
+    CREATE TABLE IF NOT EXISTS businesses (
+      id TEXT PRIMARY KEY NOT NULL,
+      name TEXT NOT NULL,
+      gstin TEXT,
+      business_type TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS customers (
+      id TEXT PRIMARY KEY NOT NULL,
+      business_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      mobile TEXT NOT NULL,
+      gstin TEXT,
+      state TEXT NOT NULL,
+      address TEXT,
+      credit_days INTEGER NOT NULL DEFAULT 15,
+      opening_balance REAL NOT NULL DEFAULT 0,
+      business_detail TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
     CREATE INDEX IF NOT EXISTS idx_customers_business_id
       ON customers (business_id);
 

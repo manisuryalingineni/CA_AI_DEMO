@@ -14,6 +14,8 @@ import {
 import { router } from 'expo-router';
 
 import { colors } from '../../src/theme/colors';
+import { saveProduct } from '../../src/services/productService';
+
 
 export default function AddProductScreen() {
   const [name, setName] = useState('');
@@ -27,34 +29,36 @@ export default function AddProductScreen() {
   const [brand, setBrand] = useState('');
   const [rack, setRack] = useState('');
 
-  function handleSave() {
+  async function handleSave() {
     const productName = name.trim();
-
+  
     if (!productName) {
       Alert.alert('Product name required', 'Please enter the product name.');
       return;
     }
-
-    const product = {
-      name: productName,
-      hsn: hsn.trim(),
-      unit: unit.trim() || 'Piece',
-      salePrice: Number(salePrice) || 0,
-      purchasePrice: Number(purchasePrice) || 0,
-      gstRate: Number(gstRate) || 0,
-      openingStock: Number(openingStock) || 0,
-      barcode: barcode.trim(),
-      brand: brand.trim(),
-      rack: rack.trim(),
-    };
-
-    router.navigate({
-      pathname: '/products',
-      params: {
-        product: JSON.stringify(product),
-      },
-    });
-  }
+  
+    try {
+      await saveProduct({
+        name: productName,
+        hsn: hsn.trim(),
+        unit: unit.trim() || 'Piece',
+        salePrice: Number(salePrice) || 0,
+        purchasePrice: Number(purchasePrice) || 0,
+        gstRate: Number(gstRate) || 0,
+        openingStock: Number(openingStock) || 0,
+        barcode: barcode.trim(),
+        brand: brand.trim(),
+        rack: rack.trim(),
+      });
+  
+      router.replace('/products');
+    } catch (error) {
+      Alert.alert(
+        'Unable to save product',
+        error instanceof Error ? error.message : 'Something went wrong.',
+      );
+    }
+  } 
 
   function handleCancel() {
     router.back();
