@@ -1,4 +1,3 @@
-
 import {
   Pressable,
   ScrollView,
@@ -8,9 +7,9 @@ import {
   useWindowDimensions,
 } from 'react-native';
 
-import {
-  useSafeAreaInsets,
-} from 'react-native-safe-area-context';
+import { router } from 'expo-router';
+
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { StatusBar } from 'expo-status-bar';
 
@@ -20,15 +19,18 @@ type QuickActionProps = {
   icon: string;
   title: string;
   description: string;
+  onPress?: () => void;
 };
 
 function QuickAction({
   icon,
   title,
   description,
+  onPress,
 }: QuickActionProps) {
   return (
     <Pressable
+      onPress={onPress}
       style={({ pressed }) => [
         styles.quickAction,
         pressed && styles.quickActionPressed,
@@ -156,105 +158,107 @@ export default function DashboardScreen() {
           ================================================= */}
 
           <View style={styles.hero}>
-  <View
-    style={[
-      styles.heroRow,
-      !isLargeScreen && styles.heroRowMobile,
-    ]}
-  >
-    <View style={styles.heroIdentity}>
-      <View style={styles.heroIcon}>
-        <Text style={styles.heroIconText}>
-          🛍️
-        </Text>
-      </View>
+            <View
+              style={[
+                styles.heroRow,
+                !isLargeScreen && styles.heroRowMobile,
+              ]}
+            >
+              <View style={styles.heroIdentity}>
+                <View style={styles.heroIcon}>
+                  <Text style={styles.heroIconText}>
+                    🛍️
+                  </Text>
+                </View>
 
-      <View style={styles.heroTitleArea}>
-        <Text
-          style={styles.heroTitle}
-          numberOfLines={1}
-          adjustsFontSizeToFit
-          minimumFontScale={0.85}
-        >
-          Retail Shop
-        </Text>
+                <View style={styles.heroTitleArea}>
+                  <Text
+                    style={styles.heroTitle}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.85}
+                  >
+                    Retail Shop
+                  </Text>
 
-        <Text
-          style={styles.heroDescription}
-          numberOfLines={2}
-        >
-          POS, products and counter sales
-          {' • '}
-          Owner workspace
-        </Text>
-      </View>
-    </View>
+                  <Text
+                    style={styles.heroDescription}
+                    numberOfLines={2}
+                  >
+                    POS, products and counter sales
+                    {' • '}
+                    Owner workspace
+                  </Text>
+                </View>
+              </View>
 
-    <Pressable
-      style={({ pressed }) => [
-        styles.switchButton,
-        !isLargeScreen && styles.switchButtonMobile,
-        pressed && styles.switchButtonPressed,
-      ]}
-    >
-      <Text
-        style={styles.switchButtonText}
-        numberOfLines={1}
-      >
-        Switch business
-      </Text>
-    </Pressable>
-  </View>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.switchButton,
+                  !isLargeScreen &&
+                    styles.switchButtonMobile,
+                  pressed && styles.switchButtonPressed,
+                ]}
+              >
+                <Text
+                  style={styles.switchButtonText}
+                  numberOfLines={1}
+                >
+                  Switch business
+                </Text>
+              </Pressable>
+            </View>
 
-  {/* KPI STRIP */}
+            {/* KPI STRIP */}
 
-  <View
-    style={[
-      styles.kpiGrid,
-      !isLargeScreen && styles.kpiGridMobile,
-    ]}
-  >
-    <View style={styles.kpi}>
-      <Text style={styles.kpiLabel}>
-        Sales
-      </Text>
+            <View
+              style={[
+                styles.kpiGrid,
+                !isLargeScreen &&
+                  styles.kpiGridMobile,
+              ]}
+            >
+              <View style={styles.kpi}>
+                <Text style={styles.kpiLabel}>
+                  Sales
+                </Text>
 
-      <Text style={styles.kpiValue}>
-        ₹0
-      </Text>
-    </View>
+                <Text style={styles.kpiValue}>
+                  ₹0
+                </Text>
+              </View>
 
-    <View style={styles.kpi}>
-      <Text style={styles.kpiLabel}>
-        Purchases
-      </Text>
+              <View style={styles.kpi}>
+                <Text style={styles.kpiLabel}>
+                  Purchases
+                </Text>
 
-      <Text style={styles.kpiValue}>
-        ₹0
-      </Text>
-    </View>
+                <Text style={styles.kpiValue}>
+                  ₹0
+                </Text>
+              </View>
 
-    <View style={styles.kpi}>
-      <Text style={styles.kpiLabel}>
-        To receive
-      </Text>
+              <View style={styles.kpi}>
+                <Text style={styles.kpiLabel}>
+                  To receive
+                </Text>
 
-      <Text style={styles.kpiValue}>
-        ₹0
-      </Text>
-    </View>
+                <Text style={styles.kpiValue}>
+                  ₹0
+                </Text>
+              </View>
 
-    <View style={styles.kpi}>
-      <Text style={styles.kpiLabel}>
-        To pay
-      </Text>
+              <View style={styles.kpi}>
+                <Text style={styles.kpiLabel}>
+                  To pay
+                </Text>
 
-      <Text style={styles.kpiValue}>
-        ₹0
-      </Text>
-    </View>
-  </View>
-</View>
+                <Text style={styles.kpiValue}>
+                  ₹0
+                </Text>
+              </View>
+            </View>
+          </View>
 
           {/* =================================================
               QUICK WORK HEADER
@@ -285,7 +289,8 @@ export default function DashboardScreen() {
           <View
             style={[
               styles.quickGrid,
-              isLargeScreen && styles.quickGridLarge,
+              isLargeScreen &&
+                styles.quickGridLarge,
             ]}
           >
             <QuickAction
@@ -310,6 +315,17 @@ export default function DashboardScreen() {
               icon="📦"
               title="Stock check"
               description="Quantity, cost and reorder view"
+            />
+
+            {/* =================================================
+                PRODUCTS
+            ================================================= */}
+
+            <QuickAction
+              icon="📋"
+              title="Products"
+              description="Manage products, prices and stock"
+              onPress={() => router.push('/products')}
             />
 
             <QuickAction
@@ -644,130 +660,130 @@ const styles = StyleSheet.create({
     maxWidth: 1050,
   },
 
- /* =======================================================
-   HERO
-======================================================= */
+  /* =======================================================
+     HERO
+  ======================================================= */
 
-hero: {
-  width: '100%',
+  hero: {
+    width: '100%',
 
-  backgroundColor: colors.primary,
+    backgroundColor: colors.primary,
 
-  borderRadius: 24,
+    borderRadius: 24,
 
-  padding: 18,
+    padding: 18,
 
-  overflow: 'hidden',
+    overflow: 'hidden',
 
-  shadowColor: colors.primary,
-  shadowOffset: {
-    width: 0,
-    height: 9,
+    shadowColor: colors.primary,
+    shadowOffset: {
+      width: 0,
+      height: 9,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 15,
+
+    elevation: 3,
   },
-  shadowOpacity: 0.10,
-  shadowRadius: 15,
 
-  elevation: 3,
-},
+  heroRow: {
+    width: '100%',
 
-heroRow: {
-  width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
 
-  flexDirection: 'row',
-  alignItems: 'center',
-  justifyContent: 'space-between',
+    gap: 12,
+  },
 
-  gap: 12,
-},
+  heroRowMobile: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+  },
 
-heroRowMobile: {
-  flexDirection: 'column',
-  alignItems: 'flex-start',
-},
+  heroIdentity: {
+    flex: 1,
+    minWidth: 0,
+    width: '100%',
 
-heroIdentity: {
-  flex: 1,
-  minWidth: 0,
-  width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
 
-  flexDirection: 'row',
-  alignItems: 'center',
-},
+  heroIcon: {
+    width: 52,
+    height: 52,
 
-heroIcon: {
-  width: 52,
-  height: 52,
+    flexShrink: 0,
 
-  flexShrink: 0,
+    borderRadius: 17,
 
-  borderRadius: 17,
+    backgroundColor: 'rgba(255,255,255,0.09)',
 
-  backgroundColor: 'rgba(255,255,255,0.09)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 
-  alignItems: 'center',
-  justifyContent: 'center',
-},
+  heroIconText: {
+    fontSize: 30,
+  },
 
-heroIconText: {
-  fontSize: 30,
-},
+  heroTitleArea: {
+    flex: 1,
+    minWidth: 0,
 
-heroTitleArea: {
-  flex: 1,
-  minWidth: 0,
+    marginLeft: 12,
+  },
 
-  marginLeft: 12,
-},
+  heroTitle: {
+    color: '#FFFFFF',
 
-heroTitle: {
-  color: '#FFFFFF',
+    fontSize: 21,
+    fontWeight: '700',
+  },
 
-  fontSize: 21,
-  fontWeight: '700',
-},
+  heroDescription: {
+    color: '#D9E8F0',
 
-heroDescription: {
-  color: '#D9E8F0',
+    fontSize: 11,
 
-  fontSize: 11,
+    marginTop: 4,
 
-  marginTop: 4,
+    lineHeight: 15,
+  },
 
-  lineHeight: 15,
-},
+  switchButton: {
+    flexShrink: 0,
 
-switchButton: {
-  flexShrink: 0,
+    backgroundColor: '#FFFFFF',
 
-  backgroundColor: '#FFFFFF',
+    borderRadius: 12,
 
-  borderRadius: 12,
+    paddingHorizontal: 13,
+    paddingVertical: 8,
 
-  paddingHorizontal: 13,
-  paddingVertical: 8,
+    minHeight: 34,
 
-  minHeight: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 
-  alignItems: 'center',
-  justifyContent: 'center',
-},
+  switchButtonMobile: {
+    minWidth: 150,
+    alignSelf: 'center',
+    marginTop: 12,
+  },
 
-switchButtonMobile: {
-  minWidth: 150,
-  alignSelf: 'center',
-  marginTop: 12,
-},
+  switchButtonPressed: {
+    opacity: 0.75,
+  },
 
-switchButtonPressed: {
-  opacity: 0.75,
-},
+  switchButtonText: {
+    color: colors.primary,
 
-switchButtonText: {
-  color: colors.primary,
-
-  fontSize: 10,
-  fontWeight: '800',
-},
+    fontSize: 10,
+    fontWeight: '800',
+  },
 
   /* =======================================================
      KPI
@@ -777,7 +793,7 @@ switchButtonText: {
     width: '100%',
 
     flexDirection: 'row',
-    
+
     gap: 7,
 
     marginTop: 15,
@@ -892,6 +908,7 @@ switchButtonText: {
     borderRadius: 18,
 
     padding: 13,
+
     alignItems: 'center',
     justifyContent: 'center',
 
@@ -933,6 +950,8 @@ switchButtonText: {
 
     fontSize: 12,
     fontWeight: '700',
+
+    textAlign: 'center',
   },
 
   quickActionDescription: {
@@ -943,6 +962,10 @@ switchButtonText: {
     lineHeight: 13,
 
     marginTop: 4,
+
+    textAlign: 'center',
+
+    width: '100%',
   },
 
   openBadge: {
@@ -1145,35 +1168,39 @@ switchButtonText: {
     marginTop: 3,
   },
 
+  /* =======================================================
+     BOTTOM NAVIGATION
+  ======================================================= */
+
   bottomNavigation: {
-  position: 'absolute',
+    position: 'absolute',
 
-  left: 9,
-  right: 9,
+    left: 9,
+    right: 9,
 
-  flexDirection: 'row',
+    flexDirection: 'row',
 
-  gap: 4,
+    gap: 4,
 
-  padding: 6,
+    padding: 6,
 
-  backgroundColor: '#FFFFFF',
+    backgroundColor: '#FFFFFF',
 
-  borderWidth: 1,
-  borderColor: colors.border,
+    borderWidth: 1,
+    borderColor: colors.border,
 
-  borderRadius: 20,
+    borderRadius: 20,
 
-  shadowColor: colors.primary,
-  shadowOffset: {
-    width: 0,
-    height: 12,
+    shadowColor: colors.primary,
+    shadowOffset: {
+      width: 0,
+      height: 12,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 25,
+
+    elevation: 10,
   },
-  shadowOpacity: 0.20,
-  shadowRadius: 25,
-
-  elevation: 10,
-},
 
   navButton: {
     flex: 1,
@@ -1212,4 +1239,3 @@ switchButtonText: {
     fontWeight: '800',
   },
 });
-
