@@ -60,6 +60,25 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
 
     CREATE INDEX IF NOT EXISTS idx_products_business_id
       ON products (business_id);
+
+
+        CREATE TABLE IF NOT EXISTS vendors (
+      id TEXT PRIMARY KEY NOT NULL,
+      business_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      mobile TEXT NOT NULL,
+      gstin TEXT,
+      state TEXT NOT NULL,
+      address TEXT,
+      credit_days INTEGER NOT NULL DEFAULT 15,
+      opening_balance REAL NOT NULL DEFAULT 0,
+      business_detail TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_vendors_business_id
+      ON vendors (business_id);
   `);
 
   return database;
