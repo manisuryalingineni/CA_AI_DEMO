@@ -5,17 +5,21 @@ import {
   Text,
   View,
   useWindowDimensions,
-} from 'react-native';
+} from "react-native";
 
-import { router } from 'expo-router';
+import { router, useFocusEffect } from "expo-router";
 
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { StatusBar } from 'expo-status-bar';
+import { StatusBar } from "expo-status-bar";
 
-import { colors } from '../../src/theme/colors';
+import { useCallback, useState } from "react";
 
+import { colors } from "../../src/theme/colors";
 
+import { getBusiness } from "../../src/repositories/businessRepository";
+
+import { getCustomers } from "../../src/repositories/customerRepository";
 
 type QuickActionProps = {
   icon: string;
@@ -61,6 +65,48 @@ function QuickAction({
   );
 }
 
+/* =========================================================
+   QUICK ENTRY CARD
+   Icon + title only
+========================================================= */
+
+type QuickEntryProps = {
+  icon: string;
+  title: string;
+  onPress?: () => void;
+};
+
+function QuickEntry({
+  icon,
+  title,
+  onPress,
+}: QuickEntryProps) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.quickEntryCard,
+        pressed && styles.quickActionPressed,
+      ]}
+    >
+      <View style={styles.quickEntryIcon}>
+        <Text style={styles.quickEntryIconText}>
+          {icon}
+        </Text>
+      </View>
+
+      <Text
+        style={styles.quickEntryTitle}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.8}
+      >
+        {title}
+      </Text>
+    </Pressable>
+  );
+}
+
 type FlowStepProps = {
   number: string;
   title: string;
@@ -101,9 +147,72 @@ function FlowStep({
 
 export default function DashboardScreen() {
   const { width } = useWindowDimensions();
+
   const insets = useSafeAreaInsets();
 
   const isLargeScreen = width >= 721;
+
+  /*
+   * =========================================================
+   * CUSTOMER STATUS
+   * =========================================================
+   *
+   * false = no customers → show Operations Expert
+   * true  = customers exist → hide Operations Expert
+   */
+
+  const [hasCustomers, setHasCustomers] =
+    useState(false);
+
+  const loadCustomerStatus = useCallback(
+    async () => {
+      try {
+        const business = await getBusiness();
+
+        if (!business) {
+          setHasCustomers(false);
+          return;
+        }
+
+        const customers =
+          await getCustomers(business.id);
+
+        setHasCustomers(customers.length > 0);
+      } catch (error) {
+        console.error(
+          "Unable to check customer status:",
+          error,
+        );
+
+        setHasCustomers(false);
+      }
+    },
+    [],
+  );
+
+  /*
+   * Refresh every time dashboard receives focus.
+   *
+   * Example:
+   *
+   * Dashboard
+   *    ↓
+   * Customer
+   *    ↓
+   * Add Customer
+   *    ↓
+   * Save
+   *    ↓
+   * Back to Dashboard
+   *
+   * Operations Expert disappears automatically.
+   */
+
+  useFocusEffect(
+    useCallback(() => {
+      loadCustomerStatus();
+    }, [loadCustomerStatus]),
+  );
 
   return (
     <View style={styles.container}>
@@ -154,7 +263,9 @@ export default function DashboardScreen() {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={
+          styles.scrollContent
+        }
       >
         <View
           style={[
@@ -162,7 +273,6 @@ export default function DashboardScreen() {
             isLargeScreen && styles.mainLarge,
           ]}
         >
-
           {/* =================================================
               RETAIL HERO
           ================================================= */}
@@ -171,7 +281,8 @@ export default function DashboardScreen() {
             <View
               style={[
                 styles.heroRow,
-                !isLargeScreen && styles.heroRowMobile,
+                !isLargeScreen &&
+                  styles.heroRowMobile,
               ]}
             >
               <View style={styles.heroIdentity}>
@@ -196,7 +307,7 @@ export default function DashboardScreen() {
                     numberOfLines={2}
                   >
                     POS, products and counter sales
-                    {' • '}
+                    {" • "}
                     Owner workspace
                   </Text>
                 </View>
@@ -207,7 +318,8 @@ export default function DashboardScreen() {
                   styles.switchButton,
                   !isLargeScreen &&
                     styles.switchButtonMobile,
-                  pressed && styles.switchButtonPressed,
+                  pressed &&
+                    styles.switchButtonPressed,
                 ]}
               >
                 <Text
@@ -271,17 +383,77 @@ export default function DashboardScreen() {
           </View>
 
           {/* =================================================
-              QUICK WORK HEADER
+              QUICK ENTRY
           ================================================= */}
 
           <View style={styles.sectionHeader}>
             <View>
               <Text style={styles.sectionTitle}>
-                Quick work • Retail Shop
+                Quick Entry
               </Text>
 
               <Text style={styles.sectionSubtitle}>
-                Only work assigned to this login is shown
+                Frequently used retail operations
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.quickEntryGrid}>
+            <QuickEntry
+              icon="👤"
+              title="Customer"
+              onPress={() =>
+                router.push("/customers")
+              }
+            />
+
+            <QuickEntry
+              icon="🏢"
+              title="Vendor"
+              onPress={() =>
+                router.push("/vendors")
+              }
+            />
+
+            <QuickEntry
+              icon="🧾"
+              title="Sale Bill"
+            />
+
+            <QuickEntry
+              icon="📥"
+              title="Purchase"
+            />
+
+            <QuickEntry
+              icon="💰"
+              title="Money"
+            />
+
+            <QuickEntry
+              icon="🏦"
+              title="Bank"
+            />
+
+            <QuickEntry
+              icon="👥"
+              title="Payroll"
+            />
+
+            <QuickEntry
+              icon="📊"
+              title="Reports"
+            />
+          </View>
+
+          {/* =================================================
+              RETAIL WORKS
+          ================================================= */}
+
+          <View style={styles.sectionHeader}>
+            <View>
+              <Text style={styles.sectionTitle}>
+                Retail Works
               </Text>
             </View>
 
@@ -291,10 +463,6 @@ export default function DashboardScreen() {
               </Text>
             </Pressable>
           </View>
-
-          {/* =================================================
-              QUICK WORK
-          ================================================= */}
 
           <View
             style={[
@@ -307,7 +475,9 @@ export default function DashboardScreen() {
               icon="👤"
               title="Customer"
               description="Add customer or walk-in party"
-              onPress={() => router.push('/customers')}
+              onPress={() =>
+                router.push("/customers")
+              }
             />
 
             <QuickAction
@@ -328,17 +498,6 @@ export default function DashboardScreen() {
               description="Quantity, cost and reorder view"
             />
 
-            {/* =================================================
-                PRODUCTS
-            ================================================= */}
-
-            <QuickAction
-              icon="📋"
-              title="Products"
-              description="Manage products, prices and stock"
-              onPress={() => router.push('/products')}
-            />
-
             <QuickAction
               icon="💳"
               title="Receive money"
@@ -354,47 +513,62 @@ export default function DashboardScreen() {
 
           {/* =================================================
               OPERATIONS EXPERT
+
+              ONLY SHOW WHEN THERE ARE ZERO CUSTOMERS
           ================================================= */}
 
-          <View style={styles.sectionHeader}>
-            <View>
-              <Text style={styles.sectionTitle}>
-                Operations Expert
-              </Text>
+          {!hasCustomers && (
+            <>
+              <View style={styles.sectionHeader}>
+                <View>
+                  <Text style={styles.sectionTitle}>
+                    Operations Expert
+                  </Text>
 
-              <Text style={styles.sectionSubtitle}>
-                The next useful step from your saved data
-              </Text>
-            </View>
-          </View>
+                  <Text
+                    style={styles.sectionSubtitle}
+                  >
+                    The next useful step from your saved
+                    data
+                  </Text>
+                </View>
+              </View>
 
-          <View style={styles.expertCard}>
-            <View style={styles.expertIcon}>
-              <Text style={styles.expertIconText}>
-                🧭
-              </Text>
-            </View>
+              <View style={styles.expertCard}>
+                <View style={styles.expertIcon}>
+                  <Text
+                    style={styles.expertIconText}
+                  >
+                    🧭
+                  </Text>
+                </View>
 
-            <View style={styles.expertContent}>
-              <Text style={styles.expertTitle}>
-                Create the first customer
-              </Text>
+                <View style={styles.expertContent}>
+                  <Text style={styles.expertTitle}>
+                    Create the first customer
+                  </Text>
 
-              <Text style={styles.expertDescription}>
-                A customer is required before
-                quotations and sales invoices.
-              </Text>
-            </View>
+                  <Text
+                    style={styles.expertDescription}
+                  >
+                    A customer is required before
+                    quotations and sales invoices.
+                  </Text>
+                </View>
 
-            <Pressable
-              onPress={() => router.push('/customers')}
-              style={styles.doNowButton}
-            >
-              <Text style={styles.doNowText}>
-                Do now
-              </Text>
-            </Pressable>
-          </View>
+                <Pressable
+                  onPress={() =>
+                    router.push("/customers")
+                  }
+                  style={styles.doNowButton}
+                >
+                  <Text style={styles.doNowText}>
+                    Do now
+                  </Text>
+                </Pressable>
+              </View>
+            </>
+          )}
 
           {/* =================================================
               COMPLETE BUSINESS FLOW
@@ -421,7 +595,9 @@ export default function DashboardScreen() {
               number="1"
               title="Create party"
               description="Customer or vendor"
-              onPress={() => router.push('/customers')}
+              onPress={() =>
+                router.push("/customers")
+              }
             />
 
             <FlowStep
@@ -483,8 +659,7 @@ export default function DashboardScreen() {
             </Text>
 
             <Text style={styles.emptyDescription}>
-              Create the first document from
-              Quick Work.
+              Create the first document from Quick Work.
             </Text>
           </View>
         </View>
@@ -498,7 +673,10 @@ export default function DashboardScreen() {
         style={[
           styles.bottomNavigation,
           {
-            bottom: Math.max(8, insets.bottom),
+            bottom: Math.max(
+              8,
+              insets.bottom,
+            ),
           },
         ]}
       >
@@ -566,11 +744,11 @@ const styles = StyleSheet.create({
   ======================================================= */
 
   topHeader: {
-    width: '100%',
+    width: "100%",
 
     backgroundColor: colors.primary,
 
-    shadowColor: '#0015',
+    shadowColor: "#0015",
     shadowOffset: {
       width: 0,
       height: 3,
@@ -582,17 +760,17 @@ const styles = StyleSheet.create({
   },
 
   headerInner: {
-    width: '100%',
+    width: "100%",
     maxWidth: 1050,
 
     minHeight: 64,
 
-    alignSelf: 'center',
+    alignSelf: "center",
 
     paddingHorizontal: 14,
 
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
 
     gap: 10,
   },
@@ -605,14 +783,14 @@ const styles = StyleSheet.create({
 
     backgroundColor: colors.gold,
 
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   logoText: {
     color: colors.primary,
     fontSize: 15,
-    fontWeight: '900',
+    fontWeight: "900",
   },
 
   headerTitle: {
@@ -620,13 +798,13 @@ const styles = StyleSheet.create({
   },
 
   appTitle: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: "700",
   },
 
   appSubtitle: {
-    color: '#D8E7EF',
+    color: "#D8E7EF",
     fontSize: 11,
     marginTop: 2,
   },
@@ -638,10 +816,12 @@ const styles = StyleSheet.create({
   userButton: {
     maxWidth: 120,
 
-    backgroundColor: 'rgba(255,255,255,0.09)',
+    backgroundColor:
+      "rgba(255,255,255,0.09)",
 
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
+    borderColor:
+      "rgba(255,255,255,0.14)",
 
     borderRadius: 99,
 
@@ -650,7 +830,7 @@ const styles = StyleSheet.create({
   },
 
   userButtonText: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: 10,
   },
 
@@ -663,12 +843,12 @@ const styles = StyleSheet.create({
   },
 
   main: {
-    width: '100%',
+    width: "100%",
 
     paddingHorizontal: 11,
     paddingTop: 14,
 
-    alignSelf: 'center',
+    alignSelf: "center",
   },
 
   mainLarge: {
@@ -680,7 +860,7 @@ const styles = StyleSheet.create({
   ======================================================= */
 
   hero: {
-    width: '100%',
+    width: "100%",
 
     backgroundColor: colors.primary,
 
@@ -688,7 +868,7 @@ const styles = StyleSheet.create({
 
     padding: 18,
 
-    overflow: 'hidden',
+    overflow: "hidden",
 
     shadowColor: colors.primary,
     shadowOffset: {
@@ -702,27 +882,27 @@ const styles = StyleSheet.create({
   },
 
   heroRow: {
-    width: '100%',
+    width: "100%",
 
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
 
     gap: 12,
   },
 
   heroRowMobile: {
-    flexDirection: 'column',
-    alignItems: 'flex-start',
+    flexDirection: "column",
+    alignItems: "flex-start",
   },
 
   heroIdentity: {
     flex: 1,
     minWidth: 0,
-    width: '100%',
+    width: "100%",
 
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
 
   heroIcon: {
@@ -733,10 +913,11 @@ const styles = StyleSheet.create({
 
     borderRadius: 17,
 
-    backgroundColor: 'rgba(255,255,255,0.09)',
+    backgroundColor:
+      "rgba(255,255,255,0.09)",
 
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   heroIconText: {
@@ -751,14 +932,14 @@ const styles = StyleSheet.create({
   },
 
   heroTitle: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
 
     fontSize: 21,
-    fontWeight: '700',
+    fontWeight: "700",
   },
 
   heroDescription: {
-    color: '#D9E8F0',
+    color: "#D9E8F0",
 
     fontSize: 11,
 
@@ -770,7 +951,7 @@ const styles = StyleSheet.create({
   switchButton: {
     flexShrink: 0,
 
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
 
     borderRadius: 12,
 
@@ -779,13 +960,13 @@ const styles = StyleSheet.create({
 
     minHeight: 34,
 
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   switchButtonMobile: {
     minWidth: 150,
-    alignSelf: 'center',
+    alignSelf: "center",
     marginTop: 12,
   },
 
@@ -797,7 +978,7 @@ const styles = StyleSheet.create({
     color: colors.primary,
 
     fontSize: 10,
-    fontWeight: '800',
+    fontWeight: "800",
   },
 
   /* =======================================================
@@ -805,9 +986,9 @@ const styles = StyleSheet.create({
   ======================================================= */
 
   kpiGrid: {
-    width: '100%',
+    width: "100%",
 
-    flexDirection: 'row',
+    flexDirection: "row",
 
     gap: 7,
 
@@ -815,7 +996,7 @@ const styles = StyleSheet.create({
   },
 
   kpiGridMobile: {
-    flexWrap: 'wrap',
+    flexWrap: "wrap",
   },
 
   kpi: {
@@ -823,10 +1004,12 @@ const styles = StyleSheet.create({
 
     minWidth: 0,
 
-    backgroundColor: 'rgba(255,255,255,0.075)',
+    backgroundColor:
+      "rgba(255,255,255,0.075)",
 
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.09)',
+    borderColor:
+      "rgba(255,255,255,0.09)",
 
     borderRadius: 13,
 
@@ -834,15 +1017,15 @@ const styles = StyleSheet.create({
   },
 
   kpiLabel: {
-    color: '#D8E6EE',
+    color: "#D8E6EE",
     fontSize: 9,
   },
 
   kpiValue: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
 
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: "700",
 
     marginTop: 3,
   },
@@ -852,11 +1035,11 @@ const styles = StyleSheet.create({
   ======================================================= */
 
   sectionHeader: {
-    width: '100%',
+    width: "100%",
 
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
 
     marginTop: 20,
     marginBottom: 9,
@@ -868,7 +1051,7 @@ const styles = StyleSheet.create({
     color: colors.text,
 
     fontSize: 17,
-    fontWeight: '700',
+    fontWeight: "700",
   },
 
   sectionSubtitle: {
@@ -880,7 +1063,7 @@ const styles = StyleSheet.create({
   },
 
   smallButton: {
-    backgroundColor: '#E8F4F3',
+    backgroundColor: "#E8F4F3",
 
     borderRadius: 12,
 
@@ -889,21 +1072,93 @@ const styles = StyleSheet.create({
   },
 
   smallButtonText: {
-    color: '#08736C',
+    color: "#08736C",
 
     fontSize: 10,
-    fontWeight: '800',
+    fontWeight: "800",
   },
 
   /* =======================================================
-     QUICK WORK
+     QUICK ENTRY
+  ======================================================= */
+
+  quickEntryGrid: {
+    width: "100%",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+  },
+
+  quickEntryCard: {
+    width: "23%",
+    minHeight: 80,
+
+    backgroundColor: colors.card,
+
+    borderWidth: 1,
+    borderColor: colors.border,
+
+    borderRadius: 14,
+
+    alignItems: "center",
+    justifyContent: "center",
+
+    paddingHorizontal: 4,
+    paddingVertical: 7,
+
+    marginBottom: 10,
+
+    shadowColor: colors.primary,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+
+    elevation: 2,
+  },
+
+  quickEntryIcon: {
+    width: 34,
+    height: 34,
+
+    borderRadius: 17,
+
+    backgroundColor: "#E8F6F3",
+
+    alignItems: "center",
+    justifyContent: "center",
+
+    marginBottom: 5,
+  },
+
+  quickEntryIconText: {
+    fontSize: 17,
+    lineHeight: 21,
+    textAlign: "center",
+  },
+
+  quickEntryTitle: {
+    width: "100%",
+
+    color: colors.text,
+
+    fontSize: 11,
+    fontWeight: "800",
+
+    textAlign: "center",
+  },
+
+  /* =======================================================
+     RETAIL WORK
   ======================================================= */
 
   quickGrid: {
-    width: '100%',
+    width: "100%",
 
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
 
     gap: 9,
   },
@@ -913,7 +1168,7 @@ const styles = StyleSheet.create({
   },
 
   quickAction: {
-    width: '48%',
+    width: "48%",
 
     backgroundColor: colors.card,
 
@@ -924,8 +1179,8 @@ const styles = StyleSheet.create({
 
     padding: 13,
 
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
 
     shadowColor: colors.primary,
     shadowOffset: {
@@ -948,10 +1203,10 @@ const styles = StyleSheet.create({
 
     borderRadius: 13,
 
-    backgroundColor: '#E8F6F3',
+    backgroundColor: "#E8F6F3",
 
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
 
     marginBottom: 9,
   },
@@ -964,9 +1219,9 @@ const styles = StyleSheet.create({
     color: colors.text,
 
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: "700",
 
-    textAlign: 'center',
+    textAlign: "center",
   },
 
   quickActionDescription: {
@@ -978,15 +1233,15 @@ const styles = StyleSheet.create({
 
     marginTop: 4,
 
-    textAlign: 'center',
+    textAlign: "center",
 
-    width: '100%',
+    width: "100%",
   },
 
   openBadge: {
-    alignSelf: 'center',
+    alignSelf: "center",
 
-    backgroundColor: '#E4F6ED',
+    backgroundColor: "#E4F6ED",
 
     borderRadius: 99,
 
@@ -1000,7 +1255,7 @@ const styles = StyleSheet.create({
     color: colors.success,
 
     fontSize: 8,
-    fontWeight: '900',
+    fontWeight: "900",
   },
 
   /* =======================================================
@@ -1008,19 +1263,19 @@ const styles = StyleSheet.create({
   ======================================================= */
 
   expertCard: {
-    width: '100%',
+    width: "100%",
 
-    backgroundColor: '#FFF8DF',
+    backgroundColor: "#FFF8DF",
 
     borderWidth: 1,
-    borderColor: '#F0D277',
+    borderColor: "#F0D277",
 
     borderRadius: 18,
 
     padding: 14,
 
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
 
     gap: 12,
   },
@@ -1031,10 +1286,10 @@ const styles = StyleSheet.create({
 
     borderRadius: 13,
 
-    backgroundColor: '#FFF1BF',
+    backgroundColor: "#FFF1BF",
 
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   expertIconText: {
@@ -1050,11 +1305,11 @@ const styles = StyleSheet.create({
     color: colors.text,
 
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: "700",
   },
 
   expertDescription: {
-    color: '#66551C',
+    color: "#66551C",
 
     fontSize: 9,
 
@@ -1073,10 +1328,10 @@ const styles = StyleSheet.create({
   },
 
   doNowText: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
 
     fontSize: 10,
-    fontWeight: '800',
+    fontWeight: "800",
   },
 
   /* =======================================================
@@ -1110,22 +1365,22 @@ const styles = StyleSheet.create({
 
     backgroundColor: colors.teal,
 
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   flowNumberText: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
 
     fontSize: 10,
-    fontWeight: '900',
+    fontWeight: "900",
   },
 
   flowTitle: {
     color: colors.text,
 
     fontSize: 10,
-    fontWeight: '700',
+    fontWeight: "700",
 
     marginTop: 7,
   },
@@ -1145,7 +1400,7 @@ const styles = StyleSheet.create({
   ======================================================= */
 
   emptyCard: {
-    width: '100%',
+    width: "100%",
 
     backgroundColor: colors.card,
 
@@ -1157,7 +1412,7 @@ const styles = StyleSheet.create({
     paddingVertical: 35,
     paddingHorizontal: 15,
 
-    alignItems: 'center',
+    alignItems: "center",
   },
 
   emptyIcon: {
@@ -1168,7 +1423,7 @@ const styles = StyleSheet.create({
     color: colors.text,
 
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: "700",
 
     marginTop: 8,
   },
@@ -1178,7 +1433,7 @@ const styles = StyleSheet.create({
 
     fontSize: 10,
 
-    textAlign: 'center',
+    textAlign: "center",
 
     marginTop: 3,
   },
@@ -1188,18 +1443,18 @@ const styles = StyleSheet.create({
   ======================================================= */
 
   bottomNavigation: {
-    position: 'absolute',
+    position: "absolute",
 
     left: 9,
     right: 9,
 
-    flexDirection: 'row',
+    flexDirection: "row",
 
     gap: 4,
 
     padding: 6,
 
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
 
     borderWidth: 1,
     borderColor: colors.border,
@@ -1224,12 +1479,12 @@ const styles = StyleSheet.create({
 
     borderRadius: 14,
 
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   navButtonActive: {
-    backgroundColor: '#E5F5F2',
+    backgroundColor: "#E5F5F2",
   },
 
   navIcon: {
@@ -1244,13 +1499,13 @@ const styles = StyleSheet.create({
     color: colors.teal,
 
     fontSize: 9,
-    fontWeight: '800',
+    fontWeight: "800",
   },
 
   navText: {
     color: colors.mutedText,
 
     fontSize: 9,
-    fontWeight: '800',
+    fontWeight: "800",
   },
 });

@@ -69,14 +69,14 @@ const STATES = [
   'Uttar Pradesh',
   'Uttarakhand',
   'West Bengal',
+  'Andaman and Nicobar Islands',
+  'Chandigarh',
+  'Dadra and Nagar Haveli and Daman and Diu',
   'Delhi',
   'Jammu and Kashmir',
   'Ladakh',
-  'Puducherry',
-  'Chandigarh',
-  'Andaman and Nicobar Islands',
-  'Dadra and Nagar Haveli and Daman and Diu',
   'Lakshadweep',
+  'Puducherry',
 ];
 
 /* =================================
@@ -512,6 +512,9 @@ function CustomerForm({
                       keyboardType="phone-pad"
                       maxLength={10}
                       style={styles.input}
+                      textContentType='telephoneNumber'
+                      autoComplete='tel'
+                      importantForAutofill='yes'
                     />
                   </View>
                 </View>
@@ -666,6 +669,9 @@ function CustomerForm({
                       }
                       keyboardType="numeric"
                       style={styles.input}
+                      textContentType='none'
+                      autoComplete='off'
+                      importantForAutofill='no'
                     />
                   </View>
 
@@ -696,8 +702,11 @@ function CustomerForm({
                       placeholderTextColor={
                         colors.mutedText
                       }
-                      keyboardType="decimal-pad"
+                      keyboardType="numeric"
                       style={styles.input}
+                      textContentType='none'
+                      autoComplete='off'
+                      importantForAutofill='no'
                     />
                   </View>
                 </View>

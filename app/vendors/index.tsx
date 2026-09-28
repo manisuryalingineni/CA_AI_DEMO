@@ -1,4 +1,3 @@
-
 import React, {
   useCallback,
   useState,
@@ -26,33 +25,13 @@ import { SafeAreaView } from
 
 import type { Vendor } from '../../src/types/vendor';
 
+import {
+  loadVendors,
+  removeVendor,
+} from '../../src/services/vendorService';
+
 import { colors } from '../../src/theme/colors';
 
-/* =================================
-   TEMPORARY VENDOR DATA LOADER
-================================= */
-
-/*
-  These functions will be replaced with
-  the actual vendorService functions once
-  your colleague creates the Vendor
-  repository/service layer.
-
-  Expected functions:
-
-  loadVendors()
-  removeVendor(vendorId)
-*/
-
-async function loadVendors(): Promise<Vendor[]> {
-  return [];
-}
-
-async function removeVendor(
-  vendorId: string,
-): Promise<void> {
-  // Will be connected to vendorService.
-}
 
 /* =================================
    VIEW VENDOR MODAL
@@ -71,6 +50,7 @@ function VendorViewModal({
   onClose,
   onEdit,
 }: VendorViewProps) {
+
   if (!vendor) {
     return null;
   }
@@ -89,6 +69,7 @@ function VendorViewModal({
         <View
           style={styles.formScreen}
         >
+
           {/* VIEW HEADER */}
 
           <View
@@ -99,6 +80,7 @@ function VendorViewModal({
                 styles.formHeaderLeft
               }
             >
+
               <Pressable
                 onPress={onClose}
                 style={
@@ -131,6 +113,7 @@ function VendorViewModal({
                   View retail vendor information
                 </Text>
               </View>
+
             </View>
 
             <View
@@ -146,6 +129,9 @@ function VendorViewModal({
             </View>
           </View>
 
+
+          {/* VIEW CONTENT */}
+
           <ScrollView
             showsVerticalScrollIndicator={
               false
@@ -154,6 +140,7 @@ function VendorViewModal({
               styles.formScroll
             }
           >
+
             {/* VENDOR PROFILE */}
 
             <View
@@ -164,6 +151,7 @@ function VendorViewModal({
                   styles.viewProfileRow
                 }
               >
+
                 <View
                   style={
                     styles.viewAvatar
@@ -201,16 +189,21 @@ function VendorViewModal({
                     {vendor.mobile}
                   </Text>
                 </View>
+
               </View>
             </View>
+
 
             {/* BASIC DETAILS */}
 
             <View
               style={styles.viewCard}
             >
+
               <Text
-                style={styles.viewSectionTitle}
+                style={
+                  styles.viewSectionTitle
+                }
               >
                 Basic Information
               </Text>
@@ -218,6 +211,7 @@ function VendorViewModal({
               <View
                 style={styles.viewRow}
               >
+
                 <View
                   style={styles.viewItem}
                 >
@@ -257,11 +251,14 @@ function VendorViewModal({
                     {vendor.mobile}
                   </Text>
                 </View>
+
               </View>
+
 
               <View
                 style={styles.viewRow}
               >
+
                 <View
                   style={styles.viewItem}
                 >
@@ -303,16 +300,22 @@ function VendorViewModal({
                       '—'}
                   </Text>
                 </View>
+
               </View>
+
             </View>
+
 
             {/* ACCOUNT DETAILS */}
 
             <View
               style={styles.viewCard}
             >
+
               <Text
-                style={styles.viewSectionTitle}
+                style={
+                  styles.viewSectionTitle
+                }
               >
                 Account Details
               </Text>
@@ -320,6 +323,7 @@ function VendorViewModal({
               <View
                 style={styles.viewRow}
               >
+
                 <View
                   style={styles.viewItem}
                 >
@@ -336,11 +340,11 @@ function VendorViewModal({
                       styles.viewValue
                     }
                   >
-                    {vendor.creditDays ??
-                      0}{' '}
+                    {vendor.creditDays ?? 0}{' '}
                     days
                   </Text>
                 </View>
+
 
                 <View
                   style={styles.viewItem}
@@ -360,14 +364,15 @@ function VendorViewModal({
                   >
                     ₹
                     {Number(
-                      vendor.openingBalance ??
-                        0,
+                      vendor.openingBalance ?? 0,
                     ).toLocaleString(
                       'en-IN',
                     )}
                   </Text>
                 </View>
+
               </View>
+
 
               <View
                 style={styles.viewFullItem}
@@ -390,6 +395,7 @@ function VendorViewModal({
                 </Text>
               </View>
 
+
               <View
                 style={styles.viewFullItem}
               >
@@ -410,9 +416,11 @@ function VendorViewModal({
                     '—'}
                 </Text>
               </View>
+
             </View>
 
-            {/* ACTION */}
+
+            {/* EDIT */}
 
             <Pressable
               onPress={onEdit}
@@ -428,18 +436,22 @@ function VendorViewModal({
                 Edit Vendor
               </Text>
             </Pressable>
+
           </ScrollView>
+
         </View>
       </SafeAreaView>
     </Modal>
   );
 }
 
+
 /* =================================
    MAIN SCREEN
 ================================= */
 
 export default function VendorsScreen() {
+
   const { width } =
     useWindowDimensions();
 
@@ -455,33 +467,47 @@ export default function VendorsScreen() {
   const [showView, setShowView] =
     useState(false);
 
+
   /* =================================
-     LOAD
+     LOAD VENDORS
   ================================= */
 
   const refreshVendors =
     useCallback(async () => {
+
       try {
+
         const data =
           await loadVendors();
 
         setVendors(data);
+
       } catch (error) {
+
         Alert.alert(
           'Unable to load vendors',
-
           error instanceof Error
             ? error.message
             : 'Something went wrong.',
         );
+
       }
+
     }, []);
+
+
+  /* =================================
+     REFRESH WHEN SCREEN OPENS
+  ================================= */
 
   useFocusEffect(
     useCallback(() => {
+
       refreshVendors();
+
     }, [refreshVendors]),
   );
+
 
   /* =================================
      SEARCH
@@ -490,6 +516,7 @@ export default function VendorsScreen() {
   const filteredVendors =
     vendors.filter(
       (vendor) => {
+
         const query =
           search
             .trim()
@@ -502,17 +529,23 @@ export default function VendorsScreen() {
         return (
           vendor.name
             .toLowerCase()
-            .includes(query) ||
+            .includes(query)
+
+          ||
 
           vendor.mobile.includes(
             query,
-          ) ||
+          )
+
+          ||
 
           (
             vendor.gstin ?? ''
           )
             .toLowerCase()
-            .includes(query) ||
+            .includes(query)
+
+          ||
 
           (
             vendor.state ?? ''
@@ -523,6 +556,7 @@ export default function VendorsScreen() {
       },
     );
 
+
   /* =================================
      SUMMARY
   ================================= */
@@ -531,29 +565,34 @@ export default function VendorsScreen() {
     vendors.filter(
       (vendor) =>
         Number(
-          vendor.openingBalance ??
-            0,
+          vendor.openingBalance ?? 0,
         ) > 0,
     ).length;
+
 
   const totalPayable =
     vendors.reduce(
       (sum, vendor) =>
         sum +
         Number(
-          vendor.openingBalance ??
-            0,
+          vendor.openingBalance ?? 0,
         ),
       0,
     );
+
 
   /* =================================
      ADD
   ================================= */
 
   const handleAddVendor = () => {
-    router.push('/vendors/add');
+
+    router.push(
+      '/vendors/add',
+    );
+
   };
+
 
   /* =================================
      EDIT
@@ -562,7 +601,9 @@ export default function VendorsScreen() {
   const handleEditVendor = (
     vendor: Vendor,
   ) => {
+
     setShowView(false);
+
     setViewingVendor(null);
 
     router.push({
@@ -571,7 +612,9 @@ export default function VendorsScreen() {
         vendorId: vendor.id,
       },
     });
+
   };
+
 
   /* =================================
      VIEW
@@ -580,9 +623,13 @@ export default function VendorsScreen() {
   const handleViewVendor = (
     vendor: Vendor,
   ) => {
+
     setViewingVendor(vendor);
+
     setShowView(true);
+
   };
+
 
   /* =================================
      DELETE
@@ -591,6 +638,7 @@ export default function VendorsScreen() {
   const handleDeleteVendor = (
     vendor: Vendor,
   ) => {
+
     Alert.alert(
       'Delete Vendor',
 
@@ -607,29 +655,37 @@ export default function VendorsScreen() {
           style: 'destructive',
 
           onPress: async () => {
+
             try {
+
               await removeVendor(
                 vendor.id,
               );
 
               await refreshVendors();
 
+
               if (
                 viewingVendor?.id ===
                 vendor.id
               ) {
+
                 setViewingVendor(
                   null,
                 );
 
                 setShowView(false);
+
               }
+
 
               Alert.alert(
                 'Deleted',
                 'Vendor has been deleted successfully.',
               );
+
             } catch (error) {
+
               Alert.alert(
                 'Unable to delete',
 
@@ -637,29 +693,41 @@ export default function VendorsScreen() {
                   ? error.message
                   : 'Something went wrong.',
               );
+
             }
+
           },
         },
       ],
     );
+
   };
+
+
+  /* =================================
+     SCREEN
+  ================================= */
 
   return (
     <SafeAreaView
       style={styles.safeArea}
       edges={['top']}
     >
+
       <View
         style={styles.container}
       >
-        {/* MAIN HEADER */}
+
+        {/* HEADER */}
 
         <View
           style={styles.header}
         >
+
           <View
             style={styles.headerLeft}
           >
+
             <Pressable
               onPress={() =>
                 router.replace(
@@ -679,6 +747,7 @@ export default function VendorsScreen() {
               </Text>
             </Pressable>
 
+
             <View
               style={styles.logo}
             >
@@ -691,7 +760,9 @@ export default function VendorsScreen() {
               </Text>
             </View>
 
+
             <View>
+
               <Text
                 style={
                   styles.headerTitle
@@ -707,8 +778,11 @@ export default function VendorsScreen() {
               >
                 Manage your retail vendors
               </Text>
+
             </View>
+
           </View>
+
 
           <View
             style={
@@ -723,7 +797,9 @@ export default function VendorsScreen() {
               RS
             </Text>
           </View>
+
         </View>
+
 
         {/* CONTENT */}
 
@@ -738,6 +814,7 @@ export default function VendorsScreen() {
               styles.contentLarge,
           ]}
         >
+
           {/* SEARCH */}
 
           <View
@@ -745,6 +822,7 @@ export default function VendorsScreen() {
               styles.searchContainer
             }
           >
+
             <Text
               style={
                 styles.searchIcon
@@ -767,8 +845,7 @@ export default function VendorsScreen() {
               }
             />
 
-            {search.length >
-              0 && (
+            {search.length > 0 && (
               <Pressable
                 onPress={() =>
                   setSearch('')
@@ -786,13 +863,16 @@ export default function VendorsScreen() {
                 </Text>
               </Pressable>
             )}
+
           </View>
+
 
           {/* SUMMARY */}
 
           <View
             style={styles.summaryRow}
           >
+
             <View
               style={
                 styles.summaryCard
@@ -815,6 +895,7 @@ export default function VendorsScreen() {
               </Text>
             </View>
 
+
             <View
               style={
                 styles.summaryCard
@@ -833,11 +914,10 @@ export default function VendorsScreen() {
                   styles.summaryValue
                 }
               >
-                {
-                  vendorsWithBalance
-                }
+                {vendorsWithBalance}
               </Text>
             </View>
+
 
             <View
               style={
@@ -863,14 +943,18 @@ export default function VendorsScreen() {
                 )}
               </Text>
             </View>
+
           </View>
+
 
           {/* LIST HEADER */}
 
           <View
             style={styles.listHeader}
           >
+
             <View>
+
               <Text
                 style={
                   styles.listTitle
@@ -886,18 +970,22 @@ export default function VendorsScreen() {
               >
                 Manage vendors and payables
               </Text>
+
             </View>
+
           </View>
 
-          {/* LIST */}
 
-          {filteredVendors.length ===
-          0 ? (
+          {/* EMPTY / LIST */}
+
+          {filteredVendors.length === 0 ? (
+
             <View
               style={
                 styles.emptyCard
               }
             >
+
               <View
                 style={
                   styles.emptyIconCircle
@@ -931,20 +1019,26 @@ export default function VendorsScreen() {
                   ? 'Try another vendor name or mobile number.'
                   : 'Add your first retail vendor to get started.'}
               </Text>
+
             </View>
+
           ) : (
+
             <View
               style={
                 styles.vendorList
               }
             >
+
               {filteredVendors.map(
                 (vendor) => {
+
                   const balance =
                     Number(
                       vendor.openingBalance ??
                         0,
                     );
+
 
                   return (
                     <View
@@ -955,18 +1049,21 @@ export default function VendorsScreen() {
                         styles.vendorCard
                       }
                     >
-                      {/* VENDOR TOP */}
+
+                      {/* TOP */}
 
                       <View
                         style={
                           styles.vendorTopRow
                         }
                       >
+
                         <View
                           style={
                             styles.vendorIdentity
                           }
                         >
+
                           <View
                             style={
                               styles.vendorIcon
@@ -978,29 +1075,25 @@ export default function VendorsScreen() {
                               }
                             >
                               {vendor.name
-                                .charAt(
-                                  0,
-                                )
+                                .charAt(0)
                                 .toUpperCase()}
                             </Text>
                           </View>
+
 
                           <View
                             style={
                               styles.vendorMain
                             }
                           >
+
                             <Text
                               style={
                                 styles.vendorName
                               }
-                              numberOfLines={
-                                1
-                              }
+                              numberOfLines={1}
                             >
-                              {
-                                vendor.name
-                              }
+                              {vendor.name}
                             </Text>
 
                             <Text
@@ -1008,18 +1101,20 @@ export default function VendorsScreen() {
                                 styles.vendorMobile
                               }
                             >
-                              {
-                                vendor.mobile
-                              }
+                              {vendor.mobile}
                             </Text>
+
                           </View>
+
                         </View>
+
 
                         <View
                           style={
                             styles.balanceContainer
                           }
                         >
+
                           <Text
                             style={
                               styles.balanceLabel
@@ -1032,8 +1127,7 @@ export default function VendorsScreen() {
                             style={[
                               styles.balanceValue,
 
-                              balance >
-                                0 &&
+                              balance > 0 &&
                                 styles.balanceValueDue,
                             ]}
                           >
@@ -1042,14 +1136,18 @@ export default function VendorsScreen() {
                               'en-IN',
                             )}
                           </Text>
+
                         </View>
+
                       </View>
+
 
                       <View
                         style={
                           styles.vendorDivider
                         }
                       />
+
 
                       {/* DETAILS */}
 
@@ -1058,11 +1156,13 @@ export default function VendorsScreen() {
                           styles.vendorDetails
                         }
                       >
+
                         <View
                           style={
                             styles.detailItem
                           }
                         >
+
                           <Text
                             style={
                               styles.detailLabel
@@ -1075,20 +1175,21 @@ export default function VendorsScreen() {
                             style={
                               styles.detailValue
                             }
-                            numberOfLines={
-                              1
-                            }
+                            numberOfLines={1}
                           >
                             {vendor.gstin ||
                               'Unregistered'}
                           </Text>
+
                         </View>
+
 
                         <View
                           style={
                             styles.detailItem
                           }
                         >
+
                           <Text
                             style={
                               styles.detailLabel
@@ -1101,20 +1202,21 @@ export default function VendorsScreen() {
                             style={
                               styles.detailValue
                             }
-                            numberOfLines={
-                              1
-                            }
+                            numberOfLines={1}
                           >
                             {vendor.state ||
                               '—'}
                           </Text>
+
                         </View>
+
 
                         <View
                           style={
                             styles.detailItem
                           }
                         >
+
                           <Text
                             style={
                               styles.detailLabel
@@ -1132,8 +1234,11 @@ export default function VendorsScreen() {
                               0}{' '}
                             days
                           </Text>
+
                         </View>
+
                       </View>
+
 
                       {vendor.address ? (
                         <Text
@@ -1142,19 +1247,19 @@ export default function VendorsScreen() {
                           }
                           numberOfLines={1}
                         >
-                          {
-                            vendor.address
-                          }
+                          {vendor.address}
                         </Text>
                       ) : null}
 
-                      {/* ACTION BUTTONS */}
+
+                      {/* ACTIONS */}
 
                       <View
                         style={
                           styles.vendorActions
                         }
                       >
+
                         <Pressable
                           onPress={() =>
                             handleViewVendor(
@@ -1173,6 +1278,7 @@ export default function VendorsScreen() {
                             View
                           </Text>
                         </Pressable>
+
 
                         <Pressable
                           onPress={() =>
@@ -1193,6 +1299,7 @@ export default function VendorsScreen() {
                           </Text>
                         </Pressable>
 
+
                         <Pressable
                           onPress={() =>
                             handleDeleteVendor(
@@ -1211,20 +1318,28 @@ export default function VendorsScreen() {
                             Delete
                           </Text>
                         </Pressable>
+
                       </View>
+
                     </View>
                   );
+
                 },
               )}
+
             </View>
+
           )}
+
 
           <View
             style={
               styles.bottomSpace
             }
           />
+
         </ScrollView>
+
 
         {/* ADD VENDOR */}
 
@@ -1233,12 +1348,14 @@ export default function VendorsScreen() {
             styles.bottomActionContainer
           }
         >
+
           <Pressable
             onPress={handleAddVendor}
             style={
               styles.bottomAddButton
             }
           >
+
             <Text
               style={
                 styles.bottomAddIcon
@@ -1254,42 +1371,49 @@ export default function VendorsScreen() {
             >
               Add Vendor
             </Text>
+
           </Pressable>
+
         </View>
 
-        {/* VIEW */}
+
+        {/* VIEW MODAL */}
 
         <VendorViewModal
           visible={showView}
-          vendor={
-            viewingVendor
-          }
+          vendor={viewingVendor}
+
           onClose={() => {
             setShowView(false);
-            setViewingVendor(
-              null,
-            );
+            setViewingVendor(null);
           }}
+
           onEdit={() => {
-            if (
-              viewingVendor
-            ) {
+
+            if (viewingVendor) {
+
               handleEditVendor(
                 viewingVendor,
               );
+
             }
+
           }}
         />
+
       </View>
+
     </SafeAreaView>
   );
 }
+
 
 /* =================================
    STYLES
 ================================= */
 
 const styles = StyleSheet.create({
+
   safeArea: {
     flex: 1,
     backgroundColor:
@@ -1301,6 +1425,7 @@ const styles = StyleSheet.create({
     backgroundColor:
       colors.background,
   },
+
 
   /* HEADER */
 
@@ -1391,6 +1516,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
 
+
   /* CONTENT */
 
   content: {
@@ -1404,6 +1530,7 @@ const styles = StyleSheet.create({
     width: '100%',
     alignSelf: 'center',
   },
+
 
   /* SEARCH */
 
@@ -1449,6 +1576,7 @@ const styles = StyleSheet.create({
     fontSize: 22,
   },
 
+
   /* SUMMARY */
 
   summaryRow: {
@@ -1491,6 +1619,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     marginTop: 6,
   },
+
 
   /* LIST */
 
@@ -1636,6 +1765,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
 
+
   /* ACTIONS */
 
   vendorActions: {
@@ -1701,6 +1831,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
 
+
   /* EMPTY */
 
   emptyCard: {
@@ -1747,6 +1878,7 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
 
+
   /* BOTTOM ADD */
 
   bottomActionContainer: {
@@ -1792,6 +1924,7 @@ const styles = StyleSheet.create({
   bottomSpace: {
     height: 20,
   },
+
 
   /* FORM */
 
@@ -1882,6 +2015,9 @@ const styles = StyleSheet.create({
     paddingBottom: 30,
     flexGrow: 1,
   },
+
+
+  /* VIEW CARD */
 
   viewCard: {
     width: '100%',
@@ -1988,4 +2124,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '800',
   },
+
 });

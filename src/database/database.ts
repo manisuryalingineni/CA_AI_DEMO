@@ -62,7 +62,7 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
       ON products (business_id);
 
 
-        CREATE TABLE IF NOT EXISTS vendors (
+      CREATE TABLE IF NOT EXISTS vendors (
       id TEXT PRIMARY KEY NOT NULL,
       business_id TEXT NOT NULL,
       name TEXT NOT NULL,
@@ -79,6 +79,49 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
 
     CREATE INDEX IF NOT EXISTS idx_vendors_business_id
       ON vendors (business_id);
+
+        CREATE TABLE IF NOT EXISTS purchases (
+      id TEXT PRIMARY KEY NOT NULL,
+      business_id TEXT NOT NULL,
+      vendor_id TEXT,
+      invoice_number TEXT,
+      purchase_date TEXT NOT NULL,
+      subtotal REAL NOT NULL DEFAULT 0,
+      gst_amount REAL NOT NULL DEFAULT 0,
+      discount REAL NOT NULL DEFAULT 0,
+      total_amount REAL NOT NULL DEFAULT 0,
+      paid_amount REAL NOT NULL DEFAULT 0,
+      due_amount REAL NOT NULL DEFAULT 0,
+      payment_status TEXT NOT NULL DEFAULT 'UNPAID',
+      notes TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_purchases_business_id
+      ON purchases (business_id);
+
+    CREATE INDEX IF NOT EXISTS idx_purchases_vendor_id
+      ON purchases (vendor_id);
+
+    CREATE TABLE IF NOT EXISTS purchase_items (
+      id TEXT PRIMARY KEY NOT NULL,
+      purchase_id TEXT NOT NULL,
+      product_id TEXT NOT NULL,
+      quantity REAL NOT NULL DEFAULT 0,
+      unit_price REAL NOT NULL DEFAULT 0,
+      gst_rate REAL NOT NULL DEFAULT 0,
+      gst_amount REAL NOT NULL DEFAULT 0,
+      discount REAL NOT NULL DEFAULT 0,
+      total_amount REAL NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_purchase_items_purchase_id
+      ON purchase_items (purchase_id);
+
+    CREATE INDEX IF NOT EXISTS idx_purchase_items_product_id
+      ON purchase_items (product_id);
   `);
 
   return database;

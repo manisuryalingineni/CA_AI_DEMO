@@ -1,5 +1,5 @@
-
 import React, {
+  useEffect,
   useState,
 } from 'react';
 
@@ -31,8 +31,9 @@ import {
   editVendor,
 } from '../../src/services/vendorService';
 
-import { getVendorById } from
-  '../../src/repositories/vendorRepository';
+import {
+  getVendorById,
+} from '../../src/repositories/vendorRepository';
 
 import type {
   CreateVendorInput,
@@ -149,7 +150,9 @@ function VendorForm({
 
       setMobile(vendor.mobile);
 
-      setGstin(vendor.gstin ?? '');
+      setGstin(
+        vendor.gstin ?? '',
+      );
 
       setState(
         vendor.state ||
@@ -190,7 +193,7 @@ function VendorForm({
   };
 
 
-  React.useEffect(() => {
+  useEffect(() => {
     resetForm();
   }, [vendor]);
 
@@ -213,120 +216,84 @@ function VendorForm({
   ================================= */
 
   const handleSave = async () => {
-    const vendorName =
-      name.trim();
+  const vendorName = name.trim();
+  const vendorMobile = mobile.trim();
 
-    const vendorMobile =
-      mobile.trim();
+  if (!vendorName) {
+    Alert.alert(
+      'Required',
+      'Please enter vendor name.',
+    );
+    return;
+  }
 
-    if (!vendorName) {
-      Alert.alert(
-        'Required',
-        'Please enter vendor name.',
-      );
-      return;
-    }
+  if (!vendorMobile) {
+    Alert.alert(
+      'Required',
+      'Please enter mobile number.',
+    );
+    return;
+  }
 
-    if (!vendorMobile) {
-      Alert.alert(
-        'Required',
-        'Please enter mobile number.',
-      );
-      return;
-    }
+  if (!/^\d{10}$/.test(vendorMobile)) {
+    Alert.alert(
+      'Invalid mobile number',
+      'Please enter a valid 10-digit mobile number.',
+    );
+    return;
+  }
 
-    if (
-      !/^\d{10}$/.test(
-        vendorMobile,
-      )
-    ) {
-      Alert.alert(
-        'Invalid mobile number',
-        'Please enter a valid 10-digit mobile number.',
-      );
-      return;
-    }
+  if (saving) {
+    return;
+  }
 
-    setSaving(true);
+  setSaving(true);
 
-    try {
-      if (vendor) {
-        await editVendor({
-          ...vendor,
-
-          name: vendorName,
-
-          mobile: vendorMobile,
-
-          gstin:
-            gstin.trim() ||
-            undefined,
-
-          state,
-
-          creditDays:
-            Number(creditDays) || 0,
-
-          openingBalance:
-            Number(openingBalance) || 0,
-
-          businessDetail:
-            businessDetail.trim() ||
-            undefined,
-
-          address:
-            address.trim() ||
-            undefined,
-        });
-      } else {
-        const input: CreateVendorInput =
-          {
-            name: vendorName,
-
-            mobile: vendorMobile,
-
-            gstin:
-              gstin.trim() ||
-              undefined,
-
-            state,
-
-            creditDays:
-              Number(creditDays) || 0,
-
-            openingBalance:
-              Number(openingBalance) || 0,
-
-            businessDetail:
-              businessDetail.trim() ||
-              undefined,
-
-            address:
-              address.trim() ||
-              undefined,
-          };
-
-        await saveVendor(input);
-      }
+  try {
+    if (vendor) {
+      await editVendor({
+        ...vendor,
+        name: vendorName,
+        mobile: vendorMobile,
+        gstin: gstin.trim() || undefined,
+        state,
+        creditDays: Number(creditDays) || 0,
+        openingBalance: Number(openingBalance) || 0,
+        businessDetail: businessDetail.trim() || undefined,
+        address: address.trim() || undefined,
+      });
 
       onSaved();
-
-      onClose();
-
-    } catch (error) {
-      Alert.alert(
-        isEditMode
-          ? 'Unable to update'
-          : 'Unable to save',
-
-        error instanceof Error
-          ? error.message
-          : 'Something went wrong.',
-      );
-    } finally {
-      setSaving(false);
+      return;
     }
-  };
+
+    const input: CreateVendorInput = {
+      name: vendorName,
+      mobile: vendorMobile,
+      gstin: gstin.trim() || undefined,
+      state,
+      creditDays: Number(creditDays) || 0,
+      openingBalance: Number(openingBalance) || 0,
+      businessDetail: businessDetail.trim() || undefined,
+      address: address.trim() || undefined,
+    };
+
+    await saveVendor(input);
+
+    onSaved();
+  } catch (error) {
+    Alert.alert(
+      vendor
+        ? 'Unable to update'
+        : 'Unable to save',
+      error instanceof Error
+        ? error.message
+        : 'Something went wrong.',
+    );
+  } finally {
+    setSaving(false);
+  }
+};
 
 
   return (
@@ -480,7 +447,9 @@ function VendorForm({
 
                   <TextInput
                     value={name}
-                    onChangeText={setName}
+                    onChangeText={
+                      setName
+                    }
                     placeholder="Enter vendor name"
                     placeholderTextColor={
                       colors.mutedText
@@ -880,7 +849,7 @@ export default function AddVendorScreen() {
     useState(Boolean(vendorId));
 
 
-  React.useEffect(() => {
+  useEffect(() => {
 
     let mounted = true;
 
@@ -1024,12 +993,14 @@ export default function AddVendorScreen() {
   return (
     <VendorForm
       vendor={vendor}
+
       onClose={() =>
         router.back()
       }
-      onSaved={() => {
-        router.back();
-      }}
+
+      onSaved={() =>
+        router.back()
+      }
     />
   );
 }
@@ -1306,7 +1277,7 @@ const styles = StyleSheet.create({
   cancelButtonText: {
     color: colors.text,
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '700',
   },
 
   saveButton: {
