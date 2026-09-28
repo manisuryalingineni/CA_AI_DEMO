@@ -425,13 +425,10 @@ export default function DashboardScreen() {
               }
             />
 
-            {/* UPDATED: Purchase */}
             <QuickEntry
               icon="📥"
               title="Purchase"
-              onPress={() =>
-                router.push("/purchases")
-              }
+              onPress={()=> router.push('/purchases')}
             />
 
             <QuickEntry
@@ -504,9 +501,7 @@ export default function DashboardScreen() {
               icon="📥"
               title="Buy stock"
               description="Purchase bill and inward stock"
-              onPress={() =>
-                router.push("/purchases")
-              }
+              onPress={()=> router.push("/purchases")}
             />
 
             {/* PRODUCTS / STOCK */}
