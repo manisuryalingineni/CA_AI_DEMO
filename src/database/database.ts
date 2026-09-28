@@ -79,6 +79,50 @@ CREATE TABLE IF NOT EXISTS vendors (
 
 CREATE INDEX IF NOT EXISTS idx_vendors_business_id
   ON vendors (business_id);
+
+  CREATE TABLE IF NOT EXISTS sales (
+  id TEXT PRIMARY KEY NOT NULL,
+  business_id TEXT NOT NULL,
+  customer_id TEXT,
+  invoice_number TEXT,
+  sale_date TEXT NOT NULL,
+  subtotal REAL NOT NULL DEFAULT 0,
+  gst_amount REAL NOT NULL DEFAULT 0,
+  discount REAL NOT NULL DEFAULT 0,
+  total_amount REAL NOT NULL DEFAULT 0,
+  paid_amount REAL NOT NULL DEFAULT 0,
+  due_amount REAL NOT NULL DEFAULT 0,
+  payment_method TEXT NOT NULL,
+  payment_status TEXT NOT NULL,
+  notes TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_sales_business_id
+  ON sales (business_id);
+
+CREATE INDEX IF NOT EXISTS idx_sales_customer_id
+  ON sales (customer_id);
+
+CREATE TABLE IF NOT EXISTS sale_items (
+  id TEXT PRIMARY KEY NOT NULL,
+  sale_id TEXT NOT NULL,
+  product_id TEXT NOT NULL,
+  quantity REAL NOT NULL,
+  unit_price REAL NOT NULL,
+  gst_rate REAL NOT NULL,
+  gst_amount REAL NOT NULL DEFAULT 0,
+  discount REAL NOT NULL DEFAULT 0,
+  total_amount REAL NOT NULL,
+  created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_sale_items_sale_id
+  ON sale_items (sale_id);
+
+CREATE INDEX IF NOT EXISTS idx_sale_items_product_id
+  ON sale_items (product_id);
   `);
 
   return database;

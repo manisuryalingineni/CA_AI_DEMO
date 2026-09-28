@@ -233,7 +233,7 @@ export default function DashboardScreen() {
 
           <Pressable style={styles.userButton}>
             <Text style={styles.userButtonText}>
-              👤 User
+              👤 Business Owner
             </Text>
           </Pressable>
         </View>
@@ -264,7 +264,7 @@ export default function DashboardScreen() {
               style={[
                 styles.heroRow,
                 !isLargeScreen &&
-                styles.heroRowMobile,
+                  styles.heroRowMobile,
               ]}
             >
               <View style={styles.heroIdentity}>
@@ -299,9 +299,9 @@ export default function DashboardScreen() {
                 style={({ pressed }) => [
                   styles.switchButton,
                   !isLargeScreen &&
-                  styles.switchButtonMobile,
+                    styles.switchButtonMobile,
                   pressed &&
-                  styles.switchButtonPressed,
+                    styles.switchButtonPressed,
                 ]}
               >
                 <Text
@@ -314,49 +314,68 @@ export default function DashboardScreen() {
             </View>
 
             {/* KPI STRIP */}
-
             <View
               style={[
                 styles.kpiGrid,
                 !isLargeScreen &&
-                styles.kpiGridMobile,
+                  styles.kpiGridMobile,
               ]}
             >
-              <View style={styles.kpi}>
+              <View
+                style={[
+                  styles.kpi,
+                  !isLargeScreen &&
+                    styles.kpiMobile,
+                ]}
+              >
                 <Text style={styles.kpiLabel}>
                   Sales
                 </Text>
-
                 <Text style={styles.kpiValue}>
                   ₹0
                 </Text>
               </View>
 
-              <View style={styles.kpi}>
+              <View
+                style={[
+                  styles.kpi,
+                  !isLargeScreen &&
+                    styles.kpiMobile,
+                ]}
+              >
                 <Text style={styles.kpiLabel}>
                   Purchases
                 </Text>
-
                 <Text style={styles.kpiValue}>
                   ₹0
                 </Text>
               </View>
 
-              <View style={styles.kpi}>
+              <View
+                style={[
+                  styles.kpi,
+                  !isLargeScreen &&
+                    styles.kpiMobile,
+                ]}
+              >
                 <Text style={styles.kpiLabel}>
-                  To receive
+                  To Receive
                 </Text>
-
                 <Text style={styles.kpiValue}>
                   ₹0
                 </Text>
               </View>
 
-              <View style={styles.kpi}>
+              <View
+                style={[
+                  styles.kpi,
+                  !isLargeScreen &&
+                    styles.kpiMobile,
+                ]}
+              >
                 <Text style={styles.kpiLabel}>
-                  To pay
+                  To Pay
                 </Text>
-
                 <Text style={styles.kpiValue}>
                   ₹0
                 </Text>
@@ -397,14 +416,22 @@ export default function DashboardScreen() {
               }
             />
 
+            {/* UPDATED: Sale Bill */}
             <QuickEntry
               icon="🧾"
               title="Sale Bill"
+              onPress={() =>
+                router.push("/pos")
+              }
             />
 
+            {/* UPDATED: Purchase */}
             <QuickEntry
               icon="📥"
               title="Purchase"
+              onPress={() =>
+                router.push("/purchases")
+              }
             />
 
             <QuickEntry
@@ -450,7 +477,7 @@ export default function DashboardScreen() {
             style={[
               styles.quickGrid,
               isLargeScreen &&
-              styles.quickGridLarge,
+                styles.quickGridLarge,
             ]}
           >
             <QuickAction
@@ -462,22 +489,34 @@ export default function DashboardScreen() {
               }
             />
 
+            {/* POS SALE */}
             <QuickAction
               icon="🧾"
               title="POS sale"
               description="GST invoice and counter sale"
+              onPress={() =>
+                router.push("/pos")
+              }
             />
 
+            {/* PURCHASE */}
             <QuickAction
               icon="📥"
               title="Buy stock"
               description="Purchase bill and inward stock"
+              onPress={() =>
+                router.push("/purchases")
+              }
             />
 
+            {/* PRODUCTS / STOCK */}
             <QuickAction
               icon="📦"
               title="Stock check"
               description="Quantity, cost and reorder view"
+              onPress={() =>
+                router.push("/products")
+              }
             />
 
             <QuickAction
@@ -486,10 +525,14 @@ export default function DashboardScreen() {
               description="Cash, UPI, card or cheque"
             />
 
+            {/* SALES REGISTER */}
             <QuickAction
               icon="📈"
               title="Daily sales"
               description="Live sales register PDF"
+              onPress={() =>
+                router.push("/sales")
+              }
             />
           </View>
 
@@ -586,6 +629,9 @@ export default function DashboardScreen() {
               number="2"
               title="Add item/service"
               description="HSN/SAC, unit, GST"
+              onPress={() =>
+                router.push("/products")
+              }
             />
 
             <FlowStep
@@ -598,6 +644,9 @@ export default function DashboardScreen() {
               number="4"
               title="Invoice/bill"
               description="Stock + ledger + GST"
+              onPress={() =>
+                router.push("/pos")
+              }
             />
 
             <FlowStep
@@ -648,7 +697,7 @@ export default function DashboardScreen() {
       </ScrollView>
 
       {/* =====================================================
-          FLOATING BOTTOM NAVIGATION
+          BOTTOM NAVIGATION
       ===================================================== */}
 
       <View
@@ -662,7 +711,11 @@ export default function DashboardScreen() {
           },
         ]}
       >
+        {/* HOME */}
         <Pressable
+          onPress={() =>
+            router.replace("/dashboard")
+          }
           style={[
             styles.navButton,
             styles.navButtonActive,
@@ -677,7 +730,13 @@ export default function DashboardScreen() {
           </Text>
         </Pressable>
 
-        <Pressable style={styles.navButton}>
+        {/* SALES */}
+        <Pressable
+          onPress={() =>
+            router.push("/sales")
+          }
+          style={styles.navButton}
+        >
           <Text style={styles.navIcon}>
             🧾
           </Text>
@@ -687,7 +746,13 @@ export default function DashboardScreen() {
           </Text>
         </Pressable>
 
-        <Pressable style={styles.navButton}>
+        {/* PURCHASES */}
+        <Pressable
+          onPress={() =>
+            router.push("/purchases")
+          }
+          style={styles.navButton}
+        >
           <Text style={styles.navIcon}>
             📥
           </Text>
@@ -697,7 +762,13 @@ export default function DashboardScreen() {
           </Text>
         </Pressable>
 
-        <Pressable style={styles.navButton}>
+        {/* MORE */}
+        <Pressable
+          onPress={() =>
+            router.push("/products")
+          }
+          style={styles.navButton}
+        >
           <Text style={styles.navIcon}>
             ▦
           </Text>
@@ -966,51 +1037,65 @@ const styles = StyleSheet.create({
   /* =======================================================
      KPI
   ======================================================= */
-
   kpiGrid: {
     width: "100%",
-
     flexDirection: "row",
-
-    gap: 7,
-
-    marginTop: 15,
+    flexWrap: "wrap",
+    gap: 18,
+    marginTop: 14,
   },
 
   kpiGridMobile: {
-    flexWrap: "wrap",
+    justifyContent: "center",
+    alignSelf: "center",
   },
 
   kpi: {
-    flex: 1,
-
-    minWidth: 0,
-
-    backgroundColor:
-      "rgba(255,255,255,0.075)",
+    backgroundColor: "rgba(255,255,255,0.08)",
 
     borderWidth: 1,
-    borderColor:
-      "rgba(255,255,255,0.09)",
+    borderColor: "rgba(255,255,255,0.12)",
 
-    borderRadius: 13,
+    borderRadius: 16,
 
-    padding: 10,
+    paddingVertical: 18,
+    paddingHorizontal: 12,
+
+    alignItems: "center",
+    justifyContent: "center",
+
+    minHeight: 105,
+
+    // 4 columns on large screens
+    flex: 1,
+    minWidth: 0,
+  },
+
+  kpiMobile: {
+    flex: 0,
+    width: "44%",
+    flexGrow: 0,
+    flexShrink: 0,
+    minHeight: 78,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
   },
 
   kpiLabel: {
-    color: "#D8E6EE",
-    fontSize: 9,
+    color: "#C9D9E2",
+    fontSize: 11,
+    fontWeight: "700",
+    textAlign: "center",
+    marginBottom: 5,
   },
-
+  
   kpiValue: {
     color: "#FFFFFF",
-
-    fontSize: 15,
-    fontWeight: "700",
-
-    marginTop: 3,
+    fontSize: 16,
+    fontWeight: "800",
+    textAlign: "center",
   },
+
 
   /* =======================================================
      SECTION
