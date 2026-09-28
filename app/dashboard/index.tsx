@@ -423,6 +423,7 @@ export default function DashboardScreen() {
             <QuickEntry
               icon="📥"
               title="Purchase"
+              onPress={()=> router.push('/purchases')}
             />
 
             <QuickEntry
@@ -490,6 +491,7 @@ export default function DashboardScreen() {
               icon="📥"
               title="Buy stock"
               description="Purchase bill and inward stock"
+              onPress={()=> router.push("/purchases")}
             />
 
             <QuickAction
