@@ -1,9 +1,11 @@
-import { useCallback, useState } from 'react';
+import React, {
+  useCallback,
+  useState,
+} from 'react';
+
 import {
   Alert,
-  KeyboardAvoidingView,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -12,345 +14,447 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
-import { useFocusEffect } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { StatusBar } from 'expo-status-bar';
 
-import { loadCustomers, saveCustomer } from '../../src/services/customerService';
+import {
+  router,
+  useFocusEffect,
+} from 'expo-router';
+
+import { SafeAreaView } from
+  'react-native-safe-area-context';
+
+import {
+  loadCustomers,
+  removeCustomer,
+} from '../../src/services/customerService';
+
 import type { Customer } from '../../src/types/customer';
+
 import { colors } from '../../src/theme/colors';
 
-const STATES = [
-  'Andhra Pradesh',
-  'Telangana',
-  'Tamil Nadu',
-  'Karnataka',
-  'Other State',
-];
+/* =================================
+   VIEW CUSTOMER MODAL
+================================= */
 
-function businessFieldLabel(): string {
-  // The APK uses "Customer category / loyalty ID" for the RETAIL business.
-  // More business-specific labels can be added here as new business types are implemented.
-  return 'Customer category / loyalty ID';
+interface CustomerViewProps {
+  visible: boolean;
+  customer: Customer | null;
+  onClose: () => void;
+  onEdit: () => void;
 }
 
-type CustomerFormProps = {
-  visible: boolean;
-  onClose: () => void;
-  onSaved: () => void;
-};
-
-function CustomerForm({ visible, onClose, onSaved }: CustomerFormProps) {
-  const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
-  const isWide = width >= 600;
-
-  const [name, setName] = useState('');
-  const [mobile, setMobile] = useState('');
-  const [gstin, setGstin] = useState('');
-  const [state, setState] = useState('Andhra Pradesh');
-  const [creditDays, setCreditDays] = useState('15');
-  const [openingBalance, setOpeningBalance] = useState('0');
-  const [businessDetail, setBusinessDetail] = useState('');
-  const [address, setAddress] = useState('');
-  const [saving, setSaving] = useState(false);
-
-  function resetForm() {
-    setName('');
-    setMobile('');
-    setGstin('');
-    setState('Andhra Pradesh');
-    setCreditDays('15');
-    setOpeningBalance('0');
-    setBusinessDetail('');
-    setAddress('');
-  }
-
-  function closeForm() {
-    if (saving) return;
-    resetForm();
-    onClose();
-  }
-
-  async function handleSave() {
-    if (!name.trim()) {
-      Alert.alert('Name required', 'Please enter the customer name.');
-      return;
-    }
-
-    if (!/^\d{10}$/.test(mobile)) {
-      Alert.alert('Invalid mobile', 'Please enter a 10-digit mobile number.');
-      return;
-    }
-
-    const parsedCreditDays = Number(creditDays || 0);
-    const parsedOpeningBalance = Number(openingBalance || 0);
-
-    if (!Number.isFinite(parsedCreditDays) || parsedCreditDays < 0) {
-      Alert.alert('Invalid credit days', 'Enter 0 or a positive number.');
-      return;
-    }
-
-    if (!Number.isFinite(parsedOpeningBalance)) {
-      Alert.alert('Invalid opening balance', 'Enter a valid amount.');
-      return;
-    }
-
-    try {
-      setSaving(true);
-
-      await saveCustomer({
-        name,
-        mobile,
-        gstin,
-        state,
-        creditDays: Math.floor(parsedCreditDays),
-        openingBalance: parsedOpeningBalance,
-        businessDetail,
-        address,
-      });
-
-      Alert.alert('Customer saved', `${name.trim()} was added successfully.`, [
-        {
-          text: 'OK',
-          onPress: () => {
-            resetForm();
-            onSaved();
-            onClose();
-          },
-        },
-      ]);
-    } catch (error) {
-      Alert.alert(
-        'Unable to save',
-        error instanceof Error
-          ? error.message
-          : 'Something went wrong while saving the customer.',
-      );
-    } finally {
-      setSaving(false);
-    }
+function CustomerViewModal({
+  visible,
+  customer,
+  onClose,
+  onEdit,
+}: CustomerViewProps) {
+  if (!customer) {
+    return null;
   }
 
   return (
-    <>
     <Modal
       visible={visible}
-      transparent
       animationType="slide"
-      statusBarTranslucent
-      onRequestClose={closeForm}
+      transparent={false}
+      onRequestClose={onClose}
     >
-      <View style={styles.modalBackdrop}>
-        <KeyboardAvoidingView
-          style={styles.modalSheet}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      <SafeAreaView
+        style={styles.formSafeArea}
+        edges={['top', 'bottom']}
+      >
+        <View
+          style={styles.formScreen}
         >
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            contentContainerStyle={[
-              styles.modalContent,
-              { paddingBottom: Math.max(20, insets.bottom + 12) },
-            ]}
+          {/* VIEW HEADER */}
+
+          <View
+            style={styles.formHeader}
           >
-            <View style={styles.modalHead}>
-              <View style={styles.modalTitleArea}>
-                <Text style={styles.modalTitle}>New customer</Text>
-                <Text style={styles.modalSubtitle}>
-                  Only essential fields are mandatory.
+            <View
+              style={
+                styles.formHeaderLeft
+              }
+            >
+              <Pressable
+                onPress={onClose}
+                style={
+                  styles.formBackButton
+                }
+              >
+                <Text
+                  style={
+                    styles.formBackIcon
+                  }
+                >
+                  ‹
+                </Text>
+              </Pressable>
+
+              <View>
+                <Text
+                  style={
+                    styles.formHeaderTitle
+                  }
+                >
+                  Customer Details
+                </Text>
+
+                <Text
+                  style={
+                    styles.formHeaderSubtitle
+                  }
+                >
+                  View retail customer information
+                </Text>
+              </View>
+            </View>
+
+            <View
+              style={styles.formLogo}
+            >
+              <Text
+                style={
+                  styles.formLogoText
+                }
+              >
+                CA
+              </Text>
+            </View>
+          </View>
+
+          <ScrollView
+            showsVerticalScrollIndicator={
+              false
+            }
+            contentContainerStyle={
+              styles.formScroll
+            }
+          >
+            {/* CUSTOMER PROFILE */}
+
+            <View
+              style={styles.viewCard}
+            >
+              <View
+                style={
+                  styles.viewProfileRow
+                }
+              >
+                <View
+                  style={
+                    styles.viewAvatar
+                  }
+                >
+                  <Text
+                    style={
+                      styles.viewAvatarText
+                    }
+                  >
+                    {customer.name
+                      .charAt(0)
+                      .toUpperCase()}
+                  </Text>
+                </View>
+
+                <View
+                  style={
+                    styles.viewProfileText
+                  }
+                >
+                  <Text
+                    style={
+                      styles.viewCustomerName
+                    }
+                  >
+                    {customer.name}
+                  </Text>
+
+                  <Text
+                    style={
+                      styles.viewCustomerMobile
+                    }
+                  >
+                    {customer.mobile}
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* BASIC DETAILS */}
+
+            <View
+              style={styles.viewCard}
+            >
+              <Text
+                style={styles.viewSectionTitle}
+              >
+                Basic Information
+              </Text>
+
+              <View
+                style={styles.viewRow}
+              >
+                <View
+                  style={styles.viewItem}
+                >
+                  <Text
+                    style={
+                      styles.viewLabel
+                    }
+                  >
+                    Customer Name
+                  </Text>
+
+                  <Text
+                    style={
+                      styles.viewValue
+                    }
+                  >
+                    {customer.name}
+                  </Text>
+                </View>
+
+                <View
+                  style={styles.viewItem}
+                >
+                  <Text
+                    style={
+                      styles.viewLabel
+                    }
+                  >
+                    Mobile
+                  </Text>
+
+                  <Text
+                    style={
+                      styles.viewValue
+                    }
+                  >
+                    {customer.mobile}
+                  </Text>
+                </View>
+              </View>
+
+              <View
+                style={styles.viewRow}
+              >
+                <View
+                  style={styles.viewItem}
+                >
+                  <Text
+                    style={
+                      styles.viewLabel
+                    }
+                  >
+                    GSTIN
+                  </Text>
+
+                  <Text
+                    style={
+                      styles.viewValue
+                    }
+                  >
+                    {customer.gstin ||
+                      'Unregistered'}
+                  </Text>
+                </View>
+
+                <View
+                  style={styles.viewItem}
+                >
+                  <Text
+                    style={
+                      styles.viewLabel
+                    }
+                  >
+                    State
+                  </Text>
+
+                  <Text
+                    style={
+                      styles.viewValue
+                    }
+                  >
+                    {customer.state ||
+                      '—'}
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* ACCOUNT DETAILS */}
+
+            <View
+              style={styles.viewCard}
+            >
+              <Text
+                style={styles.viewSectionTitle}
+              >
+                Account Details
+              </Text>
+
+              <View
+                style={styles.viewRow}
+              >
+                <View
+                  style={styles.viewItem}
+                >
+                  <Text
+                    style={
+                      styles.viewLabel
+                    }
+                  >
+                    Credit Days
+                  </Text>
+
+                  <Text
+                    style={
+                      styles.viewValue
+                    }
+                  >
+                    {customer.creditDays ??
+                      0}{' '}
+                    days
+                  </Text>
+                </View>
+
+                <View
+                  style={styles.viewItem}
+                >
+                  <Text
+                    style={
+                      styles.viewLabel
+                    }
+                  >
+                    Opening Balance
+                  </Text>
+
+                  <Text
+                    style={
+                      styles.viewValue
+                    }
+                  >
+                    ₹
+                    {Number(
+                      customer.openingBalance ??
+                        0,
+                    ).toLocaleString(
+                      'en-IN',
+                    )}
+                  </Text>
+                </View>
+              </View>
+
+              <View
+                style={styles.viewFullItem}
+              >
+                <Text
+                  style={
+                    styles.viewLabel
+                  }
+                >
+                  Customer Category /
+                  Loyalty ID
+                </Text>
+
+                <Text
+                  style={
+                    styles.viewValue
+                  }
+                >
+                  {customer.businessDetail ||
+                    '—'}
                 </Text>
               </View>
 
-              <Pressable
-                onPress={closeForm}
-                disabled={saving}
-                style={styles.closeButton}
+              <View
+                style={styles.viewFullItem}
               >
-                <Text style={styles.closeButtonText}>×</Text>
-              </Pressable>
-            </View>
-
-            <View style={styles.form}>
-              <View style={styles.fieldsGrid}> 
-                <View style={[styles.field, isWide && styles.fieldHalf]}>
-                  <Text style={styles.label}>NAME *</Text>
-                  <TextInput
-                    value={name}
-                    onChangeText={setName}
-                    style={styles.input}
-                    placeholder="Business or person name"
-                    placeholderTextColor={colors.mutedText}
-                    autoCapitalize="words"
-                    returnKeyType="next"
-                  />
-                </View>
-
-                <View style={[styles.field, isWide && styles.fieldHalf]}>
-                  <Text style={styles.label}>MOBILE *</Text>
-                  <TextInput
-                    value={mobile}
-                    onChangeText={(value) =>
-                      setMobile(value.replace(/\D/g, '').slice(0, 10))
-                    }
-                    style={styles.input}
-                    placeholder="10-digit number"
-                    placeholderTextColor={colors.mutedText}
-                    keyboardType="number-pad"
-                    maxLength={10}
-                    returnKeyType="next"
-                  />
-                </View>
-
-                <View style={[styles.field, isWide && styles.fieldHalf]}>
-                  <Text style={styles.label}>GSTIN (OPTIONAL)</Text>
-                  <TextInput
-                    value={gstin}
-                    onChangeText={(value) =>
-                      setGstin(
-                        value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 15),
-                      )
-                    }
-                    style={styles.input}
-                    placeholder="For registered party"
-                    placeholderTextColor={colors.mutedText}
-                    autoCapitalize="characters"
-                    maxLength={15}
-                  />
-                </View>
-
-                <View style={[styles.field, isWide && styles.fieldHalf]}>
-                  <Text style={styles.label}>STATE</Text>
-                  <View style={styles.pickerWrapper}>
-                    <Picker
-                      selectedValue={state}
-                      onValueChange={(value) => setState(String(value))}
-                      style={styles.picker}
-                    >
-                      {STATES.map((item) => (
-                        <Picker.Item key={item} label={item} value={item} />
-                      ))}
-                    </Picker>
-                  </View>
-                </View>
-
-                <View style={[styles.field, isWide && styles.fieldHalf]}>
-                  <Text style={styles.label}>CREDIT DAYS</Text>
-                  <TextInput
-                    value={creditDays}
-                    onChangeText={(value) =>
-                      setCreditDays(value.replace(/\D/g, ''))
-                    }
-                    style={styles.input}
-                    keyboardType="number-pad"
-                    placeholder="15"
-                    placeholderTextColor={colors.mutedText}
-                  />
-                </View>
-
-                <View style={[styles.field, isWide && styles.fieldHalf]}>
-                  <Text style={styles.label}>OPENING BALANCE</Text>
-                  <TextInput
-                    value={openingBalance}
-                    onChangeText={(value) =>
-                      setOpeningBalance(value.replace(/[^0-9.]/g, ''))
-                    }
-                    style={styles.input}
-                    keyboardType="decimal-pad"
-                    placeholder="0"
-                    placeholderTextColor={colors.mutedText}
-                  />
-                </View>
-
-                <View style={styles.fieldFull}>
-                  <Text style={styles.label}>{businessFieldLabel().toUpperCase()}</Text>
-                  <TextInput
-                    value={businessDetail}
-                    onChangeText={setBusinessDetail}
-                    style={styles.input}
-                    placeholder={businessFieldLabel()}
-                    placeholderTextColor={colors.mutedText}
-                  />
-                </View>
-
-                <View style={styles.fieldFull}>
-                  <Text style={styles.label}>ADDRESS</Text>
-                  <TextInput
-                    value={address}
-                    onChangeText={setAddress}
-                    style={[styles.input, styles.textArea]}
-                    placeholder="Area, city and PIN"
-                    placeholderTextColor={colors.mutedText}
-                    multiline
-                    numberOfLines={3}
-                    textAlignVertical="top"
-                  />
-                </View>
-              </View>
-
-              <View style={styles.actions}>
-                <Pressable
-                  onPress={closeForm}
-                  disabled={saving}
-                  style={({ pressed }) => [
-                    styles.button,
-                    styles.buttonSecondary,
-                    pressed && styles.buttonPressed,
-                  ]}
+                <Text
+                  style={
+                    styles.viewLabel
+                  }
                 >
-                  <Text style={styles.buttonSecondaryText}>Cancel</Text>
-                </Pressable>
+                  Address
+                </Text>
 
-                <Pressable
-                  onPress={handleSave}
-                  disabled={saving}
-                  style={({ pressed }) => [
-                    styles.button,
-                    styles.buttonPrimary,
-                    pressed && styles.buttonPressed,
-                    saving && styles.buttonDisabled,
-                  ]}
+                <Text
+                  style={
+                    styles.viewValue
+                  }
                 >
-                  <Text style={styles.buttonPrimaryText}>
-                    {saving ? 'Saving...' : 'Save customer'}
-                  </Text>
-                </Pressable>
+                  {customer.address ||
+                    '—'}
+                </Text>
               </View>
             </View>
+
+            {/* ACTION */}
+
+            <Pressable
+              onPress={onEdit}
+              style={
+                styles.viewEditButton
+              }
+            >
+              <Text
+                style={
+                  styles.viewEditButtonText
+                }
+              >
+                Edit Customer
+              </Text>
+            </Pressable>
           </ScrollView>
-        </KeyboardAvoidingView>
-      </View>
+        </View>
+      </SafeAreaView>
     </Modal>
-    </>
   );
 }
 
+/* =================================
+   MAIN SCREEN
+================================= */
+
 export default function CustomersScreen() {
-  const { width } = useWindowDimensions();
-  const insets = useSafeAreaInsets();
-  const isLargeScreen = width >= 721;
+  const { width } =
+    useWindowDimensions();
 
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [showForm, setShowForm] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [customers, setCustomers] =
+    useState<Customer[]>([]);
 
-  const refreshCustomers = useCallback(async () => {
-    try {
-      setLoading(true);
-      const data = await loadCustomers();
-      setCustomers(data);
-    } catch (error) {
-      Alert.alert(
-        'Unable to load customers',
-        error instanceof Error
-          ? error.message
-          : 'Something went wrong while loading customers.',
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const [search, setSearch] =
+    useState('');
+
+  const [viewingCustomer, setViewingCustomer] =
+    useState<Customer | null>(null);
+
+  const [showView, setShowView] =
+    useState(false);
+
+  /* =================================
+     LOAD
+  ================================= */
+
+  const refreshCustomers =
+    useCallback(async () => {
+      try {
+        const data =
+          await loadCustomers();
+
+        setCustomers(data);
+      } catch (error) {
+        Alert.alert(
+          'Unable to load customers',
+
+          error instanceof Error
+            ? error.message
+            : 'Something went wrong.',
+        );
+      }
+    }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -358,459 +462,1505 @@ export default function CustomersScreen() {
     }, [refreshCustomers]),
   );
 
-  return (
-    <View style={styles.screen}>
-      <StatusBar style="light" />
+  /* =================================
+     SEARCH
+  ================================= */
 
-      <View style={[styles.header, { paddingTop: insets.top }]}>
-        <View style={styles.headerInner}>
-          <View style={styles.logo}>
-            <Text style={styles.logoText}>CA</Text>
+  const filteredCustomers =
+    customers.filter(
+      (customer) => {
+        const query =
+          search
+            .trim()
+            .toLowerCase();
+
+        if (!query) {
+          return true;
+        }
+
+        return (
+          customer.name
+            .toLowerCase()
+            .includes(query) ||
+
+          customer.mobile.includes(
+            query,
+          ) ||
+
+          (
+            customer.gstin ?? ''
+          )
+            .toLowerCase()
+            .includes(query) ||
+
+          (
+            customer.state ?? ''
+          )
+            .toLowerCase()
+            .includes(query)
+        );
+      },
+    );
+
+  /* =================================
+     SUMMARY
+  ================================= */
+
+  const customersWithBalance =
+    customers.filter(
+      (customer) =>
+        Number(
+          customer.openingBalance ??
+            0,
+        ) > 0,
+    ).length;
+
+  const totalReceivable =
+    customers.reduce(
+      (sum, customer) =>
+        sum +
+        Number(
+          customer.openingBalance ??
+            0,
+        ),
+      0,
+    );
+
+  /* =================================
+     ADD
+  ================================= */
+
+  const handleAddCustomer = () => {
+    router.push('/customers/add');
+  };
+
+  /* =================================
+     EDIT
+  ================================= */
+
+  const handleEditCustomer = (
+    customer: Customer,
+  ) => {
+    setShowView(false);
+    setViewingCustomer(null);
+
+    router.push({
+      pathname: '/customers/add',
+      params: { customerId: customer.id },
+    });
+  };
+
+  /* =================================
+     VIEW
+  ================================= */
+
+  const handleViewCustomer = (
+    customer: Customer,
+  ) => {
+    setViewingCustomer(customer);
+    setShowView(true);
+  };
+
+  /* =================================
+     DELETE
+  ================================= */
+
+  const handleDeleteCustomer = (
+    customer: Customer,
+  ) => {
+    Alert.alert(
+      'Delete Customer',
+
+      `Are you sure you want to delete ${customer.name}?`,
+
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+
+        {
+          text: 'Delete',
+          style: 'destructive',
+
+          onPress: async () => {
+            try {
+              await removeCustomer(
+                customer.id,
+              );
+
+              await refreshCustomers();
+
+              if (
+                viewingCustomer?.id ===
+                customer.id
+              ) {
+                setViewingCustomer(
+                  null,
+                );
+
+                setShowView(false);
+              }
+
+              Alert.alert(
+                'Deleted',
+                'Customer has been deleted successfully.',
+              );
+            } catch (error) {
+              Alert.alert(
+                'Unable to delete',
+
+                error instanceof Error
+                  ? error.message
+                  : 'Something went wrong.',
+              );
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  return (
+    <SafeAreaView
+      style={styles.safeArea}
+      edges={['top']}
+    >
+      <View
+        style={styles.container}
+      >
+        {/* MAIN HEADER */}
+
+        <View
+          style={styles.header}
+        >
+          <View
+            style={styles.headerLeft}
+          >
+            <Pressable
+              onPress={() =>
+                router.replace(
+                  '/dashboard',
+                )
+              }
+              style={
+                styles.backButton
+              }
+            >
+              <Text
+                style={
+                  styles.backIcon
+                }
+              >
+                ‹
+              </Text>
+            </Pressable>
+
+            <View
+              style={styles.logo}
+            >
+              <Text
+                style={
+                  styles.logoText
+                }
+              >
+                CA
+              </Text>
+            </View>
+
+            <View>
+              <Text
+                style={
+                  styles.headerTitle
+                }
+              >
+                Customers
+              </Text>
+
+              <Text
+                style={
+                  styles.headerSubtitle
+                }
+              >
+                Manage your retail customers
+              </Text>
+            </View>
           </View>
 
-          <View style={styles.headerTitleArea}>
-            <Text style={styles.headerTitle}>Customers</Text>
-            <Text style={styles.headerSubtitle}>
-              Sales, receipts and receivables
+          <View
+            style={
+              styles.profileCircle
+            }
+          >
+            <Text
+              style={
+                styles.profileText
+              }
+            >
+              RS
             </Text>
           </View>
         </View>
-      </View>
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-        <View style={[styles.main, isLargeScreen && styles.mainLarge]}>
-          <View style={styles.sectionHeader}>
-            <View>
-              <Text style={styles.sectionTitle}>Customers</Text>
-              <Text style={styles.sectionSubtitle}>
-                Add customer or walk-in party
-              </Text>
-            </View>
+        {/* CONTENT */}
 
-            <Pressable
-              onPress={() => setShowForm(true)}
-              style={({ pressed }) => [
-                styles.addButton,
-                pressed && styles.buttonPressed,
-              ]}
+        <ScrollView
+          showsVerticalScrollIndicator={
+            false
+          }
+          contentContainerStyle={[
+            styles.content,
+
+            width >= 900 &&
+              styles.contentLarge,
+          ]}
+        >
+          {/* SEARCH */}
+
+          <View
+            style={
+              styles.searchContainer
+            }
+          >
+            <Text
+              style={
+                styles.searchIcon
+              }
             >
-              <Text style={styles.addButtonText}>+ Add</Text>
-            </Pressable>
-          </View>
-
-          <View style={styles.notice}>
-            <Text style={styles.noticeText}>
-              Business field: {businessFieldLabel()}
+              ⌕
             </Text>
+
+            <TextInput
+              value={search}
+              onChangeText={
+                setSearch
+              }
+              placeholder="Search customers..."
+              placeholderTextColor={
+                colors.mutedText
+              }
+              style={
+                styles.searchInput
+              }
+            />
+
+            {search.length >
+              0 && (
+              <Pressable
+                onPress={() =>
+                  setSearch('')
+                }
+                style={
+                  styles.clearSearch
+                }
+              >
+                <Text
+                  style={
+                    styles.clearSearchText
+                  }
+                >
+                  ×
+                </Text>
+              </Pressable>
+            )}
           </View>
 
-          {loading ? (
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyTitle}>Loading customers...</Text>
-            </View>
-          ) : customers.length === 0 ? (
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyIcon}>👤</Text>
-              <Text style={styles.emptyTitle}>No customers yet</Text>
-              <Text style={styles.emptyDescription}>
-                Create your first customer to start sales and receipts.
+          {/* SUMMARY */}
+
+          <View
+            style={styles.summaryRow}
+          >
+            <View
+              style={
+                styles.summaryCard
+              }
+            >
+              <Text
+                style={
+                  styles.summaryLabel
+                }
+              >
+                Customers
               </Text>
 
-              <Pressable
-                onPress={() => setShowForm(true)}
-                style={styles.emptyAction}
+              <Text
+                style={
+                  styles.summaryValue
+                }
               >
-                <Text style={styles.emptyActionText}>Add first customer</Text>
-              </Pressable>
+                {customers.length}
+              </Text>
+            </View>
+
+            <View
+              style={
+                styles.summaryCard
+              }
+            >
+              <Text
+                style={
+                  styles.summaryLabel
+                }
+              >
+                With Balance
+              </Text>
+
+              <Text
+                style={
+                  styles.summaryValue
+                }
+              >
+                {
+                  customersWithBalance
+                }
+              </Text>
+            </View>
+
+            <View
+              style={
+                styles.summaryCard
+              }
+            >
+              <Text
+                style={
+                  styles.summaryLabel
+                }
+              >
+                Receivable
+              </Text>
+
+              <Text
+                style={
+                  styles.summaryValueSmall
+                }
+              >
+                ₹
+                {totalReceivable.toLocaleString(
+                  'en-IN',
+                )}
+              </Text>
+            </View>
+          </View>
+
+          {/* LIST HEADER */}
+
+          <View
+            style={styles.listHeader}
+          >
+            <View>
+              <Text
+                style={
+                  styles.listTitle
+                }
+              >
+                Customer List
+              </Text>
+
+              <Text
+                style={
+                  styles.listSubtitle
+                }
+              >
+                Manage customers and receivables
+              </Text>
+            </View>
+          </View>
+
+          {/* LIST */}
+
+          {filteredCustomers.length ===
+          0 ? (
+            <View
+              style={
+                styles.emptyCard
+              }
+            >
+              <View
+                style={
+                  styles.emptyIconCircle
+                }
+              >
+                <Text
+                  style={
+                    styles.emptyIcon
+                  }
+                >
+                  👤
+                </Text>
+              </View>
+
+              <Text
+                style={
+                  styles.emptyTitle
+                }
+              >
+                {search
+                  ? 'No customers found'
+                  : 'No customers yet'}
+              </Text>
+
+              <Text
+                style={
+                  styles.emptyText
+                }
+              >
+                {search
+                  ? 'Try another customer name or mobile number.'
+                  : 'Add your first retail customer to get started.'}
+              </Text>
             </View>
           ) : (
-            <View style={styles.list}>
-              {customers.map((customer) => (
-                <View key={customer.id} style={styles.row}>
-                  <View style={styles.rowIcon}>
-                    <Text style={styles.rowIconText}>👤</Text>
-                  </View>
+            <View
+              style={
+                styles.customerList
+              }
+            >
+              {filteredCustomers.map(
+                (customer) => {
+                  const balance =
+                    Number(
+                      customer.openingBalance ??
+                        0,
+                    );
 
-                  <View style={styles.rowMain}>
-                    <Text style={styles.rowName} numberOfLines={1}>
-                      {customer.name}
-                    </Text>
-                    <Text style={styles.rowMeta} numberOfLines={1}>
-                      {customer.mobile} • {customer.gstin || 'Unregistered'} •{' '}
-                      {customer.state}
-                    </Text>
-                    <Text style={styles.rowMeta} numberOfLines={1}>
-                      {customer.address || 'No address'}
-                    </Text>
-                    <View style={styles.badge}>
-                      <Text style={styles.badgeText}>
-                        {customer.creditDays} days credit
-                      </Text>
+                  return (
+                    <View
+                      key={
+                        customer.id
+                      }
+                      style={
+                        styles.customerCard
+                      }
+                    >
+                      {/* CUSTOMER TOP */}
+
+                      <View
+                        style={
+                          styles.customerTopRow
+                        }
+                      >
+                        <View
+                          style={
+                            styles.customerIdentity
+                          }
+                        >
+                          <View
+                            style={
+                              styles.customerIcon
+                            }
+                          >
+                            <Text
+                              style={
+                                styles.customerIconText
+                              }
+                            >
+                              {customer.name
+                                .charAt(
+                                  0,
+                                )
+                                .toUpperCase()}
+                            </Text>
+                          </View>
+
+                          <View
+                            style={
+                              styles.customerMain
+                            }
+                          >
+                            <Text
+                              style={
+                                styles.customerName
+                              }
+                              numberOfLines={
+                                1
+                              }
+                            >
+                              {
+                                customer.name
+                              }
+                            </Text>
+
+                            <Text
+                              style={
+                                styles.customerMobile
+                              }
+                            >
+                              {
+                                customer.mobile
+                              }
+                            </Text>
+                          </View>
+                        </View>
+
+                        <View
+                          style={
+                            styles.balanceContainer
+                          }
+                        >
+                          <Text
+                            style={
+                              styles.balanceLabel
+                            }
+                          >
+                            Balance
+                          </Text>
+
+                          <Text
+                            style={[
+                              styles.balanceValue,
+
+                              balance >
+                                0 &&
+                                styles.balanceValueDue,
+                            ]}
+                          >
+                            ₹
+                            {balance.toLocaleString(
+                              'en-IN',
+                            )}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View
+                        style={
+                          styles.customerDivider
+                        }
+                      />
+
+                      {/* DETAILS */}
+
+                      <View
+                        style={
+                          styles.customerDetails
+                        }
+                      >
+                        <View
+                          style={
+                            styles.detailItem
+                          }
+                        >
+                          <Text
+                            style={
+                              styles.detailLabel
+                            }
+                          >
+                            GSTIN
+                          </Text>
+
+                          <Text
+                            style={
+                              styles.detailValue
+                            }
+                            numberOfLines={
+                              1
+                            }
+                          >
+                            {customer.gstin ||
+                              'Unregistered'}
+                          </Text>
+                        </View>
+
+                        <View
+                          style={
+                            styles.detailItem
+                          }
+                        >
+                          <Text
+                            style={
+                              styles.detailLabel
+                            }
+                          >
+                            State
+                          </Text>
+
+                          <Text
+                            style={
+                              styles.detailValue
+                            }
+                            numberOfLines={
+                              1
+                            }
+                          >
+                            {customer.state ||
+                              '—'}
+                          </Text>
+                        </View>
+
+                        <View
+                          style={
+                            styles.detailItem
+                          }
+                        >
+                          <Text
+                            style={
+                              styles.detailLabel
+                            }
+                          >
+                            Credit
+                          </Text>
+
+                          <Text
+                            style={
+                              styles.detailValue
+                            }
+                          >
+                            {customer.creditDays ??
+                              0}{' '}
+                            days
+                          </Text>
+                        </View>
+                      </View>
+
+                      {customer.address ? (
+                        <Text
+                          style={
+                            styles.customerAddress
+                          }
+                          numberOfLines={1}
+                        >
+                          {
+                            customer.address
+                          }
+                        </Text>
+                      ) : null}
+
+                      {/* ACTION BUTTONS */}
+
+                      <View
+                        style={
+                          styles.customerActions
+                        }
+                      >
+                        <Pressable
+                          onPress={() =>
+                            handleViewCustomer(
+                              customer,
+                            )
+                          }
+                          style={
+                            styles.viewButton
+                          }
+                        >
+                          <Text
+                            style={
+                              styles.viewButtonText
+                            }
+                          >
+                            View
+                          </Text>
+                        </Pressable>
+
+                        <Pressable
+                          onPress={() =>
+                            handleEditCustomer(
+                              customer,
+                            )
+                          }
+                          style={
+                            styles.editButton
+                          }
+                        >
+                          <Text
+                            style={
+                              styles.editButtonText
+                            }
+                          >
+                            Edit
+                          </Text>
+                        </Pressable>
+
+                        <Pressable
+                          onPress={() =>
+                            handleDeleteCustomer(
+                              customer,
+                            )
+                          }
+                          style={
+                            styles.deleteButton
+                          }
+                        >
+                          <Text
+                            style={
+                              styles.deleteButtonText
+                            }
+                          >
+                            Delete
+                          </Text>
+                        </Pressable>
+                      </View>
                     </View>
-                  </View>
-
-                  <View style={styles.amountArea}>
-                    <Text style={styles.amount}>
-                      ₹
-                      {customer.openingBalance.toLocaleString('en-IN', {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
-                    </Text>
-                    <Text style={styles.amountLabel}>opening balance</Text>
-                  </View>
-                </View>
-              ))}
+                  );
+                },
+              )}
             </View>
           )}
-        </View>
-      </ScrollView>
 
-      <CustomerForm
-        visible={showForm}
-        onClose={() => setShowForm(false)}
-        onSaved={refreshCustomers}
-      />
-    </View>
+          <View
+            style={
+              styles.bottomSpace
+            }
+          />
+        </ScrollView>
+
+        {/* ADD CUSTOMER */}
+
+        <View
+          style={
+            styles.bottomActionContainer
+          }
+        >
+          <Pressable
+            onPress={handleAddCustomer}
+            style={
+              styles.bottomAddButton
+            }
+          >
+            <Text
+              style={
+                styles.bottomAddIcon
+              }
+            >
+              +
+            </Text>
+
+            <Text
+              style={
+                styles.bottomAddText
+              }
+            >
+              Add Customer
+            </Text>
+          </Pressable>
+        </View>
+
+        {/* VIEW */}
+
+        <CustomerViewModal
+          visible={showView}
+          customer={
+            viewingCustomer
+          }
+          onClose={() => {
+            setShowView(false);
+            setViewingCustomer(
+              null,
+            );
+          }}
+          onEdit={() => {
+            if (
+              viewingCustomer
+            ) {
+              handleEditCustomer(
+                viewingCustomer,
+              );
+            }
+          }}
+        />
+      </View>
+    </SafeAreaView>
   );
 }
 
+/* =================================
+   STYLES
+================================= */
+
 const styles = StyleSheet.create({
-  screen: {
+  safeArea: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor:
+      colors.background,
   },
+
+  container: {
+    flex: 1,
+    backgroundColor:
+      colors.background,
+  },
+
+  /* HEADER */
+
   header: {
-    backgroundColor: colors.primary,
-    elevation: 6,
-  },
-  headerInner: {
-    minHeight: 64,
-    paddingHorizontal: 14,
+    minHeight: 76,
+    backgroundColor:
+      colors.primary,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    justifyContent:
+      'space-between',
+    elevation: 6,
   },
+
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor:
+      '#FFFFFF',
+    alignItems: 'center',
+    justifyContent:
+      'center',
+    marginRight: 10,
+  },
+
+  backIcon: {
+    color: colors.primary,
+    fontSize: 30,
+    lineHeight: 32,
+    fontWeight: '500',
+    marginTop: -2,
+  },
+
   logo: {
     width: 42,
     height: 42,
-    borderRadius: 14,
-    backgroundColor: colors.gold,
+    borderRadius: 13,
+    backgroundColor:
+      colors.gold,
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent:
+      'center',
+    marginRight: 10,
   },
+
   logoText: {
     color: colors.primary,
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '900',
   },
-  headerTitleArea: {
-    flex: 1,
-  },
+
   headerTitle: {
     color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  headerSubtitle: {
-    color: '#D8E7EF',
-    fontSize: 11,
-    marginTop: 2,
-  },
-  scrollContent: {
-    paddingBottom: 32,
-  },
-  main: {
-    width: '100%',
-    paddingHorizontal: 11,
-    paddingTop: 14,
-    alignSelf: 'center',
-  },
-  mainLarge: {
-    maxWidth: 1050,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    marginHorizontal: 2,
-    marginBottom: 9,
-    gap: 12,
-  },
-  sectionTitle: {
-    color: colors.text,
     fontSize: 17,
-    fontWeight: '700',
-  },
-  sectionSubtitle: {
-    color: colors.mutedText,
-    fontSize: 10,
-    marginTop: 3,
-  },
-  addButton: {
-    borderRadius: 12,
-    paddingHorizontal: 13,
-    paddingVertical: 11,
-    backgroundColor: colors.teal,
-  },
-  addButtonText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  notice: {
-    borderWidth: 1,
-    borderColor: '#B9D9EE',
-    backgroundColor: '#EAF6FF',
-    borderRadius: 13,
-    padding: 10,
-    marginBottom: 10,
-  },
-  noticeText: {
-    color: '#164F76',
-    fontSize: 10,
-    lineHeight: 15,
-  },
-  list: {
-    gap: 8,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 16,
-    padding: 12,
-  },
-  rowIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 13,
-    backgroundColor: '#E9F5F3',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  rowIconText: {
-    fontSize: 18,
-  },
-  rowMain: {
-    minWidth: 0,
-    flex: 1,
-  },
-  rowName: {
-    color: colors.text,
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  rowMeta: {
-    color: colors.mutedText,
-    fontSize: 9,
-    marginTop: 3,
-  },
-  badge: {
-    alignSelf: 'flex-start',
-    marginTop: 7,
-    borderRadius: 99,
-    paddingHorizontal: 7,
-    paddingVertical: 4,
-    backgroundColor: '#EEF2F5',
-  },
-  badgeText: {
-    color: '#607080',
-    fontSize: 8,
-    fontWeight: '900',
-  },
-  amountArea: {
-    alignItems: 'flex-end',
-  },
-  amount: {
-    color: colors.text,
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  amountLabel: {
-    color: colors.mutedText,
-    fontSize: 8,
-    marginTop: 2,
-  },
-  emptyCard: {
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 18,
-    padding: 24,
-    alignItems: 'center',
-  },
-  emptyIcon: {
-    fontSize: 32,
-    marginBottom: 8,
-  },
-  emptyTitle: {
-    color: colors.text,
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  emptyDescription: {
-    color: colors.mutedText,
-    fontSize: 11,
-    lineHeight: 16,
-    textAlign: 'center',
-    marginTop: 6,
-  },
-  emptyAction: {
-    marginTop: 14,
-    backgroundColor: colors.teal,
-    borderRadius: 11,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  emptyActionText: {
-    color: '#FFFFFF',
-    fontSize: 11,
     fontWeight: '800',
   },
 
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(4, 25, 43, 0.67)',
-    justifyContent: 'flex-end',
+  headerSubtitle: {
+    color: '#D6E3EC',
+    fontSize: 11,
+    marginTop: 2,
   },
-  modalSheet: {
-    maxHeight: '94%',
-    backgroundColor: colors.background,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    overflow: 'hidden',
-  },
-  modalContent: {
-    paddingHorizontal: 15,
-    paddingTop: 17,
-  },
-  modalHead: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-    marginBottom: 12,
-  },
-  modalTitleArea: {
-    flex: 1,
-  },
-  modalTitle: {
-    color: colors.text,
-    fontSize: 19,
-    fontWeight: '700',
-  },
-  modalSubtitle: {
-    color: colors.mutedText,
-    fontSize: 10,
-    marginTop: 3,
-  },
-  closeButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#E8EDF1',
+
+  profileCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor:
+      colors.secondary,
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent:
+      'center',
+    marginLeft: 10,
   },
-  closeButtonText: {
-    color: colors.text,
-    fontSize: 21,
-    lineHeight: 23,
-  },
-  form: {
-    gap: 10,
-  },
-  fieldsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 9,
-  },
-  field: {
-    width: '100%',
-    gap: 4,
-  },
-  fieldHalf: {
-    width: '48%',
-  },
-  fieldFull: {
-    width: '100%',
-    gap: 4,
-  },
-  label: {
-    color: '#46586B',
-    fontSize: 9,
+
+  profileText: {
+    color: '#FFFFFF',
+    fontSize: 12,
     fontWeight: '800',
-    letterSpacing: 0.3,
   },
-  input: {
+
+  /* CONTENT */
+
+  content: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 120,
+  },
+
+  contentLarge: {
+    maxWidth: 1200,
     width: '100%',
-    minHeight: 45,
+    alignSelf: 'center',
+  },
+
+  /* SEARCH */
+
+  searchContainer: {
+    minHeight: 48,
+    backgroundColor:
+      colors.card,
     borderWidth: 1,
-    borderColor: '#CDD9E1',
+    borderColor:
+      colors.border,
     borderRadius: 12,
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-    color: colors.text,
-    fontSize: 14,
-  },
-  textArea: {
-    minHeight: 75,
-    paddingTop: 12,
-  },
-  pickerWrapper: {
-    minHeight: 45,
-    borderWidth: 1,
-    borderColor: '#CDD9E1',
-    borderRadius: 12,
-    backgroundColor: '#FFFFFF',
-    overflow: 'hidden',
-    justifyContent: 'center',
-  },
-  picker: {
-    color: colors.text,
-    height: 48,
-  },
-  actions: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 8,
-    marginTop: 4,
-  },
-  button: {
-    minWidth: 110,
-    minHeight: 44,
-    borderRadius: 12,
     alignItems: 'center',
-    justifyContent: 'center',
     paddingHorizontal: 14,
   },
-  buttonSecondary: {
-    backgroundColor: '#E8EDF1',
+
+  searchIcon: {
+    color:
+      colors.mutedText,
+    fontSize: 25,
+    marginRight: 8,
+    marginTop: -2,
   },
-  buttonPrimary: {
-    backgroundColor: colors.teal,
+
+  searchInput: {
+    flex: 1,
+    color: colors.text,
+    fontSize: 14,
+    paddingVertical: 10,
   },
-  buttonSecondaryText: {
+
+  clearSearch: {
+    width: 30,
+    height: 30,
+    alignItems: 'center',
+    justifyContent:
+      'center',
+  },
+
+  clearSearchText: {
+    color:
+      colors.mutedText,
+    fontSize: 22,
+  },
+
+  /* SUMMARY */
+
+  summaryRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 12,
+  },
+
+  summaryCard: {
+    flex: 1,
+    minHeight: 78,
+    backgroundColor:
+      colors.card,
+    borderWidth: 1,
+    borderColor:
+      colors.border,
+    borderRadius: 12,
+    padding: 12,
+    justifyContent:
+      'center',
+  },
+
+  summaryLabel: {
+    color:
+      colors.mutedText,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+
+  summaryValue: {
+    color: colors.text,
+    fontSize: 21,
+    fontWeight: '800',
+    marginTop: 4,
+  },
+
+  summaryValueSmall: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '800',
+    marginTop: 6,
+  },
+
+  /* LIST */
+
+  listHeader: {
+    marginTop: 20,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+
+  listTitle: {
+    color: colors.text,
+    fontSize: 18,
+    fontWeight: '800',
+  },
+
+  listSubtitle: {
+    color:
+      colors.mutedText,
+    fontSize: 12,
+    marginTop: 3,
+  },
+
+  customerList: {
+    gap: 10,
+  },
+
+  customerCard: {
+    backgroundColor:
+      colors.card,
+    borderWidth: 1,
+    borderColor:
+      colors.border,
+    borderRadius: 14,
+    padding: 14,
+  },
+
+  customerTopRow: {
+    flexDirection: 'row',
+    justifyContent:
+      'space-between',
+    alignItems: 'center',
+  },
+
+  customerIdentity: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+
+  customerIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    backgroundColor:
+      '#E5F4F2',
+    alignItems: 'center',
+    justifyContent:
+      'center',
+    marginRight: 11,
+  },
+
+  customerIconText: {
+    color: colors.teal,
+    fontSize: 16,
+    fontWeight: '900',
+  },
+
+  customerMain: {
+    flex: 1,
+  },
+
+  customerName: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '800',
+  },
+
+  customerMobile: {
+    color:
+      colors.mutedText,
+    fontSize: 12,
+    marginTop: 3,
+  },
+
+  balanceContainer: {
+    alignItems: 'flex-end',
+    marginLeft: 10,
+  },
+
+  balanceLabel: {
+    color:
+      colors.mutedText,
+    fontSize: 10,
+    fontWeight: '600',
+  },
+
+  balanceValue: {
+    color: colors.success,
+    fontSize: 15,
+    fontWeight: '800',
+    marginTop: 3,
+  },
+
+  balanceValueDue: {
+    color: colors.warning,
+  },
+
+  customerDivider: {
+    height: 1,
+    backgroundColor:
+      colors.border,
+    marginVertical: 12,
+  },
+
+  customerDetails: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+
+  detailItem: {
+    flex: 1,
+  },
+
+  detailLabel: {
+    color:
+      colors.mutedText,
+    fontSize: 10,
+    fontWeight: '600',
+    marginBottom: 3,
+  },
+
+  detailValue: {
+    color: colors.text,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+
+  customerAddress: {
+    color:
+      colors.mutedText,
+    fontSize: 11,
+    marginTop: 10,
+  },
+
+  /* ACTIONS */
+
+  customerActions: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 14,
+  },
+
+  viewButton: {
+    flex: 1,
+    minHeight: 40,
+    borderRadius: 9,
+    borderWidth: 1,
+    borderColor:
+      colors.border,
+    backgroundColor:
+      colors.card,
+    alignItems: 'center',
+    justifyContent:
+      'center',
+  },
+
+  viewButtonText: {
     color: colors.primary,
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '800',
   },
-  buttonPrimaryText: {
+
+  editButton: {
+    flex: 1,
+    minHeight: 40,
+    borderRadius: 9,
+    backgroundColor:
+      colors.secondary,
+    alignItems: 'center',
+    justifyContent:
+      'center',
+  },
+
+  editButtonText: {
     color: '#FFFFFF',
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '800',
   },
-  buttonPressed: {
-    opacity: 0.78,
+
+  deleteButton: {
+    flex: 1,
+    minHeight: 40,
+    borderRadius: 9,
+    borderWidth: 1,
+    borderColor:
+      '#E7B7B4',
+    backgroundColor:
+      '#FFF7F6',
+    alignItems: 'center',
+    justifyContent:
+      'center',
   },
-  buttonDisabled: {
-    opacity: 0.55,
+
+  deleteButtonText: {
+    color: colors.error,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+
+  /* EMPTY */
+
+  emptyCard: {
+    backgroundColor:
+      colors.card,
+    borderWidth: 1,
+    borderColor:
+      colors.border,
+    borderRadius: 14,
+    padding: 28,
+    alignItems: 'center',
+  },
+
+  emptyIconCircle: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor:
+      '#E5F4F2',
+    alignItems: 'center',
+    justifyContent:
+      'center',
+  },
+
+  emptyIcon: {
+    fontSize: 25,
+  },
+
+  emptyTitle: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '800',
+    marginTop: 12,
+  },
+
+  emptyText: {
+    color:
+      colors.mutedText,
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 5,
+    lineHeight: 18,
+  },
+
+  /* BOTTOM ADD */
+
+  bottomActionContainer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 12,
+    backgroundColor:
+      colors.background,
+    borderTopWidth: 1,
+    borderTopColor:
+      colors.border,
+  },
+
+  bottomAddButton: {
+    minHeight: 50,
+    borderRadius: 12,
+    backgroundColor:
+      colors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent:
+      'center',
+    elevation: 4,
+  },
+
+  bottomAddIcon: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: '500',
+    marginRight: 7,
+  },
+
+  bottomAddText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+
+  bottomSpace: {
+    height: 20,
+  },
+
+  /* FORM */
+
+  formSafeArea: {
+    flex: 1,
+    backgroundColor:
+      colors.background,
+  },
+
+  formScreen: {
+    flex: 1,
+    width: '100%',
+    backgroundColor:
+      colors.background,
+  },
+
+  formHeader: {
+    minHeight: 76,
+    backgroundColor:
+      colors.primary,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent:
+      'space-between',
+    elevation: 6,
+  },
+
+  formHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+
+  formBackButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor:
+      '#FFFFFF',
+    alignItems: 'center',
+    justifyContent:
+      'center',
+    marginRight: 10,
+  },
+
+  formBackIcon: {
+    color: colors.primary,
+    fontSize: 30,
+    lineHeight: 32,
+    fontWeight: '500',
+    marginTop: -2,
+  },
+
+  formHeaderTitle: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '800',
+  },
+
+  formHeaderSubtitle: {
+    color: '#D6E3EC',
+    fontSize: 11,
+    marginTop: 3,
+  },
+
+  formLogo: {
+    width: 42,
+    height: 42,
+    borderRadius: 13,
+    backgroundColor:
+      colors.gold,
+    alignItems: 'center',
+    justifyContent:
+      'center',
+    marginLeft: 10,
+  },
+
+  formLogoText: {
+    color: colors.primary,
+    fontSize: 14,
+    fontWeight: '900',
+  },
+
+  formScroll: {
+    padding: 16,
+    paddingBottom: 30,
+    flexGrow: 1,
+  },
+
+  viewCard: {
+    width: '100%',
+    backgroundColor:
+      colors.card,
+    borderWidth: 1,
+    borderColor:
+      colors.border,
+    borderRadius: 16,
+    padding: 18,
+    marginBottom: 12,
+  },
+
+  viewProfileRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+
+  viewAvatar: {
+    width: 58,
+    height: 58,
+    borderRadius: 16,
+    backgroundColor:
+      '#E5F4F2',
+    alignItems: 'center',
+    justifyContent:
+      'center',
+    marginRight: 14,
+  },
+
+  viewAvatarText: {
+    color: colors.teal,
+    fontSize: 22,
+    fontWeight: '900',
+  },
+
+  viewProfileText: {
+    flex: 1,
+  },
+
+  viewCustomerName: {
+    color: colors.text,
+    fontSize: 20,
+    fontWeight: '800',
+  },
+
+  viewCustomerMobile: {
+    color:
+      colors.mutedText,
+    fontSize: 13,
+    marginTop: 4,
+  },
+
+  viewSectionTitle: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '800',
+    marginBottom: 14,
+  },
+
+  viewRow: {
+    flexDirection: 'row',
+    gap: 14,
+    marginBottom: 16,
+  },
+
+  viewItem: {
+    flex: 1,
+  },
+
+  viewFullItem: {
+    width: '100%',
+    marginBottom: 16,
+  },
+
+  viewLabel: {
+    color:
+      colors.mutedText,
+    fontSize: 10,
+    fontWeight: '600',
+    marginBottom: 5,
+  },
+
+  viewValue: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 19,
+  },
+
+  viewEditButton: {
+    minHeight: 50,
+    borderRadius: 12,
+    backgroundColor:
+      colors.primary,
+    alignItems: 'center',
+    justifyContent:
+      'center',
+    marginBottom: 20,
+  },
+
+  viewEditButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
   },
 });

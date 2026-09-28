@@ -1,3 +1,4 @@
+
 import { getDatabase } from '../database/database';
 import type { Product } from '../types/product';
 
@@ -37,6 +38,9 @@ function mapRowToProduct(row: ProductRow): Product {
   };
 }
 
+/**
+ * Create a new product
+ */
 export async function createProduct(product: Product): Promise<void> {
   const db = await getDatabase();
 
@@ -61,25 +65,30 @@ export async function createProduct(product: Product): Promise<void> {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
     `,
     [
-        product.id,
-        product.businessId,
-        product.name,
-        product.hsn ?? null,
-        product.unit,
-        product.salePrice,
-        product.purchasePrice,
-        product.gstRate,
-        product.openingStock,
-        product.barcode ?? null,
-        product.brand ?? null,
-        product.rack ?? null,
-        product.createdAt,
-        product.updatedAt,
-      ],
-    );
+      product.id,
+      product.businessId,
+      product.name,
+      product.hsn ?? null,
+      product.unit,
+      product.salePrice,
+      product.purchasePrice,
+      product.gstRate,
+      product.openingStock,
+      product.barcode ?? null,
+      product.brand ?? null,
+      product.rack ?? null,
+      product.createdAt,
+      product.updatedAt,
+    ],
+  );
 }
 
-export async function getProducts(businessId: string): Promise<Product[]> {
+/**
+ * Get all products for a business
+ */
+export async function getProducts(
+  businessId: string,
+): Promise<Product[]> {
   const db = await getDatabase();
 
   const rows = await db.getAllAsync<ProductRow>(
@@ -107,4 +116,107 @@ export async function getProducts(businessId: string): Promise<Product[]> {
   );
 
   return rows.map(mapRowToProduct);
+}
+
+/**
+ * Get a single product by ID
+ */
+export async function getProductById(
+  productId: string,
+): Promise<Product | null> {
+  const db = await getDatabase();
+
+  const row = await db.getFirstAsync<ProductRow>(
+    `
+      SELECT
+        id,
+        business_id,
+        name,
+        hsn,
+        unit,
+        sale_price,
+        purchase_price,
+        gst_rate,
+        opening_stock,
+        barcode,
+        brand,
+        rack,
+        created_at,
+        updated_at
+      FROM products
+      WHERE id = ?
+      LIMIT 1;
+    `,
+    productId,
+  );
+
+  if (!row) {
+    return null;
+  }
+
+  return mapRowToProduct(row);
+}
+
+/**
+ * Update an existing product
+ */
+export async function updateProduct(
+  product: Product,
+): Promise<void> {
+  const db = await getDatabase();
+
+  await db.runAsync(
+    `
+      UPDATE products
+      SET
+        name = ?,
+        hsn = ?,
+        unit = ?,
+        sale_price = ?,
+        purchase_price = ?,
+        gst_rate = ?,
+        opening_stock = ?,
+        barcode = ?,
+        brand = ?,
+        rack = ?,
+        updated_at = ?
+      WHERE id = ?
+        AND business_id = ?;
+    `,
+    [
+      product.name,
+      product.hsn ?? null,
+      product.unit,
+      product.salePrice,
+      product.purchasePrice,
+      product.gstRate,
+      product.openingStock,
+      product.barcode ?? null,
+      product.brand ?? null,
+      product.rack ?? null,
+      product.updatedAt,
+      product.id,
+      product.businessId,
+    ],
+  );
+}
+
+/**
+ * Delete a product
+ */
+export async function deleteProduct(
+  productId: string,
+  businessId: string,
+): Promise<void> {
+  const db = await getDatabase();
+
+  await db.runAsync(
+    `
+      DELETE FROM products
+      WHERE id = ?
+        AND business_id = ?;
+    `,
+    productId,
+    businessId,
+  );
 }

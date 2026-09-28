@@ -1,665 +1,1256 @@
 
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
-  FlatList,
-  KeyboardAvoidingView,
-  Platform,
+  Alert,
+  Modal,
   Pressable,
+  RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
   useWindowDimensions,
 } from 'react-native';
-import { router } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 
-import { colors } from '../../src/theme/colors';
-import { loadProducts } from '../../src/services/productService';
+import {
+  loadProducts,
+  removeProduct,
+} from '../../src/services/productService';
 
 import type { Product } from '../../src/types/product';
+import { colors } from '../../src/theme/colors';
 
-const LOW_STOCK_LIMIT = 10;
+const COLORS = {
+  navy: '#08233D',
+  secondaryNavy: '#145784',
+  teal: '#07867D',
+  gold: '#F6BD43',
+  background: '#F2F6F8',
+  card: '#FFFFFF',
+  text: '#12243A',
+  muted: '#6B7C8D',
+  border: '#DDE6EC',
+  success: '#087A59',
+  error: '#B33B34',
+};
 
 export default function ProductsScreen() {
+  const router = useRouter();
   const { width } = useWindowDimensions();
-  const [search, setSearch] = useState('');
+
   const [products, setProducts] = useState<Product[]>([]);
+  const [search, setSearch] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
+  const [selectedProduct, setSelectedProduct] =
+    useState<Product | null>(null);
 
-  const isSmallScreen = width < 360;
+  const isWide = width >= 800;
 
-  /*
-   * Temporary frontend-only product state.
-   * The database integration will be handled separately.
-   */
-  React.useEffect(() => {
-    let isMounted = true;
-  
-    async function loadProductList() {
-      try {
-        const savedProducts = await loadProducts();
-  
-        if (isMounted) {
-          setProducts(savedProducts);
-        }
-      } catch (error) {
-        console.error('Failed to load products:', error);
-      }
+  const loadData = useCallback(async () => {
+    try {
+      const data = await loadProducts();
+      setProducts(data);
+    } catch (error) {
+      console.error('Failed to load products:', error);
+      Alert.alert('Error', 'Unable to load products.');
     }
-  
-    loadProductList();
-  
-    return () => {
-      isMounted = false;
-    };
   }, []);
 
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [loadData]),
+  );
 
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadData();
+    setRefreshing(false);
+  };
 
-  const filteredProducts = useMemo(() => {
+  const filteredProducts = products.filter((product) => {
     const query = search.trim().toLowerCase();
 
-    if (!query) {
-      return products;
-    }
+    if (!query) return true;
 
-    return products.filter((product) => {
-      return (
-        product.name.toLowerCase().includes(query) ||
-        product.hsn?.toLowerCase().includes(query) ||
-        product.barcode?.toLowerCase().includes(query) ||
-        product.brand?.toLowerCase().includes(query)
-      );
-    });
-  }, [products, search]);
+    return (
+      product.name.toLowerCase().includes(query) ||
+      (product.hsn ?? '').toLowerCase().includes(query) ||
+      (product.barcode ?? '').toLowerCase().includes(query) ||
+      (product.brand ?? '').toLowerCase().includes(query) ||
+      (product.rack ?? '').toLowerCase().includes(query)
+    );
+  });
 
-  const lowStockCount = useMemo(() => {
-    return products.filter(
-      (product) => product.openingStock <= LOW_STOCK_LIMIT,
-    ).length;
-  }, [products]);
+  const totalStock = products.reduce(
+    (sum, product) =>
+      sum + Number(product.openingStock || 0),
+    0,
+  );
 
-  const stockValue = useMemo(() => {
-    return products.reduce((total, product) => {
-      return total + product.openingStock * product.purchasePrice;
-    }, 0);
-  }, [products]);
+  const totalValue = products.reduce(
+    (sum, product) =>
+      sum +
+      Number(product.openingStock || 0) *
+        Number(product.purchasePrice || 0),
+    0,
+  );
 
   const formatCurrency = (value: number) => {
-    return `₹${value.toLocaleString('en-IN', {
-      maximumFractionDigits: 2,
+    return `₹${Number(value || 0).toLocaleString('en-IN', {
+      maximumFractionDigits: 0,
     })}`;
   };
 
-  const renderProduct = ({ item }: { item: Product }) => {
-    const isLowStock = item.openingStock <= LOW_STOCK_LIMIT;
+  const handleDelete = (product: Product) => {
+    Alert.alert(
+      'Delete Product',
+      `Are you sure you want to delete "${product.name}"?`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await removeProduct(product.id);
+              await loadData();
 
-    return (
-      <View style={styles.productCard}>
-        <View style={styles.productTopRow}>
-          <View style={styles.productNameContainer}>
-            <Text style={styles.productName} numberOfLines={1}>
-              {item.name}
-            </Text>
-
-            {item.brand ? (
-              <Text style={styles.productBrand}>{item.brand}</Text>
-            ) : null}
-          </View>
-
-          {isLowStock ? (
-            <View style={styles.lowStockBadge}>
-              <Text style={styles.lowStockBadgeText}>Low Stock</Text>
-            </View>
-          ) : null}
-        </View>
-
-        <View style={styles.productDetailsRow}>
-          <View style={styles.detailItem}>
-            <Text style={styles.detailLabel}>Stock</Text>
-            <Text style={styles.detailValue}>
-              {item.openingStock} {item.unit}
-            </Text>
-          </View>
-
-          <View style={styles.detailItem}>
-            <Text style={styles.detailLabel}>Sale Price</Text>
-            <Text style={styles.detailValue}>
-              {formatCurrency(item.salePrice)}
-            </Text>
-          </View>
-
-          <View style={styles.detailItem}>
-            <Text style={styles.detailLabel}>GST</Text>
-            <Text style={styles.detailValue}>{item.gstRate}%</Text>
-          </View>
-        </View>
-
-        {item.hsn || item.barcode || item.rack ? (
-          <View style={styles.extraInfoRow}>
-            {item.hsn ? (
-              <Text style={styles.extraInfo}>HSN {item.hsn}</Text>
-            ) : null}
-
-            {item.barcode ? (
-              <Text style={styles.extraInfo}>Barcode {item.barcode}</Text>
-            ) : null}
-
-            {item.rack ? (
-              <Text style={styles.extraInfo}>Rack {item.rack}</Text>
-            ) : null}
-          </View>
-        ) : null}
-      </View>
+              if (selectedProduct?.id === product.id) {
+                setSelectedProduct(null);
+              }
+            } catch (error) {
+              console.error('Delete product error:', error);
+              Alert.alert(
+                'Error',
+                'Unable to delete the product.',
+              );
+            }
+          },
+        },
+      ],
     );
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.screen}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      {/* Header */}
+    <View style={styles.screen}>
+      {/* HEADER */}
       <View style={styles.header}>
-  {/* Left side - Back button + Product title */}
-  <View style={styles.headerLeft}>
-    <Pressable
-      style={({ pressed }) => [
-        styles.backButton,
-        pressed && styles.buttonPressed,
-      ]}
-      onPress={() => router.replace('/dashboard')}
-    >
-      <Text style={styles.backIcon}>‹</Text>
-    </Pressable>
+        <View style={styles.headerLeft}>
+          <Pressable
+            style={styles.backButton}
+            onPress={() => router.back()}
+          >
+            <Text style={styles.backText}>‹</Text>
+          </Pressable>
 
-    <View style={styles.headerTitleContainer}>
-      
-      <Text style={styles.headerTitle}>
-        Manage Products
-      </Text>
-    </View>
-  </View>
+          <View style={styles.logo}>
+            <Text style={styles.logoText}>CA</Text>
+          </View>
 
-  {/* Right side - Profile */}
-  <View style={styles.profileCircle}>
-    <Text style={styles.profileText}>RS</Text>
-  </View>
-</View>
-
-      {/* Main Content */}
-      <View style={styles.content}>
-        {/* Search Bar */}
-        <View style={styles.searchContainer}>
-          <Text style={styles.searchIcon}>⌕</Text>
-
-          <TextInput
-            value={search}
-            onChangeText={setSearch}
-            placeholder="Search products..."
-            placeholderTextColor={colors.mutedText}
-            style={styles.searchInput}
-            returnKeyType="search"
-          />
-
-          {search.length > 0 ? (
-            <Pressable
-              onPress={() => setSearch('')}
-              style={styles.clearButton}
-            >
-              <Text style={styles.clearText}>×</Text>
-            </Pressable>
-          ) : null}
+          <View>
+            <Text style={styles.headerTitle}>Products</Text>
+            <Text style={styles.headerSubtitle}>
+              Retail inventory
+            </Text>
+          </View>
         </View>
 
-        {/* Summary Cards */}
+        <View style={styles.profileCircle}>
+          <Text style={styles.profileText}>RS</Text>
+        </View>
+      </View>
+
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={[
+          styles.scrollContent,
+          isWide && styles.scrollContentWide,
+        ]}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+          />
+        }
+        showsVerticalScrollIndicator={false}
+      >
         <View
           style={[
-            styles.summaryRow,
-            isSmallScreen && styles.summaryRowSmall,
+            styles.content,
+            isWide && styles.contentWide,
           ]}
         >
-          <View style={styles.summaryCard}>
-            <Text style={styles.summaryValue}>{products.length}</Text>
-            <Text style={styles.summaryLabel}>Products</Text>
-          </View>
+          {/* PAGE TITLE */}
+          <View style={styles.pageHeading}>
+            <Text style={styles.pageTitle}>Products</Text>
 
-          <View style={styles.summaryCard}>
-            <Text style={[styles.summaryValue, styles.warningValue]}>
-              {lowStockCount}
-            </Text>
-            <Text style={styles.summaryLabel}>Low Stock</Text>
-          </View>
-
-          <View style={styles.summaryCard}>
-            <Text
-              style={styles.summaryValue}
-              numberOfLines={1}
-              adjustsFontSizeToFit
-            >
-              {formatCurrency(stockValue)}
-            </Text>
-            <Text style={styles.summaryLabel}>Stock Value</Text>
-          </View>
-        </View>
-
-        {/* Product List Header */}
-        <View style={styles.listHeader}>
-          <View>
-            <Text style={styles.listTitle}>Product List</Text>
-
-            <Text style={styles.listSubtitle}>
-              {filteredProducts.length}{' '}
-              {filteredProducts.length === 1 ? 'product' : 'products'}
+            <Text style={styles.pageDescription}>
+              Manage products, pricing, GST and stock information.
             </Text>
           </View>
-        </View>
 
-        {/* Product List */}
-        <FlatList
-          data={filteredProducts}
-          keyExtractor={(item) => item.id}
-          renderItem={renderProduct}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={[
-            styles.listContent,
-            filteredProducts.length === 0 && styles.emptyListContent,
-          ]}
-          ListEmptyComponent={
-            <View style={styles.emptyState}>
-              <View style={styles.emptyIconCircle}>
-                <Text style={styles.emptyIcon}>📦</Text>
-              </View>
-
-              <Text style={styles.emptyTitle}>
-                {search ? 'No products found' : 'No products yet'}
+          {/* SUMMARY */}
+          <View style={styles.summaryRow}>
+            <View style={styles.summaryCard}>
+              <Text
+                style={styles.summaryLabel}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.85}
+              >
+                Total Products
               </Text>
 
-              <Text style={styles.emptyDescription}>
-                {search
-                  ? 'Try searching with a different product name, HSN or barcode.'
-                  : 'Add your first retail product to start managing your inventory.'}
+              <Text
+                style={styles.summaryValue}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.75}
+              >
+                {products.length}
               </Text>
             </View>
-          }
-        />
-      </View>
 
-      {/* Bottom Add Product Button */}
-      <View style={styles.bottomActionContainer}>
+            <View style={styles.summaryCard}>
+              <Text
+                style={styles.summaryLabel}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.85}
+              >
+                Total Stock
+              </Text>
+
+              <Text
+                style={styles.summaryValue}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.75}
+              >
+                {totalStock}
+              </Text>
+            </View>
+
+            <View style={styles.summaryCard}>
+              <Text
+                style={styles.summaryLabel}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.75}
+              >
+                Stock Value
+              </Text>
+
+              <Text
+                style={styles.summaryCurrencyValue}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.55}
+              >
+                {formatCurrency(totalValue)}
+              </Text>
+            </View>
+          </View>
+
+          {/* SEARCH */}
+          <View style={styles.searchCard}>
+            <Text style={styles.searchLabel}>
+              Search Products
+            </Text>
+
+            <TextInput
+              value={search}
+              onChangeText={setSearch}
+              placeholder="Search by product, HSN, barcode, brand or rack"
+              placeholderTextColor={COLORS.muted}
+              style={styles.searchInput}
+            />
+          </View>
+
+          {/* LIST HEADER */}
+          <View style={styles.listHeader}>
+            <View>
+              <Text style={styles.listTitle}>
+                Product List
+              </Text>
+
+              <Text style={styles.listSubtitle}>
+                {filteredProducts.length} product
+                {filteredProducts.length === 1 ? '' : 's'}
+              </Text>
+            </View>
+          </View>
+
+          {/* PRODUCT LIST */}
+          {filteredProducts.length === 0 ? (
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyTitle}>
+                No Products Found
+              </Text>
+
+              <Text style={styles.emptyText}>
+                {search
+                  ? 'Try changing your search.'
+                  : 'Add your first product to start managing inventory.'}
+              </Text>
+
+              {!search && (
+                <Pressable
+                  style={styles.emptyButton}
+                  onPress={() => router.push('/products/add')}
+                >
+                  <Text style={styles.emptyButtonText}>
+                    Add Product
+                  </Text>
+                </Pressable>
+              )}
+            </View>
+          ) : (
+            <View style={styles.productList}>
+              {filteredProducts.map((product) => (
+                <View
+                  key={product.id}
+                  style={styles.productCard}
+                >
+                  {/* PRODUCT HEADER */}
+                  <View style={styles.productTopRow}>
+                    <View style={styles.productIdentity}>
+                      <View style={styles.productAvatar}>
+                        <Text style={styles.productAvatarText}>
+                          {product.name
+                            .trim()
+                            .charAt(0)
+                            .toUpperCase()}
+                        </Text>
+                      </View>
+
+                      <View style={styles.productNameArea}>
+                        <Text
+                          style={styles.productName}
+                          numberOfLines={1}
+                        >
+                          {product.name}
+                        </Text>
+
+                        <Text style={styles.productMeta}>
+                          {product.unit}
+                          {product.hsn
+                            ? `  •  HSN ${product.hsn}`
+                            : ''}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.gstBadge}>
+                      <Text style={styles.gstText}>
+                        GST {product.gstRate}%
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.divider} />
+
+                  {/* PRODUCT DETAILS */}
+                  <View
+                    style={[
+                      styles.detailsGrid,
+                      isWide && styles.detailsGridWide,
+                    ]}
+                  >
+                    <View style={styles.detailItem}>
+                      <Text style={styles.detailLabel}>
+                        Sale Price
+                      </Text>
+
+                      <Text style={styles.detailValue}>
+                        {formatCurrency(product.salePrice)}
+                      </Text>
+                    </View>
+
+                    <View style={styles.detailItem}>
+                      <Text style={styles.detailLabel}>
+                        Purchase Price
+                      </Text>
+
+                      <Text style={styles.detailValue}>
+                        {formatCurrency(product.purchasePrice)}
+                      </Text>
+                    </View>
+
+                    <View style={styles.detailItem}>
+                      <Text style={styles.detailLabel}>
+                        Stock
+                      </Text>
+
+                      <Text
+                        style={[
+                          styles.detailValue,
+                          Number(product.openingStock) <= 0 &&
+                            styles.stockEmpty,
+                        ]}
+                      >
+                        {product.openingStock} {product.unit}
+                      </Text>
+                    </View>
+
+                    <View style={styles.detailItem}>
+                      <Text style={styles.detailLabel}>
+                        Brand
+                      </Text>
+
+                      <Text style={styles.detailValue}>
+                        {product.brand || '—'}
+                      </Text>
+                    </View>
+
+                    <View style={styles.detailItem}>
+                      <Text style={styles.detailLabel}>
+                        Rack
+                      </Text>
+
+                      <Text style={styles.detailValue}>
+                        {product.rack || '—'}
+                      </Text>
+                    </View>
+
+                    <View style={styles.detailItem}>
+                      <Text style={styles.detailLabel}>
+                        Barcode
+                      </Text>
+
+                      <Text
+                        style={styles.detailValue}
+                        numberOfLines={1}
+                      >
+                        {product.barcode || '—'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* CUSTOMER-STYLE ACTION BUTTONS */}
+                  <View style={styles.actionsRow}>
+                    <Pressable
+                      style={styles.viewButton}
+                      onPress={() =>
+                        setSelectedProduct(product)
+                      }
+                    >
+                      <Text style={styles.viewButtonText}>
+                        View
+                      </Text>
+                    </Pressable>
+
+                    <Pressable
+                      style={styles.editButton}
+                      onPress={() =>
+                        router.push(
+                          `/products/add?productId=${product.id}`,
+                        )
+                      }
+                    >
+                      <Text style={styles.editButtonText}>
+                        Edit
+                      </Text>
+                    </Pressable>
+
+                    <Pressable
+                      style={styles.deleteButton}
+                      onPress={() => handleDelete(product)}
+                    >
+                      <Text style={styles.deleteButtonText}>
+                        Delete
+                      </Text>
+                    </Pressable>
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+      </ScrollView>
+
+      {/* BOTTOM ADD BUTTON */}
+      <View style={styles.bottomBar}>
         <Pressable
-          style={({ pressed }) => [
-            styles.addProductButton,
-            pressed && styles.buttonPressed,
-          ]}
+          style={styles.addButton}
           onPress={() => router.push('/products/add')}
         >
-          <Text style={styles.addProductIcon}>+</Text>
-          <Text style={styles.addProductText}>Add Product</Text>
+          <Text style={styles.addButtonText}>
+            Add Product
+          </Text>
         </Pressable>
       </View>
-    </KeyboardAvoidingView>
+
+      {/* VIEW PRODUCT */}
+      <Modal
+        visible={!!selectedProduct}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSelectedProduct(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View
+            style={[
+              styles.modalCard,
+              isWide && styles.modalCardWide,
+            ]}
+          >
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={styles.modalTitle}>
+                  Product Details
+                </Text>
+
+                <Text style={styles.modalSubtitle}>
+                  Product information
+                </Text>
+              </View>
+
+              <Pressable
+                style={styles.modalClose}
+                onPress={() => setSelectedProduct(null)}
+              >
+                <Text style={styles.modalCloseText}>
+                  ×
+                </Text>
+              </Pressable>
+            </View>
+
+            {selectedProduct && (
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={
+                  styles.modalContent
+                }
+              >
+                <View style={styles.modalProductHeader}>
+                  <View style={styles.modalAvatar}>
+                    <Text style={styles.modalAvatarText}>
+                      {selectedProduct.name
+                        .trim()
+                        .charAt(0)
+                        .toUpperCase()}
+                    </Text>
+                  </View>
+
+                  <View>
+                    <Text style={styles.modalProductName}>
+                      {selectedProduct.name}
+                    </Text>
+
+                    <Text style={styles.modalProductMeta}>
+                      {selectedProduct.unit}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.modalDivider} />
+
+                <View style={styles.modalDetailsGrid}>
+                  <View style={styles.modalDetail}>
+                    <Text style={styles.modalDetailLabel}>
+                      HSN
+                    </Text>
+
+                    <Text style={styles.modalDetailValue}>
+                      {selectedProduct.hsn || '—'}
+                    </Text>
+                  </View>
+
+                  <View style={styles.modalDetail}>
+                    <Text style={styles.modalDetailLabel}>
+                      GST Rate
+                    </Text>
+
+                    <Text style={styles.modalDetailValue}>
+                      {selectedProduct.gstRate}%
+                    </Text>
+                  </View>
+
+                  <View style={styles.modalDetail}>
+                    <Text style={styles.modalDetailLabel}>
+                      Sale Price
+                    </Text>
+
+                    <Text style={styles.modalDetailValue}>
+                      {formatCurrency(
+                        selectedProduct.salePrice,
+                      )}
+                    </Text>
+                  </View>
+
+                  <View style={styles.modalDetail}>
+                    <Text style={styles.modalDetailLabel}>
+                      Purchase Price
+                    </Text>
+
+                    <Text style={styles.modalDetailValue}>
+                      {formatCurrency(
+                        selectedProduct.purchasePrice,
+                      )}
+                    </Text>
+                  </View>
+
+                  <View style={styles.modalDetail}>
+                    <Text style={styles.modalDetailLabel}>
+                      Opening Stock
+                    </Text>
+
+                    <Text style={styles.modalDetailValue}>
+                      {selectedProduct.openingStock}{' '}
+                      {selectedProduct.unit}
+                    </Text>
+                  </View>
+
+                  <View style={styles.modalDetail}>
+                    <Text style={styles.modalDetailLabel}>
+                      Brand
+                    </Text>
+
+                    <Text style={styles.modalDetailValue}>
+                      {selectedProduct.brand || '—'}
+                    </Text>
+                  </View>
+
+                  <View style={styles.modalDetail}>
+                    <Text style={styles.modalDetailLabel}>
+                      Rack
+                    </Text>
+
+                    <Text style={styles.modalDetailValue}>
+                      {selectedProduct.rack || '—'}
+                    </Text>
+                  </View>
+
+                  <View style={styles.modalDetail}>
+                    <Text style={styles.modalDetailLabel}>
+                      Barcode
+                    </Text>
+
+                    <Text style={styles.modalDetailValue}>
+                      {selectedProduct.barcode || '—'}
+                    </Text>
+                  </View>
+                </View>
+
+                <Pressable
+                  style={styles.modalEditButton}
+                  onPress={() => {
+                    const productId =
+                      selectedProduct.id;
+
+                    setSelectedProduct(null);
+
+                    router.push(
+                      `/products/add?productId=${productId}`,
+                    );
+                  }}
+                >
+                  <Text style={styles.modalEditText}>
+                    Edit Product
+                  </Text>
+                </Pressable>
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: COLORS.background,
   },
 
   header: {
-    minHeight: 82,
-    paddingHorizontal: 20,
-    paddingTop: 18,
-    paddingBottom: 14,
-    backgroundColor: colors.card,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    height: 76,
+    backgroundColor: COLORS.navy,
+    paddingHorizontal: 18,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
 
-  headerTitle: {
-    color: colors.primary,
-    fontSize: 20,
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+
+  backText: {
+    color: COLORS.navy,
+    fontSize: 30,
+    lineHeight: 32,
+    fontWeight: '400',
+    marginTop: -3,
+  },
+
+  logo: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    backgroundColor: COLORS.gold,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+
+  logoText: {
+    color: COLORS.navy,
+    fontSize: 16,
     fontWeight: '800',
   },
 
+  headerTitle: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+
   headerSubtitle: {
-    marginTop: 3,
-    color: colors.mutedText,
-    fontSize: 13,
+    color: '#C8D6E1',
+    fontSize: 12,
+    marginTop: 2,
   },
 
   profileCircle: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: colors.primary,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.secondaryNavy,
     alignItems: 'center',
     justifyContent: 'center',
   },
 
   profileText: {
-    color: colors.card,
-    fontSize: 13,
-    fontWeight: '800',
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+
+  scroll: {
+    flex: 1,
+  },
+
+  scrollContent: {
+    padding: 16,
+    paddingBottom: 110,
+  },
+
+  scrollContentWide: {
+    paddingHorizontal: 24,
   },
 
   content: {
-    flex: 1,
-    paddingHorizontal: 16,
-    paddingTop: 14,
+    width: '100%',
   },
 
-  searchContainer: {
-    height: 50,
-    backgroundColor: colors.card,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    marginBottom: 12,
+  contentWide: {
+    maxWidth: 1200,
+    alignSelf: 'center',
+    width: '100%',
   },
 
-  searchIcon: {
-    color: colors.secondary,
-    fontSize: 25,
-    fontWeight: '700',
-    marginRight: 9,
-    marginTop: -3,
+  pageHeading: {
+    marginBottom: 16,
   },
 
-  searchInput: {
-    flex: 1,
-    color: colors.text,
-    fontSize: 15,
-    paddingVertical: 0,
+  pageTitle: {
+    color: COLORS.text,
+    fontSize: 24,
+    fontWeight: '800',
   },
 
-  clearButton: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.background,
-  },
-
-  clearText: {
-    color: colors.mutedText,
-    fontSize: 22,
-    lineHeight: 23,
+  pageDescription: {
+    color: COLORS.muted,
+    fontSize: 13,
+    marginTop: 4,
+    lineHeight: 19,
   },
 
   summaryRow: {
     flexDirection: 'row',
-    gap: 9,
+    gap: 10,
     marginBottom: 14,
+    width: '100%',
   },
-
-  summaryRowSmall: {
-    gap: 6,
-  },
-
-  headerLeft: {
-  flex: 1,
-  flexDirection: 'row',
-  alignItems: 'center',
-},
-
-backButton: {
-  width: 40,
-  height: 40,
-  borderRadius: 10,
-  backgroundColor: colors.background,
-  borderWidth: 1,
-  borderColor: colors.border,
-  alignItems: 'center',
-  justifyContent: 'center',
-  marginRight: 10,
-},
-
-backIcon: {
-  color: colors.primary,
-  fontSize: 30,
-  lineHeight: 32,
-  fontWeight: '400',
-  marginTop: -3,
-},
-
-headerTitleContainer: {
-  flex: 1,
-},
 
   summaryCard: {
     flex: 1,
-    minHeight: 72,
-    backgroundColor: colors.card,
-    borderRadius: 12,
+    minWidth: 0,
+    minHeight: 82,
+    backgroundColor: COLORS.card,
     borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: 8,
-    paddingVertical: 10,
-    alignItems: 'center',
+    borderColor: COLORS.border,
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
     justifyContent: 'center',
-  },
-
-  summaryValue: {
-    color: colors.primary,
-    fontSize: 18,
-    fontWeight: '800',
-  },
-
-  warningValue: {
-    color: colors.warning,
+    alignItems: 'center',
   },
 
   summaryLabel: {
-    marginTop: 3,
-    color: colors.mutedText,
+    color: COLORS.muted,
     fontSize: 11,
     fontWeight: '600',
+    lineHeight: 14,
+    textAlign: 'center',
+  },
+
+  summaryValue: {
+    color: COLORS.text,
+    fontSize: 19,
+    lineHeight: 23,
+    fontWeight: '800',
+    marginTop: 4,
+    textAlign: 'center',
+  },
+
+  summaryCurrencyValue: {
+    color: COLORS.text,
+    fontSize: 15,
+    lineHeight: 19,
+    fontWeight: '800',
+    marginTop: 4,
+    textAlign: 'center',
+  },
+
+  searchCard: {
+    backgroundColor: COLORS.card,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 18,
+  },
+
+  searchLabel: {
+    color: COLORS.text,
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+
+  searchInput: {
+    height: 46,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 10,
+    backgroundColor: '#FAFCFD',
+    paddingHorizontal: 14,
+    color: COLORS.text,
+    fontSize: 14,
   },
 
   listHeader: {
-    marginBottom: 8,
-    paddingHorizontal: 2,
+    marginBottom: 12,
   },
 
   listTitle: {
-    color: colors.text,
+    color: COLORS.text,
     fontSize: 18,
     fontWeight: '800',
   },
 
   listSubtitle: {
-    marginTop: 2,
-    color: colors.mutedText,
-    fontSize: 12,
-  },
-
-  listContent: {
-    paddingTop: 2,
-    paddingBottom: 100,
-  },
-
-  emptyListContent: {
-    flexGrow: 1,
-  },
-
-  productCard: {
-    backgroundColor: colors.card,
-    borderRadius: 13,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 14,
-    marginBottom: 9,
-  },
-
-  productTopRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-  },
-
-  productNameContainer: {
-    flex: 1,
-    paddingRight: 8,
-  },
-
-  productName: {
-    color: colors.text,
-    fontSize: 16,
-    fontWeight: '800',
-  },
-
-  productBrand: {
-    color: colors.mutedText,
+    color: COLORS.muted,
     fontSize: 12,
     marginTop: 3,
   },
 
-  lowStockBadge: {
-    backgroundColor: '#FFF3DF',
-    borderRadius: 7,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+  productList: {
+    gap: 12,
   },
 
-  lowStockBadgeText: {
-    color: colors.warning,
-    fontSize: 10,
+  productCard: {
+    backgroundColor: COLORS.card,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 14,
+    padding: 15,
+  },
+
+  productTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+
+  productIdentity: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    minWidth: 0,
+  },
+
+  productAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: COLORS.teal,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 11,
+  },
+
+  productAvatarText: {
+    color: '#FFFFFF',
+    fontSize: 16,
     fontWeight: '800',
   },
 
-  productDetailsRow: {
+  productNameArea: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  productName: {
+    color: COLORS.text,
+    fontSize: 15,
+    fontWeight: '800',
+  },
+
+  productMeta: {
+    color: COLORS.muted,
+    fontSize: 12,
+    marginTop: 4,
+  },
+
+  gstBadge: {
+    backgroundColor: '#E7F5F3',
+    borderRadius: 8,
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    marginLeft: 10,
+  },
+
+  gstText: {
+    color: COLORS.teal,
+    fontSize: 11,
+    fontWeight: '800',
+  },
+
+  divider: {
+    height: 1,
+    backgroundColor: COLORS.border,
+    marginVertical: 13,
+  },
+
+  detailsGrid: {
     flexDirection: 'row',
-    marginTop: 13,
-    paddingTop: 11,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+
+  detailsGridWide: {
+    gap: 0,
   },
 
   detailItem: {
-    flex: 1,
+    width: '48%',
+    minWidth: 130,
+    marginBottom: 8,
   },
 
   detailLabel: {
-    color: colors.mutedText,
-    fontSize: 10,
+    color: COLORS.muted,
+    fontSize: 11,
     fontWeight: '600',
     marginBottom: 3,
   },
 
   detailValue: {
-    color: colors.text,
+    color: COLORS.text,
     fontSize: 13,
     fontWeight: '700',
   },
 
-  extraInfoRow: {
+  stockEmpty: {
+    color: COLORS.error,
+  },
+
+  /*
+   * SAME CUSTOMER-LIST BUTTON STYLE
+   */
+  actionsRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginTop: 10,
+    gap: 8,
+    marginTop: 8,
   },
 
-  extraInfo: {
-    color: colors.secondary,
-    backgroundColor: '#EEF5F8',
-    borderRadius: 5,
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    fontSize: 10,
-    fontWeight: '600',
-  },
-
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 25,
-    paddingVertical: 50,
-  },
-
-  emptyIconCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+  viewButton: {
+    flex: 1,
+    height: 38,
+    borderRadius: 9,
     backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: '#DDE6EC',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 14,
   },
 
-  emptyIcon: {
-    fontSize: 27,
+  viewButtonText: {
+    color:colors.primary,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+
+  editButton: {
+    flex: 1,
+    height: 38,
+    borderRadius: 9,
+    backgroundColor: colors.secondary,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  editButtonText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+
+  deleteButton: {
+    flex: 1,
+    height: 38,
+    borderRadius: 9,
+    backgroundColor: '#FFF5F4',
+    borderWidth: 1,
+    borderColor: '#F0D3D0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  deleteButtonText: {
+    color: colors.error,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+
+  emptyCard: {
+    backgroundColor: COLORS.card,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 14,
+    padding: 28,
+    alignItems: 'center',
   },
 
   emptyTitle: {
-    color: colors.text,
+    color: COLORS.text,
     fontSize: 17,
     fontWeight: '800',
-    textAlign: 'center',
   },
 
-  emptyDescription: {
-    color: colors.mutedText,
+  emptyText: {
+    color: COLORS.muted,
     fontSize: 13,
-    lineHeight: 19,
     textAlign: 'center',
     marginTop: 6,
-    maxWidth: 310,
+    lineHeight: 19,
   },
 
-  bottomActionContainer: {
+  emptyButton: {
+    backgroundColor: '#07867D',
+    borderRadius: 10,
+    paddingHorizontal: 18,
+    paddingVertical: 11,
+    marginTop: 16,
+  },
+
+  emptyButtonText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+
+  bottomBar: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
     paddingHorizontal: 16,
     paddingTop: 10,
-    paddingBottom: Platform.OS === 'ios' ? 24 : 14,
-    backgroundColor: colors.background,
+    paddingBottom: 14,
+    backgroundColor: 'rgba(242,246,248,0.97)',
     borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderTopColor: COLORS.border,
   },
 
-  addProductButton: {
-    height: 50,
-    borderRadius: 12,
+  addButton: {
+    width: '100%',
+    maxWidth: 1200,
+    alignSelf: 'center',
+    height: 48,
+    borderRadius: 11,
     backgroundColor: colors.primary,
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    shadowOffset: {
-      width: 0,
-      height: 3,
-    },
-    elevation: 4,
   },
 
-  addProductIcon: {
-    color: colors.card,
-    fontSize: 22,
-    fontWeight: '500',
-    marginRight: 8,
-    marginTop: -2,
-  },
-
-  addProductText: {
-    color: colors.card,
-    fontSize: 15,
+  addButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
     fontWeight: '800',
   },
 
-  buttonPressed: {
-    opacity: 0.82,
-    transform: [{ scale: 0.99 }],
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(8,35,61,0.55)',
+    justifyContent: 'center',
+    padding: 18,
+  },
+
+  modalCard: {
+    width: '100%',
+    maxHeight: '88%',
+    backgroundColor: COLORS.card,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+
+  modalCardWide: {
+    maxWidth: 650,
+    alignSelf: 'center',
+  },
+
+  modalHeader: {
+    minHeight: 70,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    backgroundColor: COLORS.navy,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+
+  modalTitle: {
+    color: '#FFFFFF',
+    fontSize: 17,
+    fontWeight: '800',
+  },
+
+  modalSubtitle: {
+    color: '#C8D6E1',
+    fontSize: 12,
+    marginTop: 3,
+  },
+
+  modalClose: {
+    width: 36,
+    height: 36,
+    borderRadius: 9,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  modalCloseText: {
+    color: COLORS.navy,
+    fontSize: 24,
+    lineHeight: 26,
+  },
+
+  modalContent: {
+    padding: 18,
+    paddingBottom: 22,
+  },
+
+  modalProductHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+
+  modalAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: COLORS.teal,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+
+  modalAvatarText: {
+    color: '#FFFFFF',
+    fontSize: 17,
+    fontWeight: '800',
+  },
+
+  modalProductName: {
+    color: COLORS.text,
+    fontSize: 17,
+    fontWeight: '800',
+  },
+
+  modalProductMeta: {
+    color: COLORS.muted,
+    fontSize: 12,
+    marginTop: 3,
+  },
+
+  modalDivider: {
+    height: 1,
+    backgroundColor: COLORS.border,
+    marginVertical: 16,
+  },
+
+  modalDetailsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+
+  modalDetail: {
+    width: '50%',
+    paddingRight: 10,
+    marginBottom: 15,
+  },
+
+  modalDetailLabel: {
+    color: COLORS.muted,
+    fontSize: 11,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+
+  modalDetailValue: {
+    color: COLORS.text,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+
+  modalEditButton: {
+    height: 46,
+    borderRadius: 10,
+    backgroundColor: COLORS.teal,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 4,
+  },
+
+  modalEditText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
   },
 });

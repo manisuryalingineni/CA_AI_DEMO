@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import {
   Alert,
@@ -16,7 +15,6 @@ import { router } from 'expo-router';
 import { colors } from '../../src/theme/colors';
 import { saveProduct } from '../../src/services/productService';
 
-
 export default function AddProductScreen() {
   const [name, setName] = useState('');
   const [hsn, setHsn] = useState('');
@@ -31,12 +29,15 @@ export default function AddProductScreen() {
 
   async function handleSave() {
     const productName = name.trim();
-  
+
     if (!productName) {
-      Alert.alert('Product name required', 'Please enter the product name.');
+      Alert.alert(
+        'Product name required',
+        'Please enter the product name.',
+      );
       return;
     }
-  
+
     try {
       await saveProduct({
         name: productName,
@@ -50,15 +51,17 @@ export default function AddProductScreen() {
         brand: brand.trim(),
         rack: rack.trim(),
       });
-  
+
       router.replace('/products');
     } catch (error) {
       Alert.alert(
         'Unable to save product',
-        error instanceof Error ? error.message : 'Something went wrong.',
+        error instanceof Error
+          ? error.message
+          : 'Something went wrong.',
       );
     }
-  } 
+  }
 
   function handleCancel() {
     router.back();
@@ -67,7 +70,11 @@ export default function AddProductScreen() {
   return (
     <KeyboardAvoidingView
       style={styles.screen}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={
+        Platform.OS === 'ios'
+          ? 'padding'
+          : undefined
+      }
     >
       <ScrollView
         contentContainerStyle={styles.scrollContent}
@@ -75,31 +82,62 @@ export default function AddProductScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.container}>
-          {/* Header */}
-          <View style={styles.header}>
-            <Pressable
-              onPress={handleCancel}
-              style={({ pressed }) => [
-                styles.backButton,
-                pressed && styles.pressed,
-              ]}
-            >
-              <Text style={styles.backIcon}>‹</Text>
-            </Pressable>
 
-            <View style={styles.headerText}>
-              <Text style={styles.title}>Add Product</Text>
-              <Text style={styles.subtitle}>
-                Create a product for your retail business
+          {/* =================================
+              HEADER
+          ================================= */}
+
+          <View style={styles.header}>
+            <View style={styles.headerLeft}>
+              <Pressable
+                onPress={handleCancel}
+                style={({ pressed }) => [
+                  styles.backButton,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Text style={styles.backIcon}>
+                  ‹
+                </Text>
+              </Pressable>
+
+              <View style={styles.logo}>
+                <Text style={styles.logoText}>
+                  CA
+                </Text>
+              </View>
+
+              <View style={styles.headerText}>
+                <Text style={styles.headerTitle}>
+                  Add Product
+                </Text>
+
+                <Text style={styles.headerSubtitle}>
+                  Create a product for your business
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.profileCircle}>
+              <Text style={styles.profileText}>
+                RS
               </Text>
             </View>
           </View>
 
-          {/* Basic Information */}
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Basic Information</Text>
+          {/* =================================
+              BASIC INFORMATION
+          ================================= */}
 
-            <Text style={styles.label}>Product Name *</Text>
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>
+              Basic Information
+            </Text>
+
+            <Text style={styles.label}>
+              Product Name *
+            </Text>
+
             <TextInput
               value={name}
               onChangeText={setName}
@@ -109,7 +147,10 @@ export default function AddProductScreen() {
               autoCapitalize="words"
             />
 
-            <Text style={styles.label}>HSN Code</Text>
+            <Text style={styles.label}>
+              HSN Code
+            </Text>
+
             <TextInput
               value={hsn}
               onChangeText={setHsn}
@@ -119,7 +160,10 @@ export default function AddProductScreen() {
               keyboardType="number-pad"
             />
 
-            <Text style={styles.label}>Unit</Text>
+            <Text style={styles.label}>
+              Unit
+            </Text>
+
             <TextInput
               value={unit}
               onChangeText={setUnit}
@@ -129,20 +173,33 @@ export default function AddProductScreen() {
             />
           </View>
 
-          {/* Pricing */}
+          {/* =================================
+              PRICING & TAX
+          ================================= */}
+
           <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Pricing & Tax</Text>
+            <Text style={styles.sectionTitle}>
+              Pricing & Tax
+            </Text>
 
             <View style={styles.row}>
               <View style={styles.halfField}>
-                <Text style={styles.label}>Sale Price</Text>
+                <Text style={styles.label}>
+                  Sale Price
+                </Text>
+
                 <View style={styles.currencyInput}>
-                  <Text style={styles.currency}>₹</Text>
+                  <Text style={styles.currency}>
+                    ₹
+                  </Text>
+
                   <TextInput
                     value={salePrice}
                     onChangeText={setSalePrice}
                     placeholder="0.00"
-                    placeholderTextColor={colors.mutedText}
+                    placeholderTextColor={
+                      colors.mutedText
+                    }
                     style={styles.currencyTextInput}
                     keyboardType="decimal-pad"
                   />
@@ -150,14 +207,22 @@ export default function AddProductScreen() {
               </View>
 
               <View style={styles.halfField}>
-                <Text style={styles.label}>Purchase Price</Text>
+                <Text style={styles.label}>
+                  Purchase Price
+                </Text>
+
                 <View style={styles.currencyInput}>
-                  <Text style={styles.currency}>₹</Text>
+                  <Text style={styles.currency}>
+                    ₹
+                  </Text>
+
                   <TextInput
                     value={purchasePrice}
                     onChangeText={setPurchasePrice}
                     placeholder="0.00"
-                    placeholderTextColor={colors.mutedText}
+                    placeholderTextColor={
+                      colors.mutedText
+                    }
                     style={styles.currencyTextInput}
                     keyboardType="decimal-pad"
                   />
@@ -165,7 +230,10 @@ export default function AddProductScreen() {
               </View>
             </View>
 
-            <Text style={styles.label}>GST Rate (%)</Text>
+            <Text style={styles.label}>
+              GST Rate (%)
+            </Text>
+
             <TextInput
               value={gstRate}
               onChangeText={setGstRate}
@@ -176,11 +244,19 @@ export default function AddProductScreen() {
             />
           </View>
 
-          {/* Stock */}
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Opening Stock</Text>
+          {/* =================================
+              OPENING STOCK
+          ================================= */}
 
-            <Text style={styles.label}>Opening Quantity</Text>
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>
+              Opening Stock
+            </Text>
+
+            <Text style={styles.label}>
+              Opening Quantity
+            </Text>
+
             <TextInput
               value={openingStock}
               onChangeText={setOpeningStock}
@@ -191,11 +267,19 @@ export default function AddProductScreen() {
             />
           </View>
 
-          {/* Retail Details */}
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Retail Details</Text>
+          {/* =================================
+              RETAIL DETAILS
+          ================================= */}
 
-            <Text style={styles.label}>Barcode</Text>
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>
+              Retail Details
+            </Text>
+
+            <Text style={styles.label}>
+              Barcode
+            </Text>
+
             <TextInput
               value={barcode}
               onChangeText={setBarcode}
@@ -205,7 +289,10 @@ export default function AddProductScreen() {
               keyboardType="number-pad"
             />
 
-            <Text style={styles.label}>Brand</Text>
+            <Text style={styles.label}>
+              Brand
+            </Text>
+
             <TextInput
               value={brand}
               onChangeText={setBrand}
@@ -215,7 +302,10 @@ export default function AddProductScreen() {
               autoCapitalize="words"
             />
 
-            <Text style={styles.label}>Rack</Text>
+            <Text style={styles.label}>
+              Rack
+            </Text>
+
             <TextInput
               value={rack}
               onChangeText={setRack}
@@ -226,7 +316,10 @@ export default function AddProductScreen() {
             />
           </View>
 
-          {/* Actions */}
+          {/* =================================
+              ACTIONS
+          ================================= */}
+
           <View style={styles.actions}>
             <Pressable
               onPress={handleCancel}
@@ -235,7 +328,9 @@ export default function AddProductScreen() {
                 pressed && styles.pressed,
               ]}
             >
-              <Text style={styles.cancelText}>Cancel</Text>
+              <Text style={styles.cancelText}>
+                Cancel
+              </Text>
             </Pressable>
 
             <Pressable
@@ -245,7 +340,9 @@ export default function AddProductScreen() {
                 pressed && styles.pressed,
               ]}
             >
-              <Text style={styles.saveText}>Save Product</Text>
+              <Text style={styles.saveText}>
+                Save Product
+              </Text>
             </Pressable>
           </View>
         </View>
@@ -255,68 +352,123 @@ export default function AddProductScreen() {
 }
 
 const styles = StyleSheet.create({
+  /* =================================
+     SCREEN
+  ================================= */
+
   screen: {
     flex: 1,
     backgroundColor: colors.background,
   },
 
   scrollContent: {
-    padding: 20,
     paddingBottom: 40,
   },
 
   container: {
     width: '100%',
-    maxWidth: 800,
+    maxWidth: 1200,
     alignSelf: 'center',
   },
 
+  /* =================================
+     HEADER
+     SAME AS CUSTOMERS
+  ================================= */
+
   header: {
+    minHeight: 76,
+    backgroundColor: colors.primary,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
+    justifyContent: 'space-between',
+    elevation: 6,
+  },
+
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
   },
 
   backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginRight: 10,
   },
 
   backIcon: {
-    fontSize: 32,
-    lineHeight: 32,
     color: colors.primary,
-    marginTop: -3,
+    fontSize: 30,
+    lineHeight: 32,
+    fontWeight: '500',
+    marginTop: -2,
+  },
+
+  logo: {
+    width: 42,
+    height: 42,
+    borderRadius: 13,
+    backgroundColor: colors.gold,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+
+  logoText: {
+    color: colors.primary,
+    fontSize: 14,
+    fontWeight: '900',
   },
 
   headerText: {
     flex: 1,
   },
 
-  title: {
-    fontSize: 25,
+  headerTitle: {
+    color: '#FFFFFF',
+    fontSize: 17,
     fontWeight: '800',
-    color: colors.primary,
   },
 
-  subtitle: {
-    marginTop: 4,
-    fontSize: 14,
-    color: colors.mutedText,
+  headerSubtitle: {
+    color: '#D6E3EC',
+    fontSize: 11,
+    marginTop: 2,
   },
+
+  profileCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.secondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 10,
+  },
+
+  profileText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+
+  /* =================================
+     CARDS
+  ================================= */
 
   card: {
     backgroundColor: colors.card,
-    borderRadius: 18,
-    padding: 18,
-    marginBottom: 16,
+    borderRadius: 14,
+    padding: 16,
+    marginHorizontal: 16,
+    marginTop: 16,
     borderWidth: 1,
     borderColor: colors.border,
   },
@@ -324,28 +476,32 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 17,
     fontWeight: '800',
-    color: colors.primary,
-    marginBottom: 16,
+    color: colors.text,
+    marginBottom: 14,
   },
 
+  /* =================================
+     FIELDS
+  ================================= */
+
   label: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
     color: colors.text,
-    marginBottom: 7,
+    marginBottom: 6,
     marginTop: 4,
   },
 
   input: {
-    minHeight: 48,
+    minHeight: 46,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 12,
-    backgroundColor: '#FAFCFD',
-    paddingHorizontal: 14,
-    fontSize: 15,
+    borderRadius: 10,
+    backgroundColor: colors.card,
+    paddingHorizontal: 12,
+    fontSize: 13,
     color: colors.text,
-    marginBottom: 14,
+    marginBottom: 12,
   },
 
   row: {
@@ -357,20 +513,24 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
+  /* =================================
+     CURRENCY
+  ================================= */
+
   currencyInput: {
-    minHeight: 48,
+    minHeight: 46,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 12,
-    backgroundColor: '#FAFCFD',
+    borderRadius: 10,
+    backgroundColor: colors.card,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
-    marginBottom: 14,
+    marginBottom: 12,
   },
 
   currency: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
     color: colors.mutedText,
     marginRight: 5,
@@ -378,21 +538,26 @@ const styles = StyleSheet.create({
 
   currencyTextInput: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 13,
     color: colors.text,
     paddingVertical: 0,
   },
 
+  /* =================================
+     ACTIONS
+  ================================= */
+
   actions: {
     flexDirection: 'row',
     gap: 12,
-    marginTop: 4,
+    marginHorizontal: 16,
+    marginTop: 16,
   },
 
   cancelButton: {
     flex: 1,
-    minHeight: 50,
-    borderRadius: 13,
+    minHeight: 48,
+    borderRadius: 11,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.card,
@@ -401,22 +566,22 @@ const styles = StyleSheet.create({
   },
 
   cancelText: {
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: 13,
+    fontWeight: '800',
     color: colors.text,
   },
 
   saveButton: {
     flex: 1.4,
-    minHeight: 50,
-    borderRadius: 13,
+    minHeight: 48,
+    borderRadius: 11,
     backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
 
   saveText: {
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '800',
     color: '#FFFFFF',
   },
@@ -425,4 +590,3 @@ const styles = StyleSheet.create({
     opacity: 0.75,
   },
 });
-
