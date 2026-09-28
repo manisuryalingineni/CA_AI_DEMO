@@ -303,7 +303,7 @@ function CustomerForm({
 
       onSaved();
 
-      onClose();
+      // onClose();
 
     } catch (error) {
       Alert.alert(
@@ -951,7 +951,7 @@ export default function AddCustomerScreen() {
       customer={customer}
       onClose={() => router.back()}
       onSaved={() => {
-        router.back();
+        router.replace('/customers');
       }}
     />
   );

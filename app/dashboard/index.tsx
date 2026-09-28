@@ -15,8 +15,6 @@ import { StatusBar } from 'expo-status-bar';
 
 import { colors } from '../../src/theme/colors';
 
-
-
 type QuickActionProps = {
   icon: string;
   title: string;
