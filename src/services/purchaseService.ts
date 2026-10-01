@@ -1,5 +1,4 @@
 import { getBusiness } from '../repositories/businessRepository';
-
 import {
   createPurchase,
   getPurchases,
@@ -7,36 +6,44 @@ import {
   getPurchaseItems,
   deletePurchase,
 } from '../repositories/purchaseRepository';
-
-import type {
-  PurchaseRow,
-  PurchaseItemRow,
-} from '../repositories/purchaseRepository';
+import type { Purchase, PurchaseItem } from '../types/purchase';
 
 export interface CreatePurchaseInput {
-  vendorId?: string;
+  vendorId: string;
   invoiceNumber?: string;
   purchaseDate: string;
+
   subtotal: number;
   gstAmount: number;
   discount: number;
   totalAmount: number;
+
   paidAmount: number;
   dueAmount: number;
-  paymentStatus: string;
+  paymentStatus: 'UNPAID' | 'PARTIAL' | 'PAID';
+
   notes?: string;
-  items: CreatePurchaseItemInput[];
+
+  items: Array<{
+    productId: string;
+    quantity: number;
+    unitPrice: number;
+    gstRate: number;
+    gstAmount: number;
+    discount: number;
+    totalAmount: number;
+  }>;
 }
 
-export interface CreatePurchaseItemInput {
-  productId: string;
-  quantity: number;
-  unitPrice: number;
-  gstRate: number;
-  gstAmount: number;
-  discount: number;
-  totalAmount: number;
+export interface PurchaseListItem extends Purchase {
+  vendorName?: string;
 }
+
+/*
+ * ---------------------------------------------------------
+ * ID GENERATORS
+ * ---------------------------------------------------------
+ */
 
 function generatePurchaseId(): string {
   return `purchase_${Date.now()}_${Math.random()
@@ -50,11 +57,27 @@ function generatePurchaseItemId(): string {
     .slice(2, 8)}`;
 }
 
+/*
+ * ---------------------------------------------------------
+ * VALIDATION
+ * ---------------------------------------------------------
+ */
+
 function validatePurchaseInput(
   input: CreatePurchaseInput,
 ): void {
+  if (!input.vendorId.trim()) {
+    throw new Error('Vendor is required.');
+  }
+
   if (!input.purchaseDate.trim()) {
     throw new Error('Purchase date is required.');
+  }
+
+  if (!input.items.length) {
+    throw new Error(
+      'Add at least one product to the purchase.',
+    );
   }
 
   if (input.subtotal < 0) {
@@ -87,63 +110,64 @@ function validatePurchaseInput(
     );
   }
 
-  if (!input.items.length) {
-    throw new Error(
-      'At least one purchase item is required.',
-    );
-  }
-
   for (const item of input.items) {
     if (!item.productId.trim()) {
       throw new Error(
-        'Product is required for every purchase item.',
+        'Every purchase item must have a product.',
       );
     }
 
     if (item.quantity <= 0) {
       throw new Error(
-        'Purchase quantity must be greater than zero.',
+        'Product quantity must be greater than zero.',
       );
     }
 
     if (item.unitPrice < 0) {
       throw new Error(
-        'Unit price cannot be negative.',
+        'Product purchase price cannot be negative.',
       );
     }
 
     if (item.gstRate < 0) {
       throw new Error(
-        'GST rate cannot be negative.',
+        'Product GST rate cannot be negative.',
       );
     }
 
     if (item.gstAmount < 0) {
       throw new Error(
-        'GST amount cannot be negative.',
+        'Product GST amount cannot be negative.',
       );
     }
 
     if (item.discount < 0) {
       throw new Error(
-        'Item discount cannot be negative.',
+        'Product discount cannot be negative.',
       );
     }
 
     if (item.totalAmount < 0) {
       throw new Error(
-        'Item total cannot be negative.',
+        'Product total amount cannot be negative.',
       );
     }
   }
 }
 
+/*
+ * ---------------------------------------------------------
+ * NORMALIZATION
+ * ---------------------------------------------------------
+ */
+
 function normalizePurchaseInput(
   input: CreatePurchaseInput,
 ): CreatePurchaseInput {
   return {
-    vendorId:
-      input.vendorId?.trim() || undefined,
+    ...input,
+
+    vendorId: input.vendorId.trim(),
 
     invoiceNumber:
       input.invoiceNumber?.trim() || undefined,
@@ -169,13 +193,10 @@ function normalizePurchaseInput(
     dueAmount:
       Number(input.dueAmount) || 0,
 
-    paymentStatus:
-      input.paymentStatus.trim(),
-
     notes:
       input.notes?.trim() || undefined,
 
-    items: input.items.map((item) => ({
+    items: input.items.map(item => ({
       productId:
         item.productId.trim(),
 
@@ -200,18 +221,29 @@ function normalizePurchaseInput(
   };
 }
 
-/* =================================
-   CREATE PURCHASE
-================================= */
+/*
+ * ---------------------------------------------------------
+ * SAVE PURCHASE
+ *
+ * APK-style flow:
+ *
+ * Vendor
+ *   ↓
+ * Purchase Bill
+ *   ↓
+ * Purchase Items
+ *   ↓
+ * Vendor/Product relationship
+ *   ↓
+ * Inventory IN
+ *   ↓
+ * Stock increases
+ * ---------------------------------------------------------
+ */
 
 export async function savePurchase(
   input: CreatePurchaseInput,
-): Promise<PurchaseRow> {
-  const normalized =
-    normalizePurchaseInput(input);
-
-  validatePurchaseInput(normalized);
-
+): Promise<Purchase> {
   const business =
     await getBusiness();
 
@@ -221,65 +253,149 @@ export async function savePurchase(
     );
   }
 
+  const normalized =
+    normalizePurchaseInput(input);
+
+  validatePurchaseInput(normalized);
+
   const now =
     new Date().toISOString();
 
   const purchaseId =
     generatePurchaseId();
 
-  const purchase: PurchaseRow = {
+  const purchase: Purchase = {
     id: purchaseId,
 
-    business_id:
+    businessId:
       business.id,
 
-    vendor_id:
-      normalized.vendorId ?? null,
+    vendorId:
+      normalized.vendorId,
 
-    invoice_number:
-      normalized.invoiceNumber ?? null,
+    invoiceNumber:
+      normalized.invoiceNumber,
 
-    purchase_date:
+    purchaseDate:
       normalized.purchaseDate,
 
     subtotal:
       normalized.subtotal,
 
-    gst_amount:
+    gstAmount:
       normalized.gstAmount,
 
     discount:
       normalized.discount,
 
-    total_amount:
+    totalAmount:
       normalized.totalAmount,
 
-    paid_amount:
+    paidAmount:
       normalized.paidAmount,
 
-    due_amount:
+    dueAmount:
       normalized.dueAmount,
 
-    payment_status:
+    paymentStatus:
       normalized.paymentStatus,
 
     notes:
-      normalized.notes ?? null,
+      normalized.notes,
 
-    created_at:
+    createdAt:
       now,
 
-    updated_at:
+    updatedAt:
       now,
   };
 
-  const items: PurchaseItemRow[] =
-    normalized.items.map((item) => ({
+  const purchaseItems: PurchaseItem[] =
+    normalized.items.map(item => ({
       id:
         generatePurchaseItemId(),
 
+      purchaseId,
+
+      productId:
+        item.productId,
+
+      quantity:
+        item.quantity,
+
+      unitPrice:
+        item.unitPrice,
+
+      gstRate:
+        item.gstRate,
+
+      gstAmount:
+        item.gstAmount,
+
+      discount:
+        item.discount,
+
+      totalAmount:
+        item.totalAmount,
+
+      createdAt:
+        now,
+    }));
+
+  await createPurchase(
+    {
+      id:
+        purchase.id,
+
+      business_id:
+        purchase.businessId,
+
+      vendor_id:
+        purchase.vendorId ?? null,
+
+      invoice_number:
+        purchase.invoiceNumber ?? null,
+
+      purchase_date:
+        purchase.purchaseDate,
+
+      subtotal:
+        purchase.subtotal,
+
+      gst_amount:
+        purchase.gstAmount,
+
+      discount:
+        purchase.discount,
+
+      total_amount:
+        purchase.totalAmount,
+
+      paid_amount:
+        purchase.paidAmount,
+
+      due_amount:
+        purchase.dueAmount,
+
+      payment_status:
+        purchase.paymentStatus,
+
+      notes:
+        purchase.notes ?? null,
+
+      created_at:
+        purchase.createdAt,
+
+      updated_at:
+        purchase.updatedAt,
+    },
+
+    purchaseItems.map(item => ({
+      id:
+        item.id,
+
       purchase_id:
-        purchaseId,
+        item.purchaseId,
 
       product_id:
         item.productId,
@@ -303,23 +419,21 @@ export async function savePurchase(
         item.totalAmount,
 
       created_at:
-        now,
-    }));
-
-  await createPurchase(
-    purchase,
-    items,
+        item.createdAt,
+    })),
   );
 
   return purchase;
 }
 
-/* =================================
-   LOAD ALL PURCHASES
-================================= */
+/*
+ * ---------------------------------------------------------
+ * LOAD PURCHASE LIST
+ * ---------------------------------------------------------
+ */
 
 export async function loadPurchases(): Promise<
-  PurchaseRow[]
+  PurchaseListItem[]
 > {
   const business =
     await getBusiness();
@@ -328,85 +442,193 @@ export async function loadPurchases(): Promise<
     return [];
   }
 
-  return getPurchases(
-    business.id,
-  );
+  const rows =
+    await getPurchases(
+      business.id,
+    );
+
+  return rows.map(row => ({
+    id:
+      row.id,
+
+    businessId:
+      row.business_id,
+
+    vendorId:
+      row.vendor_id ?? undefined,
+
+    vendorName:
+      row.vendor_name ?? undefined,
+
+    invoiceNumber:
+      row.invoice_number ?? undefined,
+
+    purchaseDate:
+      row.purchase_date,
+
+    subtotal:
+      row.subtotal,
+
+    gstAmount:
+      row.gst_amount,
+
+    discount:
+      row.discount,
+
+    totalAmount:
+      row.total_amount,
+
+    paidAmount:
+      row.paid_amount,
+
+    dueAmount:
+      row.due_amount,
+
+    paymentStatus:
+      row.payment_status as
+        | 'UNPAID'
+        | 'PARTIAL'
+        | 'PAID',
+
+    notes:
+      row.notes ?? undefined,
+
+    createdAt:
+      row.created_at,
+
+    updatedAt:
+      row.updated_at,
+  }));
 }
 
-/* =================================
-   LOAD SINGLE PURCHASE
-================================= */
+/*
+ * ---------------------------------------------------------
+ * LOAD SINGLE PURCHASE
+ * ---------------------------------------------------------
+ */
 
 export async function loadPurchase(
   purchaseId: string,
-): Promise<PurchaseRow | null> {
-  if (!purchaseId) {
-    return null;
-  }
-
-  const business =
-    await getBusiness();
-
-  if (!business) {
-    return null;
-  }
-
-  const purchase =
+): Promise<Purchase | null> {
+  const row =
     await getPurchaseById(
       purchaseId,
     );
 
-  if (!purchase) {
+  if (!row) {
     return null;
   }
 
-  if (
-    purchase.business_id !==
-    business.id
-  ) {
-    return null;
-  }
+  return {
+    id:
+      row.id,
 
-  return purchase;
+    businessId:
+      row.business_id,
+
+    vendorId:
+      row.vendor_id ?? undefined,
+
+    invoiceNumber:
+      row.invoice_number ?? undefined,
+
+    purchaseDate:
+      row.purchase_date,
+
+    subtotal:
+      row.subtotal,
+
+    gstAmount:
+      row.gst_amount,
+
+    discount:
+      row.discount,
+
+    totalAmount:
+      row.total_amount,
+
+    paidAmount:
+      row.paid_amount,
+
+    dueAmount:
+      row.due_amount,
+
+    paymentStatus:
+      row.payment_status as
+        | 'UNPAID'
+        | 'PARTIAL'
+        | 'PAID',
+
+    notes:
+      row.notes ?? undefined,
+
+    createdAt:
+      row.created_at,
+
+    updatedAt:
+      row.updated_at,
+  };
 }
 
-/* =================================
-   LOAD PURCHASE ITEMS
-================================= */
+/*
+ * ---------------------------------------------------------
+ * LOAD PURCHASE ITEMS
+ * ---------------------------------------------------------
+ */
 
 export async function loadPurchaseItems(
   purchaseId: string,
-): Promise<PurchaseItemRow[]> {
-  if (!purchaseId) {
-    return [];
-  }
-
-  const purchase =
-    await loadPurchase(
+): Promise<PurchaseItem[]> {
+  const rows =
+    await getPurchaseItems(
       purchaseId,
     );
 
-  if (!purchase) {
-    return [];
-  }
+  return rows.map(row => ({
+    id:
+      row.id,
 
-  return getPurchaseItems(
-    purchaseId,
-  );
+    purchaseId:
+      row.purchase_id,
+
+    productId:
+      row.product_id,
+
+    quantity:
+      row.quantity,
+
+    unitPrice:
+      row.unit_price,
+
+    gstRate:
+      row.gst_rate,
+
+    gstAmount:
+      row.gst_amount,
+
+    discount:
+      row.discount,
+
+    totalAmount:
+      row.total_amount,
+
+    createdAt:
+      row.created_at,
+  }));
 }
 
-/* =================================
-   LOAD PURCHASE WITH ITEMS
-================================= */
-
-export interface PurchaseWithItems {
-  purchase: PurchaseRow;
-  items: PurchaseItemRow[];
-}
+/*
+ * ---------------------------------------------------------
+ * LOAD PURCHASE + ITEMS
+ * ---------------------------------------------------------
+ */
 
 export async function loadPurchaseWithItems(
   purchaseId: string,
-): Promise<PurchaseWithItems | null> {
+): Promise<{
+  purchase: Purchase;
+  items: PurchaseItem[];
+} | null> {
   const purchase =
     await loadPurchase(
       purchaseId,
@@ -417,7 +639,7 @@ export async function loadPurchaseWithItems(
   }
 
   const items =
-    await getPurchaseItems(
+    await loadPurchaseItems(
       purchaseId,
     );
 
@@ -427,22 +649,17 @@ export async function loadPurchaseWithItems(
   };
 }
 
-/* =================================
-   DELETE PURCHASE
-================================= */
+/*
+ * ---------------------------------------------------------
+ * REMOVE PURCHASE
+ *
+ * Keep disabled until inventory reversal is implemented.
+ * ---------------------------------------------------------
+ */
 
 export async function removePurchase(
   purchaseId: string,
 ): Promise<void> {
-  const business =
-    await getBusiness();
-
-  if (!business) {
-    throw new Error(
-      'Business setup is required.',
-    );
-  }
-
   const purchase =
     await getPurchaseById(
       purchaseId,
@@ -451,15 +668,6 @@ export async function removePurchase(
   if (!purchase) {
     throw new Error(
       'Purchase not found.',
-    );
-  }
-
-  if (
-    purchase.business_id !==
-    business.id
-  ) {
-    throw new Error(
-      'You cannot delete a purchase from another business.',
     );
   }
 

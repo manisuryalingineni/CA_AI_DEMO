@@ -24,26 +24,10 @@ import { SafeAreaView } from
 
 import { colors } from '../../src/theme/colors';
 
-
-/* =================================
-   TEMPORARY PURCHASE TYPE
-================================= */
-
-type PurchaseStatus =
-  | 'UNPAID'
-  | 'PARTIAL'
-  | 'PAID';
-
-interface PurchaseListItem {
-  id: string;
-  vendorName: string;
-  invoiceNumber: string;
-  purchaseDate: string;
-  totalAmount: number;
-  paidAmount: number;
-  dueAmount: number;
-  paymentStatus: PurchaseStatus;
-}
+import {
+  loadPurchases,
+  type PurchaseListItem,
+} from '../../src/services/purchaseService';
 
 
 /* =================================
@@ -61,6 +45,9 @@ export default function PurchasesScreen() {
   const [search, setSearch] =
     useState('');
 
+  const [loading, setLoading] =
+    useState(false);
+
 
   /* =================================
      LOAD PURCHASES
@@ -69,15 +56,32 @@ export default function PurchasesScreen() {
   const refreshPurchases =
     useCallback(async () => {
 
-      /*
-       * Backend connection will be added
-       * after colleague completes the
-       * purchase service.
-       *
-       * For now this is UI-only.
-       */
+      try {
 
-      setPurchases([]);
+        setLoading(true);
+
+        const data =
+          await loadPurchases();
+
+        setPurchases(data);
+
+      } catch (error) {
+
+        console.error(
+          'Failed to load purchases:',
+          error,
+        );
+
+        Alert.alert(
+          'Error',
+          'Unable to load purchases.',
+        );
+
+      } finally {
+
+        setLoading(false);
+
+      }
 
     }, []);
 
@@ -113,13 +117,13 @@ export default function PurchasesScreen() {
         }
 
         return (
-          purchase.vendorName
+          (purchase.vendorName ?? '')
             .toLowerCase()
             .includes(query)
 
           ||
 
-          purchase.invoiceNumber
+          (purchase.invoiceNumber ?? '')
             .toLowerCase()
             .includes(query)
         );
@@ -165,6 +169,42 @@ export default function PurchasesScreen() {
     router.push(
       '/purchases/add',
     );
+
+  };
+
+
+  /* =================================
+     VIEW PURCHASE
+  ================================= */
+
+  const handleViewPurchase = (
+    purchaseId: string,
+  ) => {
+
+    router.push({
+      pathname: '/purchases/view',
+      params: {
+        purchaseId,
+      },
+    });
+
+  };
+
+
+  /* =================================
+     EDIT PURCHASE
+  ================================= */
+
+  const handleEditPurchase = (
+    purchaseId: string,
+  ) => {
+
+    router.push({
+      pathname: '/purchases/add',
+      params: {
+        purchaseId,
+      },
+    });
 
   };
 
@@ -488,9 +528,53 @@ export default function PurchasesScreen() {
           </View>
 
 
-          {/* EMPTY / LIST */}
+          {/* LOADING */}
 
-          {filteredPurchases.length === 0 ? (
+          {loading ? (
+
+            <View
+              style={
+                styles.emptyCard
+              }
+            >
+
+              <View
+                style={
+                  styles.emptyIconCircle
+                }
+              >
+
+                <Text
+                  style={
+                    styles.emptyIcon
+                  }
+                >
+                  P
+                </Text>
+
+              </View>
+
+
+              <Text
+                style={
+                  styles.emptyTitle
+                }
+              >
+                Loading purchases...
+              </Text>
+
+
+              <Text
+                style={
+                  styles.emptyText
+                }
+              >
+                Please wait while purchases are loaded.
+              </Text>
+
+            </View>
+
+          ) : filteredPurchases.length === 0 ? (
 
             <View
               style={
@@ -599,7 +683,10 @@ export default function PurchasesScreen() {
                             }
                             numberOfLines={1}
                           >
-                            {purchase.vendorName}
+                            {
+                              purchase.vendorName ||
+                              'Unknown Vendor'
+                            }
                           </Text>
 
                           <Text
@@ -607,7 +694,8 @@ export default function PurchasesScreen() {
                               styles.purchaseInvoice
                             }
                           >
-                            Invoice: {
+                            Invoice:{' '}
+                            {
                               purchase.invoiceNumber ||
                               '—'
                             }
@@ -784,6 +872,11 @@ export default function PurchasesScreen() {
                     >
 
                       <Pressable
+                        onPress={() =>
+                          handleViewPurchase(
+                            purchase.id,
+                          )
+                        }
                         style={
                           styles.viewButton
                         }
@@ -801,6 +894,11 @@ export default function PurchasesScreen() {
 
 
                       <Pressable
+                        onPress={() =>
+                          handleEditPurchase(
+                            purchase.id,
+                          )
+                        }
                         style={
                           styles.editButton
                         }

@@ -1,4 +1,4 @@
-import { getBusiness } from '../repositories/businessRepository';
+import { getBusiness } from "../repositories/businessRepository";
 
 import {
   createSale,
@@ -6,14 +6,18 @@ import {
   getSaleById,
   getSaleItems,
   deleteSale,
-} from '../repositories/saleRepository';
+} from "../repositories/saleRepository";
 
 import type {
   CreateSaleInput,
   Sale,
   SaleItem,
   SaleWithItems,
-} from '../types/sale';
+} from "../types/sale";
+
+/* =========================================================
+   IDS
+========================================================= */
 
 function generateSaleId(): string {
   return `sale_${Date.now()}_${Math.random()
@@ -27,103 +31,130 @@ function generateSaleItemId(): string {
     .slice(2, 8)}`;
 }
 
+/* =========================================================
+   VALIDATION
+========================================================= */
+
 function validateSaleInput(
   input: CreateSaleInput,
 ): void {
   if (!input.saleDate.trim()) {
-    throw new Error('Sale date is required.');
+    throw new Error(
+      "Sale date is required.",
+    );
   }
 
   if (!input.items.length) {
     throw new Error(
-      'Add at least one product to the sale.',
+      "Add at least one product to the sale.",
     );
   }
 
   if (input.subtotal < 0) {
-    throw new Error('Subtotal cannot be negative.');
+    throw new Error(
+      "Subtotal cannot be negative.",
+    );
   }
 
   if (input.gstAmount < 0) {
-    throw new Error('GST amount cannot be negative.');
+    throw new Error(
+      "GST amount cannot be negative.",
+    );
   }
 
   if (input.discount < 0) {
-    throw new Error('Discount cannot be negative.');
+    throw new Error(
+      "Discount cannot be negative.",
+    );
   }
 
   if (input.totalAmount < 0) {
-    throw new Error('Total amount cannot be negative.');
+    throw new Error(
+      "Total amount cannot be negative.",
+    );
   }
 
   if (input.paidAmount < 0) {
-    throw new Error('Paid amount cannot be negative.');
+    throw new Error(
+      "Paid amount cannot be negative.",
+    );
   }
 
   if (input.dueAmount < 0) {
-    throw new Error('Due amount cannot be negative.');
+    throw new Error(
+      "Due amount cannot be negative.",
+    );
   }
 
-  if (input.paidAmount > input.totalAmount) {
+  if (
+    input.paidAmount >
+    input.totalAmount
+  ) {
     throw new Error(
-      'Paid amount cannot be greater than total amount.',
+      "Paid amount cannot be greater than total amount.",
     );
   }
 
   for (const item of input.items) {
     if (!item.productId.trim()) {
       throw new Error(
-        'Every sale item must have a product.',
+        "Every sale item must have a product.",
       );
     }
 
     if (item.quantity <= 0) {
       throw new Error(
-        'Product quantity must be greater than zero.',
+        "Product quantity must be greater than zero.",
       );
     }
 
     if (item.unitPrice < 0) {
       throw new Error(
-        'Product price cannot be negative.',
+        "Product price cannot be negative.",
       );
     }
 
     if (item.gstRate < 0) {
       throw new Error(
-        'GST rate cannot be negative.',
+        "GST rate cannot be negative.",
       );
     }
 
     if (item.gstAmount < 0) {
       throw new Error(
-        'GST amount cannot be negative.',
+        "GST amount cannot be negative.",
       );
     }
 
     if (item.discount < 0) {
       throw new Error(
-        'Item discount cannot be negative.',
+        "Item discount cannot be negative.",
       );
     }
 
     if (item.totalAmount < 0) {
       throw new Error(
-        'Item total cannot be negative.',
+        "Item total cannot be negative.",
       );
     }
   }
 }
+
+/* =========================================================
+   NORMALIZE
+========================================================= */
 
 function normalizeSaleInput(
   input: CreateSaleInput,
 ): CreateSaleInput {
   return {
     customerId:
-      input.customerId?.trim() || undefined,
+      input.customerId?.trim() ||
+      undefined,
 
     invoiceNumber:
-      input.invoiceNumber?.trim() || undefined,
+      input.invoiceNumber?.trim() ||
+      undefined,
 
     saleDate:
       input.saleDate.trim(),
@@ -138,7 +169,8 @@ function normalizeSaleInput(
       Number(input.discount) || 0,
 
     totalAmount:
-      Number(input.totalAmount) || 0,
+      Number(input.totalAmount) ||
+      0,
 
     paidAmount:
       Number(input.paidAmount) || 0,
@@ -153,32 +185,82 @@ function normalizeSaleInput(
       input.paymentStatus,
 
     notes:
-      input.notes?.trim() || undefined,
+      input.notes?.trim() ||
+      undefined,
 
-    items: input.items.map((item) => ({
-      productId:
-        item.productId.trim(),
+    items:
+      input.items.map((item) => ({
+        productId:
+          item.productId.trim(),
 
-      quantity:
-        Number(item.quantity) || 0,
+        quantity:
+          Number(item.quantity) || 0,
 
-      unitPrice:
-        Number(item.unitPrice) || 0,
+        unitPrice:
+          Number(item.unitPrice) || 0,
 
-      gstRate:
-        Number(item.gstRate) || 0,
+        gstRate:
+          Number(item.gstRate) || 0,
 
-      gstAmount:
-        Number(item.gstAmount) || 0,
+        gstAmount:
+          Number(item.gstAmount) || 0,
 
-      discount:
-        Number(item.discount) || 0,
+        discount:
+          Number(item.discount) || 0,
 
-      totalAmount:
-        Number(item.totalAmount) || 0,
-    })),
+        totalAmount:
+          Number(item.totalAmount) ||
+          0,
+      })),
   };
 }
+
+/* =========================================================
+   INVOICE NUMBER
+========================================================= */
+
+async function generateInvoiceNumber(
+  businessId: string,
+): Promise<string> {
+  const sales =
+    await getSales(businessId);
+
+  let maxNumber = 1000;
+
+  for (const sale of sales) {
+    const invoice =
+      sale.invoiceNumber;
+
+    if (!invoice) {
+      continue;
+    }
+
+    const match =
+      invoice.match(
+        /^INV-(\d+)$/,
+      );
+
+    if (!match) {
+      continue;
+    }
+
+    const number =
+      Number(match[1]);
+
+    if (
+      Number.isFinite(number) &&
+      number > maxNumber
+    ) {
+      maxNumber = number;
+    }
+  }
+
+  return `INV-${maxNumber + 1}`;
+}
+
+/* =========================================================
+   SAVE SALE
+========================================================= */
 
 export async function saveSale(
   input: CreateSaleInput,
@@ -186,14 +268,16 @@ export async function saveSale(
   const normalized =
     normalizeSaleInput(input);
 
-  validateSaleInput(normalized);
+  validateSaleInput(
+    normalized,
+  );
 
   const business =
     await getBusiness();
 
   if (!business) {
     throw new Error(
-      'Business setup is required before creating a sale.',
+      "Business setup is required before creating a sale.",
     );
   }
 
@@ -203,8 +287,15 @@ export async function saveSale(
   const saleId =
     generateSaleId();
 
+  const invoiceNumber =
+    normalized.invoiceNumber ||
+    (await generateInvoiceNumber(
+      business.id,
+    ));
+
   const sale: Sale = {
-    id: saleId,
+    id:
+      saleId,
 
     businessId:
       business.id,
@@ -212,8 +303,7 @@ export async function saveSale(
     customerId:
       normalized.customerId,
 
-    invoiceNumber:
-      normalized.invoiceNumber,
+    invoiceNumber,
 
     saleDate:
       normalized.saleDate,
@@ -253,37 +343,38 @@ export async function saveSale(
   };
 
   const items: SaleItem[] =
-    normalized.items.map((item) => ({
-      id:
-        generateSaleItemId(),
+    normalized.items.map(
+      (item) => ({
+        id:
+          generateSaleItemId(),
 
-      saleId:
         saleId,
 
-      productId:
-        item.productId,
+        productId:
+          item.productId,
 
-      quantity:
-        item.quantity,
+        quantity:
+          item.quantity,
 
-      unitPrice:
-        item.unitPrice,
+        unitPrice:
+          item.unitPrice,
 
-      gstRate:
-        item.gstRate,
+        gstRate:
+          item.gstRate,
 
-      gstAmount:
-        item.gstAmount,
+        gstAmount:
+          item.gstAmount,
 
-      discount:
-        item.discount,
+        discount:
+          item.discount,
 
-      totalAmount:
-        item.totalAmount,
+        totalAmount:
+          item.totalAmount,
 
-      createdAt:
-        now,
-    }));
+        createdAt:
+          now,
+      }),
+    );
 
   await createSale(
     sale,
@@ -293,7 +384,13 @@ export async function saveSale(
   return sale;
 }
 
-export async function loadSales(): Promise<Sale[]> {
+/* =========================================================
+   LOAD SALES
+========================================================= */
+
+export async function loadSales(): Promise<
+  Sale[]
+> {
   const business =
     await getBusiness();
 
@@ -305,6 +402,10 @@ export async function loadSales(): Promise<Sale[]> {
     business.id,
   );
 }
+
+/* =========================================================
+   LOAD SINGLE SALE
+========================================================= */
 
 export async function loadSale(
   saleId: string,
@@ -339,6 +440,10 @@ export async function loadSale(
   return sale;
 }
 
+/* =========================================================
+   LOAD ITEMS
+========================================================= */
+
 export async function loadSaleItems(
   saleId: string,
 ): Promise<SaleItem[]> {
@@ -355,6 +460,10 @@ export async function loadSaleItems(
     saleId,
   );
 }
+
+/* =========================================================
+   LOAD SALE WITH ITEMS
+========================================================= */
 
 export async function loadSaleWithItems(
   saleId: string,
@@ -379,6 +488,10 @@ export async function loadSaleWithItems(
   };
 }
 
+/* =========================================================
+   DELETE SALE
+========================================================= */
+
 export async function removeSale(
   saleId: string,
 ): Promise<void> {
@@ -387,7 +500,7 @@ export async function removeSale(
 
   if (!business) {
     throw new Error(
-      'Business setup is required.',
+      "Business setup is required.",
     );
   }
 
@@ -398,7 +511,7 @@ export async function removeSale(
 
   if (!sale) {
     throw new Error(
-      'Sale not found.',
+      "Sale not found.",
     );
   }
 
@@ -407,7 +520,7 @@ export async function removeSale(
     business.id
   ) {
     throw new Error(
-      'You cannot delete a sale from another business.',
+      "You cannot delete a sale from another business.",
     );
   }
 
