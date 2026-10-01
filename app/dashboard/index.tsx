@@ -233,7 +233,7 @@ export default function DashboardScreen() {
 
           <Pressable style={styles.userButton}>
             <Text style={styles.userButtonText}>
-              👤 Business Owner
+              👤 Role
             </Text>
           </Pressable>
         </View>
@@ -264,7 +264,7 @@ export default function DashboardScreen() {
               style={[
                 styles.heroRow,
                 !isLargeScreen &&
-                  styles.heroRowMobile,
+                  styles.heroRowMobile, 
               ]}
             >
               <View style={styles.heroIdentity}>
