@@ -13,17 +13,17 @@ import type {
   Customer,
 } from '../types/customer';
 
-/* ================================
+/*     ====
    ID GENERATOR
-================================ */
+    ==== */
 
 function generateCustomerId(): string {
   return `customer_${Date.now()}`;
 }
 
-/* ================================
+/*     ====
    VALIDATION
-================================ */
+    ==== */
 
 function validateCustomerInput(
   input: CreateCustomerInput,
@@ -99,9 +99,9 @@ function validateCustomerInput(
   };
 }
 
-/* ================================
+/*     ====
    CREATE CUSTOMER
-================================ */
+    ==== */
 
 export async function saveCustomer(
   input: CreateCustomerInput,
@@ -152,9 +152,9 @@ export async function saveCustomer(
   return customer;
 }
 
-/* ================================
+/*     ====
    LOAD CUSTOMERS
-================================ */
+    ==== */
 
 export async function loadCustomers(): Promise<Customer[]> {
   const business = await getBusiness();
@@ -166,9 +166,9 @@ export async function loadCustomers(): Promise<Customer[]> {
   return findCustomers(business.id);
 }
 
-/* ================================
+/*     ====
    LOAD ONE CUSTOMER
-================================ */
+    ==== */
 
 export async function loadCustomer(
   customerId: string,
@@ -176,9 +176,9 @@ export async function loadCustomer(
   return findCustomerById(customerId);
 }
 
-/* ================================
+/*     ====
    UPDATE CUSTOMER
-================================ */
+    ==== */
 
 export async function editCustomer(
   customer: Customer,
@@ -239,9 +239,9 @@ export async function editCustomer(
   return updatedCustomer;
 }
 
-/* ================================
+/*     ====
    DELETE CUSTOMER
-================================ */
+    ==== */
 
 export async function removeCustomer(
   customerId: string,

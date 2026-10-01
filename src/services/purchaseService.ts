@@ -21,9 +21,9 @@ import type {
 } from '../repositories/purchaseRepository';
 
 
-/* =========================================
+/*      ======
    INPUT TYPES
-========================================= */
+     ====== */
 
 export interface CreatePurchaseItemInput {
   productId: string;
@@ -79,6 +79,7 @@ export interface CreatePurchaseInput {
 
   totalAmount: number;
 
+
   paidAmount: number;
 
   dueAmount: number;
@@ -91,9 +92,9 @@ export interface CreatePurchaseInput {
 }
 
 
-/* =========================================
+/*      ======
    ID GENERATORS
-========================================= */
+     ====== */
 
 function generatePurchaseId(): string {
   return (
@@ -157,9 +158,15 @@ function generatePurchaseNumber(): string {
 }
 
 
-/* =========================================
+/*      ======
    NORMALISE
-========================================= */
+     ====== */
+
+/*
+ * ---------------------------------------------------------
+ * NORMALIZATION
+ * ---------------------------------------------------------
+ */
 
 function normalizePurchaseInput(
   input: CreatePurchaseInput,
@@ -270,9 +277,9 @@ function normalizePurchaseInput(
 }
 
 
-/* =========================================
+/*      ======
    VALIDATION
-========================================= */
+     ====== */
 
 function validatePurchaseInput(
   input: CreatePurchaseInput,
@@ -488,9 +495,9 @@ function validatePurchaseInput(
 }
 
 
-/* =========================================
+/*      ======
    SAVE PURCHASE
-========================================= */
+     ====== */
 
 export async function savePurchase(
   input: CreatePurchaseInput,
@@ -666,9 +673,9 @@ export async function savePurchase(
 }
 
 
-/* =========================================
+/*      ======
    LOAD PURCHASES
-========================================= */
+     ====== */
 
 export async function loadPurchases():
   Promise<PurchaseListRow[]> {
@@ -688,9 +695,9 @@ export async function loadPurchases():
 }
 
 
-/* =========================================
+/*      ======
    LOAD ONE PURCHASE
-========================================= */
+     ====== */
 
 export async function loadPurchase(
   purchaseId: string,
@@ -733,9 +740,9 @@ export async function loadPurchase(
 }
 
 
-/* =========================================
+/*      ======
    LOAD PURCHASE ITEMS
-========================================= */
+     ====== */
 
 export async function loadPurchaseItems(
   purchaseId: string,
@@ -758,9 +765,9 @@ export async function loadPurchaseItems(
 }
 
 
-/* =========================================
+/*      ======
    PURCHASE + ITEMS
-========================================= */
+     ====== */
 
 export interface PurchaseWithItems {
   purchase: PurchaseRow;
@@ -785,7 +792,7 @@ export async function loadPurchaseWithItems(
 
 
   const items =
-    await getPurchaseItems(
+    await loadPurchaseItems(
       purchaseId,
     );
 
@@ -797,9 +804,9 @@ export async function loadPurchaseWithItems(
 }
 
 
-/* =========================================
+/*      ======
    DASHBOARD TOTALS
-========================================= */
+     ====== */
 
 export async function loadPurchaseDashboardTotals():
   Promise<PurchaseDashboardTotals> {
@@ -823,9 +830,9 @@ export async function loadPurchaseDashboardTotals():
 }
 
 
-/* =========================================
+/*      ======
    DELETE PURCHASE
-========================================= */
+     ====== */
 
 export async function removePurchase(
   purchaseId: string,

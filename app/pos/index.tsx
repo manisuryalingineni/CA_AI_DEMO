@@ -1,6 +1,13 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, {
+  useCallback,
+  useMemo,
+  useState,
+  useRef,
+} from "react";
+
 import {
   Alert,
+  Animated,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -10,63 +17,55 @@ import {
   TextInput,
   View,
   useWindowDimensions,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { router, useFocusEffect } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+} from "react-native";
 
-import { loadCustomers } from '../../src/services/customerService';
-import { loadProducts } from '../../src/services/productService';
-import { saveSale } from '../../src/services/saleService';
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 
-import type { Customer } from '../../src/types/customer';
-import type { Product } from '../../src/types/product';
+import {
+  router,
+  useFocusEffect,
+} from "expo-router";
+
+import { Ionicons } from "@expo/vector-icons";
+
+import { loadCustomers } from "../../src/services/customerService";
+import { loadProducts } from "../../src/services/productService";
+import { saveSale } from "../../src/services/saleService";
+
+import type { Customer } from "../../src/types/customer";
+import type { Product } from "../../src/types/product";
+
 import type {
   PaymentMethod,
   PaymentStatus,
-} from '../../src/types/sale';
+} from "../../src/types/sale";
 
-import { colors } from '../../src/theme/colors';
+import { colors } from "../../src/theme/colors";
+
+/*         =
+   TYPES
+        = */
 
 type CartItem = {
   product: Product;
   quantity: number;
 };
 
-const PAYMENT_METHODS: {
-  label: string;
-  value: PaymentMethod;
-  icon: keyof typeof Ionicons.glyphMap;
-}[] = [
-  {
-    label: 'Cash',
-    value: 'CASH',
-    icon: 'cash-outline',
-  },
-  {
-    label: 'UPI',
-    value: 'UPI',
-    icon: 'phone-portrait-outline',
-  },
-  {
-    label: 'Card',
-    value: 'CARD',
-    icon: 'card-outline',
-  },
-  {
-    label: 'Cheque',
-    value: 'CHEQUE',
-    icon: 'document-text-outline',
-  },
-  {
-    label: 'Credit',
-    value: 'CREDIT',
-    icon: 'time-outline',
-  },
-];
+type ScreenSize =
+  | "small"
+  | "phone"
+  | "tablet"
+  | "desktop";
+
+/*         =
+   HELPERS
+        = */
 
 function formatCurrency(value: number): string {
-  return `₹${value.toLocaleString('en-IN', {
+  return `₹${value.toLocaleString("en-IN", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
@@ -74,6 +73,16 @@ function formatCurrency(value: number): string {
 
 function todayString(): string {
   return new Date().toISOString().slice(0, 10);
+}
+
+function displayDate(date: string): string {
+  if (!date) return "";
+
+  const parts = date.split("-");
+
+  if (parts.length !== 3) return date;
+
+  return `${parts[2]}/${parts[1]}/${parts[0]}`;
 }
 
 function calculateItem(item: CartItem) {
@@ -93,10 +102,86 @@ function calculateItem(item: CartItem) {
   };
 }
 
+/*         =
+   FIELD LABEL
+        = */
+
+function FieldLabel({
+  children,
+  required,
+}: {
+  children: React.ReactNode;
+  required?: boolean;
+}) {
+  return (
+    <Text style={styles.fieldLabel}>
+      {children}
+      {required ? " *" : ""}
+    </Text>
+  );
+}
+
+/*         =
+   COMPACT INPUT
+        = */
+
+type FormInputProps = {
+  value: string;
+  placeholder: string;
+  onChangeText: (value: string) => void;
+  editable?: boolean;
+  keyboardType?: "default" | "numeric" | "decimal-pad";
+};
+
+function FormInput({
+  value,
+  placeholder,
+  onChangeText,
+  editable = true,
+  keyboardType = "default",
+}: FormInputProps) {
+  return (
+    <View style={styles.inputShell}>
+      <TextInput
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor="#8B949C"
+        editable={editable}
+        keyboardType={keyboardType}
+        style={styles.formInput}
+      />
+    </View>
+  );
+}
+
+/*         =
+   POS SCREEN
+        = */
+
 export default function POSScreen() {
   const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
 
-  const isLargeScreen = width >= 700;
+  const screenSize: ScreenSize =
+    width < 360
+      ? "small"
+      : width < 768
+        ? "phone"
+        : width < 1100
+          ? "tablet"
+          : "desktop";
+
+  const isSmall =
+    screenSize === "small";
+
+  const isWide =
+    screenSize === "tablet" ||
+    screenSize === "desktop";
+
+  /*        ======
+     DATA
+         ====== */
 
   const [products, setProducts] =
     useState<Product[]>([]);
@@ -107,49 +192,125 @@ export default function POSScreen() {
   const [cart, setCart] =
     useState<CartItem[]>([]);
 
-  const [search, setSearch] =
-    useState('');
-
-  const [customerSearch, setCustomerSearch] =
-    useState('');
-
-  const [selectedCustomer, setSelectedCustomer] =
+  const [
+    selectedCustomer,
+    setSelectedCustomer,
+  ] =
     useState<Customer | null>(null);
 
-  const [showCustomers, setShowCustomers] =
-    useState(false);
+  const [
+    showCustomers,
+    setShowCustomers,
+  ] = useState(false);
 
-  const [paymentMethod, setPaymentMethod] =
-    useState<PaymentMethod>('CASH');
+  const [
+    customerSearch,
+    setCustomerSearch,
+  ] = useState("");
 
-  const [paidAmount, setPaidAmount] =
-    useState('');
+  const [
+    selectedProduct,
+    setSelectedProduct,
+  ] =
+    useState<Product | null>(null);
+
+  const [
+    showProducts,
+    setShowProducts,
+  ] = useState(false);
+
+  const [
+    productSearch,
+    setProductSearch,
+  ] = useState("");
+
+  const [quantity, setQuantity] =
+    useState("1");
+
+  const [rate, setRate] =
+    useState("");
+
+  const [gstRate, setGstRate] =
+    useState("");
+
+  const [
+    documentDate,
+    setDocumentDate,
+  ] = useState(todayString());
+
+  const [
+    dueDate,
+    setDueDate,
+  ] = useState(todayString());
+
+  const [supply] = useState(
+    "Within state (CGST + SGST)",
+  );
+
+  const [branch, setBranch] =
+    useState("");
+
+  const [
+    salesperson,
+    setSalesperson,
+  ] = useState("");
+
+  const [
+    delivery,
+    setDelivery,
+  ] = useState("");
 
   const [notes, setNotes] =
-    useState('');
+    useState("");
+
+  const [paymentMethod] =
+    useState<PaymentMethod>("CASH");
+
+  const [paidAmount] =
+    useState("");
 
   const [saving, setSaving] =
     useState(false);
 
-  const loadData = useCallback(async () => {
-    try {
-      const [loadedProducts, loadedCustomers] =
-        await Promise.all([
-          loadProducts(),
-          loadCustomers(),
-        ]);
 
-      setProducts(loadedProducts);
-      setCustomers(loadedCustomers);
-    } catch (error) {
-      Alert.alert(
-        'Unable to load POS',
-        error instanceof Error
-          ? error.message
-          : 'Something went wrong.',
-      );
-    }
-  }, []);
+  const [toastVisible, setToastVisible] =
+  useState(false);
+
+const toastOpacity =
+  useRef(new Animated.Value(0)).current;
+
+  /*        ======
+     LOAD DATA
+         ====== */
+
+  const loadData =
+    useCallback(async () => {
+      try {
+        const [
+          loadedProducts,
+          loadedCustomers,
+        ] =
+          await Promise.all([
+            loadProducts(),
+            loadCustomers(),
+          ]);
+
+        setProducts(
+          loadedProducts,
+        );
+
+        setCustomers(
+          loadedCustomers,
+        );
+      } catch (error) {
+        Alert.alert(
+          "Unable to load POS",
+          error instanceof Error
+            ? error.message
+            : "Something went wrong.",
+        );
+      }
+    }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -157,158 +318,295 @@ export default function POSScreen() {
     }, [loadData]),
   );
 
-  const filteredProducts = useMemo(() => {
-    const query =
-      search.trim().toLowerCase();
+  /*        ======
+     FILTER CUSTOMERS
+         ====== */
 
-    if (!query) {
-      return products.slice(0, 20);
-    }
+  const filteredCustomers =
+    useMemo(() => {
+      const query =
+        customerSearch
+          .trim()
+          .toLowerCase();
 
-    return products
-      .filter((product) => {
-        return (
-          product.name
-            .toLowerCase()
-            .includes(query) ||
-          product.barcode
-            ?.toLowerCase()
-            .includes(query) ||
-          product.brand
-            ?.toLowerCase()
-            .includes(query) ||
-          product.hsn
-            ?.toLowerCase()
-            .includes(query)
+      if (!query) {
+        return customers.slice(
+          0,
+          8,
         );
-      })
-      .slice(0, 20);
-  }, [products, search]);
+      }
 
-  const filteredCustomers = useMemo(() => {
-    const query =
-      customerSearch.trim().toLowerCase();
+      return customers
+        .filter((customer) => {
+          return (
+            customer.name
+              .toLowerCase()
+              .includes(query) ||
+            customer.mobile
+              .toLowerCase()
+              .includes(query) ||
+            customer.gstin
+              ?.toLowerCase()
+              .includes(query)
+          );
+        })
+        .slice(0, 8);
+    }, [
+      customers,
+      customerSearch,
+    ]);
 
-    if (!query) {
-      return customers.slice(0, 10);
-    }
+    const showSuccessToast = () => {
+  setToastVisible(true);
 
-    return customers
-      .filter((customer) => {
-        return (
-          customer.name
-            .toLowerCase()
-            .includes(query) ||
-          customer.mobile
-            .toLowerCase()
-            .includes(query) ||
-          customer.gstin
-            ?.toLowerCase()
-            .includes(query)
+  Animated.sequence([
+    Animated.timing(
+      toastOpacity,
+      {
+        toValue: 1,
+        duration: 220,
+        useNativeDriver: true,
+      },
+    ),
+
+    Animated.delay(1800),
+
+    Animated.timing(
+      toastOpacity,
+      {
+        toValue: 0,
+        duration: 220,
+        useNativeDriver: true,
+      },
+    ),
+  ]).start(() => {
+    setToastVisible(false);
+  });
+};
+
+  /*        ======
+     FILTER PRODUCTS
+         ====== */
+
+  const filteredProducts =
+    useMemo(() => {
+      const query =
+        productSearch
+          .trim()
+          .toLowerCase();
+
+      if (!query) {
+        return products.slice(
+          0,
+          10,
         );
-      })
-      .slice(0, 10);
-  }, [customers, customerSearch]);
+      }
 
-  const subtotal = useMemo(() => {
-    return cart.reduce((sum, item) => {
-      return (
-        sum +
-        item.product.salePrice *
-          item.quantity
+      return products
+        .filter((product) => {
+          return (
+            product.name
+              .toLowerCase()
+              .includes(query) ||
+            product.barcode
+              ?.toLowerCase()
+              .includes(query) ||
+            product.brand
+              ?.toLowerCase()
+              .includes(query) ||
+            product.hsn
+              ?.toLowerCase()
+              .includes(query)
+          );
+        })
+        .slice(0, 10);
+    }, [
+      products,
+      productSearch,
+    ]);
+
+  /*        ======
+     TOTALS
+         ====== */
+
+  const subtotal =
+    useMemo(() => {
+      return cart.reduce(
+        (sum, item) => {
+          return (
+            sum +
+            item.product.salePrice *
+              item.quantity
+          );
+        },
+        0,
       );
-    }, 0);
-  }, [cart]);
+    }, [cart]);
 
-  const gstAmount = useMemo(() => {
-    return cart.reduce((sum, item) => {
-      return (
-        sum +
-        calculateItem(item).gstAmount
+  const gstAmount =
+    useMemo(() => {
+      return cart.reduce(
+        (sum, item) => {
+          return (
+            sum +
+            calculateItem(item).gstAmount
+          );
+        },
+        0,
       );
-    }, 0);
-  }, [cart]);
+    }, [cart]);
 
-  const totalAmount = useMemo(() => {
-    return subtotal + gstAmount;
-  }, [subtotal, gstAmount]);
+  const totalAmount =
+    useMemo(() => {
+      return subtotal + gstAmount;
+    }, [
+      subtotal,
+      gstAmount,
+    ]);
 
   const numericPaidAmount =
     Number(paidAmount) || 0;
 
-  const dueAmount = Math.max(
-    totalAmount - numericPaidAmount,
-    0,
-  );
+  const dueAmount =
+    Math.max(
+      totalAmount -
+        numericPaidAmount,
+      0,
+    );
 
-  const paymentStatus: PaymentStatus =
-    numericPaidAmount >= totalAmount
-      ? 'PAID'
+  const paymentStatus:
+    PaymentStatus =
+    numericPaidAmount >=
+    totalAmount
+      ? "PAID"
       : numericPaidAmount > 0
-        ? 'PARTIAL'
-        : 'DUE';
+        ? "PARTIAL"
+        : "DUE";
 
-  const addProduct = (product: Product) => {
+  /*        ======
+     CUSTOMER
+         ====== */
+
+  const selectCustomer = (
+    customer: Customer,
+  ) => {
+    setSelectedCustomer(
+      customer,
+    );
+
+    setCustomerSearch("");
+
+    setShowCustomers(false);
+  };
+
+  /*        ======
+     PRODUCT SELECT
+         ====== */
+
+  const selectProduct = (
+    product: Product,
+  ) => {
+    setSelectedProduct(
+      product,
+    );
+
+    setProductSearch(
+      product.name,
+    );
+
+    setRate(
+      String(
+        product.salePrice,
+      ),
+    );
+
+    setGstRate(
+      String(
+        product.gstRate,
+      ),
+    );
+
+    setQuantity("1");
+
+    setShowProducts(false);
+  };
+
+  /*        ======
+     ADD LINE
+         ====== */
+
+  const handleAddLine = () => {
+    if (!selectedProduct) {
+      Alert.alert(
+        "Select item",
+        "Please select an item or service.",
+      );
+
+      return;
+    }
+
+    const qty =
+      Number(quantity);
+
+    if (
+      !qty ||
+      qty <= 0
+    ) {
+      Alert.alert(
+        "Invalid quantity",
+        "Please enter a valid quantity.",
+      );
+
+      return;
+    }
+
     setCart((current) => {
       const existing =
         current.find(
           (item) =>
             item.product.id ===
-            product.id,
+            selectedProduct.id,
         );
 
       if (existing) {
-        return current.map((item) =>
-          item.product.id ===
-          product.id
-            ? {
-                ...item,
-                quantity:
-                  item.quantity + 1,
-              }
-            : item,
+        return current.map(
+          (item) =>
+            item.product.id ===
+            selectedProduct.id
+              ? {
+                  ...item,
+                  quantity:
+                    item.quantity +
+                    qty,
+                }
+              : item,
         );
       }
 
       return [
         ...current,
         {
-          product,
-          quantity: 1,
+          product:
+            selectedProduct,
+          quantity: qty,
         },
       ];
     });
 
-    setSearch('');
+    setSelectedProduct(null);
+
+    setProductSearch("");
+
+    setQuantity("1");
+
+    setRate("");
+
+    setGstRate("");
   };
 
-  const updateQuantity = (
-    productId: string,
-    quantity: number,
-  ) => {
-    if (quantity <= 0) {
-      setCart((current) =>
-        current.filter(
-          (item) =>
-            item.product.id !==
-            productId,
-        ),
-      );
-      return;
-    }
-
-    setCart((current) =>
-      current.map((item) =>
-        item.product.id ===
-        productId
-          ? {
-              ...item,
-              quantity,
-            }
-          : item,
-      ),
-    );
-  };
+  /*        ======
+     REMOVE ITEM
+         ====== */
 
   const removeItem = (
     productId: string,
@@ -322,1115 +620,1205 @@ export default function POSScreen() {
     );
   };
 
-  const selectCustomer = (
-    customer: Customer,
-  ) => {
-    setSelectedCustomer(customer);
-    setCustomerSearch('');
-    setShowCustomers(false);
-  };
+  /*        ======
+     SAVE
+         ====== */
 
-  const clearCustomer = () => {
-    setSelectedCustomer(null);
-    setCustomerSearch('');
-  };
+  const handleSaveSale =
+    async () => {
+      if (!cart.length) {
+        Alert.alert(
+          "Add items",
+          "Please add at least one item to the tax invoice.",
+        );
 
-  const handleSaveSale = async () => {
-    if (!cart.length) {
-      Alert.alert(
-        'Add products',
-        'Please add at least one product to the sale.',
-      );
-      return;
-    }
+        return;
+      }
 
-    if (numericPaidAmount > totalAmount) {
-      Alert.alert(
-        'Invalid payment',
-        'Paid amount cannot be greater than the sale total.',
-      );
-      return;
-    }
+      try {
+        setSaving(true);
 
-    if (
-      paymentMethod === 'CREDIT' &&
-      numericPaidAmount >= totalAmount
-    ) {
-      Alert.alert(
-        'Payment method',
-        'Credit sales should have an outstanding amount.',
-      );
-      return;
-    }
+        const saleItems =
+          cart.map((item) => {
+            const calculated =
+              calculateItem(
+                item,
+              );
 
-    try {
-      setSaving(true);
+            return {
+              productId:
+                item.product.id,
 
-      const saleItems = cart.map(
-        (item) => {
-          const calculated =
-            calculateItem(item);
+              quantity:
+                item.quantity,
 
-          return {
-            productId:
-              item.product.id,
-            quantity:
-              item.quantity,
-            unitPrice:
-              item.product.salePrice,
-            gstRate:
-              item.product.gstRate,
-            gstAmount:
-              calculated.gstAmount,
+              unitPrice:
+                item.product
+                  .salePrice,
+
+              gstRate:
+                item.product
+                  .gstRate,
+
+              gstAmount:
+                calculated
+                  .gstAmount,
+
+              discount: 0,
+
+              totalAmount:
+                calculated
+                  .totalAmount,
+            };
+          });
+
+        const sale =
+          await saveSale({
+            customerId:
+              selectedCustomer
+                ?.id,
+
+            saleDate:
+              documentDate,
+
+            subtotal,
+
+            gstAmount,
+
             discount: 0,
-            totalAmount:
-              calculated.totalAmount,
-          };
-        },
-      );
 
-      const sale =
-        await saveSale({
-          customerId:
-            selectedCustomer?.id,
-          saleDate:
-            todayString(),
-          subtotal,
-          gstAmount,
-          discount: 0,
-          totalAmount,
-          paidAmount:
-            numericPaidAmount,
-          dueAmount,
-          paymentMethod,
-          paymentStatus,
-          notes:
-            notes.trim() || undefined,
-          items: saleItems,
-        });
+            totalAmount,
 
-      Alert.alert(
-        'Sale saved',
-        `Sale total ${formatCurrency(
-          sale.totalAmount,
-        )} has been saved successfully.`,
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              setCart([]);
-              setPaidAmount('');
-              setNotes('');
-              setSelectedCustomer(null);
-              setPaymentMethod('CASH');
+            paidAmount:
+              numericPaidAmount,
+
+            dueAmount,
+
+            paymentMethod,
+
+            paymentStatus,
+
+            notes:
+              notes.trim() ||
+              undefined,
+
+            items:
+              saleItems,
+          });
+
+        Alert.alert(
+          "Tax invoice saved",
+          `Invoice total ${formatCurrency(
+            sale.totalAmount,
+          )} saved successfully.`,
+          [
+            {
+              text: "OK",
+
+              onPress: () => {
+                setCart([]);
+
+                setNotes("");
+
+                setSelectedCustomer(
+                  null,
+                );
+              },
             },
-          },
-        ],
-      );
-    } catch (error) {
-      Alert.alert(
-        'Unable to save sale',
-        error instanceof Error
-          ? error.message
-          : 'Something went wrong.',
-      );
-    } finally {
-      setSaving(false);
-    }
-  };
+          ],
+        );
+      } catch (error) {
+        Alert.alert(
+          "Unable to save invoice",
+
+          error instanceof Error
+            ? error.message
+            : "Something went wrong.",
+        );
+      } finally {
+        setSaving(false);
+      }
+    };
+
+  /*        ======
+     UI
+         ====== */
 
   return (
     <SafeAreaView
       style={styles.safeArea}
-      edges={['top', 'bottom']}
+      edges={[
+        "top",
+        "bottom",
+      ]}
     >
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={
-          Platform.OS === 'ios'
-            ? 'padding'
+          Platform.OS === "ios"
+            ? "padding"
             : undefined
         }
       >
-        <View style={styles.header}>
-          <Pressable
-            style={styles.backButton}
-            onPress={() =>
-              router.back()
-            }
-          >
-            <Ionicons
-              name="arrow-back"
-              size={21}
-              color={colors.navy}
-            />
-          </Pressable>
-
-          <View style={styles.headerText}>
-            <Text style={styles.headerTitle}>
-              POS Sale
-            </Text>
-            <Text style={styles.headerSubtitle}>
-              Create GST invoice and counter sale
-            </Text>
-          </View>
-
-          <View style={styles.headerIcon}>
-            <Ionicons
-              name="cart-outline"
-              size={22}
-              color="#FFFFFF"
-            />
-          </View>
-        </View>
-
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={[
-            styles.content,
-            isLargeScreen &&
-              styles.contentLarge,
+            styles.scrollContent,
+
+            isWide &&
+              styles.scrollContentWide,
+
+            {
+              paddingBottom:
+                20 +
+                insets.bottom,
+            },
           ]}
           keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
+          showsVerticalScrollIndicator={
+            false
+          }
         >
           <View
             style={[
-              styles.mainLayout,
-              isLargeScreen &&
-                styles.mainLayoutLarge,
+              styles.formContainer,
+
+              isSmall &&
+                styles.formContainerSmall,
             ]}
           >
+            {/*        
+                HEADER
+                    */}
+
             <View
-              style={[
-                styles.leftColumn,
-                isLargeScreen &&
-                  styles.leftColumnLarge,
-              ]}
+              style={
+                styles.topRow
+              }
             >
-              {/* CUSTOMER */}
-              <View style={styles.card}>
-                <View style={styles.sectionHeader}>
+              <View
+                style={
+                  styles.titleArea
+                }
+              >
+                <Text
+                  style={[
+                    styles.pageTitle,
+
+                    isSmall &&
+                      styles.pageTitleSmall,
+                  ]}
+                >
+                  Tax invoice
+                </Text>
+
+                <Text
+                  style={[
+                    styles.pageSubtitle,
+
+                    isSmall &&
+                      styles.pageSubtitleSmall,
+                  ]}
+                >
+                  Create customer sales
+                  invoice
+                </Text>
+              </View>
+
+              <Pressable
+                onPress={() =>
+                  router.back()
+                }
+                style={({ pressed }) => [
+                  styles.closeButton,
+
+                  pressed &&
+                    styles.pressed,
+                ]}
+              >
+                <Ionicons
+                  name="close"
+                  size={19}
+                  color="#142132"
+                />
+              </Pressable>
+            </View>
+
+            {/*        
+                INFO
+                    */}
+
+            <View
+              style={
+                styles.infoBox
+              }
+            >
+              <Ionicons
+                name="information-circle-outline"
+                size={16}
+                color="#3D718B"
+              />
+
+              <Text
+                style={
+                  styles.infoText
+                }
+              >
+                Retail Shop invoice
+                details
+              </Text>
+            </View>
+
+            {/*        
+                CUSTOMER
+                    */}
+
+            <View
+              style={
+                styles.fieldBlock
+              }
+            >
+              <FieldLabel required>
+                CUSTOMER
+              </FieldLabel>
+
+              <Pressable
+                onPress={() =>
+                  setShowCustomers(
+                    (value) =>
+                      !value,
+                  )
+                }
+                style={
+                  styles.selectField
+                }
+              >
+                <View
+                  style={
+                    styles.selectLeft
+                  }
+                >
                   <View
-                    style={styles.sectionIcon}
+                    style={
+                      styles.fieldIcon
+                    }
                   >
                     <Ionicons
                       name="person-outline"
-                      size={18}
+                      size={15}
                       color={colors.teal}
                     />
                   </View>
 
-                  <View>
-                    <Text
-                      style={styles.sectionTitle}
-                    >
-                      Customer
-                    </Text>
-                    <Text
-                      style={
-                        styles.sectionSubtitle
-                      }
-                    >
-                      Select party for this sale
-                    </Text>
-                  </View>
+                  <Text
+                    style={
+                      styles.selectText
+                    }
+                    numberOfLines={1}
+                  >
+                    {selectedCustomer
+                      ? selectedCustomer.name
+                      : "Walk-in Customer"}
+                  </Text>
                 </View>
 
-                {selectedCustomer ? (
+                <Ionicons
+                  name="chevron-down"
+                  size={15}
+                  color="#66727A"
+                />
+              </Pressable>
+
+              {showCustomers && (
+                <View
+                  style={
+                    styles.dropdown
+                  }
+                >
                   <View
                     style={
-                      styles.selectedCustomer
+                      styles.dropdownSearch
                     }
                   >
-                    <View
-                      style={
-                        styles.customerAvatar
-                      }
-                    >
-                      <Text
-                        style={
-                          styles.customerAvatarText
-                        }
-                      >
-                        {selectedCustomer.name
-                          .charAt(0)
-                          .toUpperCase()}
-                      </Text>
-                    </View>
+                    <Ionicons
+                      name="search-outline"
+                      size={15}
+                      color="#7B858D"
+                    />
 
-                    <View
+                    <TextInput
+                      value={
+                        customerSearch
+                      }
+                      onChangeText={
+                        setCustomerSearch
+                      }
+                      placeholder="Search customer"
+                      placeholderTextColor="#8B9298"
                       style={
-                        styles.customerInfo
+                        styles.dropdownSearchInput
                       }
-                    >
-                      <Text
-                        style={
-                          styles.customerName
-                        }
-                      >
-                        {selectedCustomer.name}
-                      </Text>
-
-                      <Text
-                        style={
-                          styles.customerMobile
-                        }
-                      >
-                        {selectedCustomer.mobile}
-                      </Text>
-                    </View>
-
-                    <Pressable
-                      onPress={
-                        clearCustomer
-                      }
-                      style={
-                        styles.clearButton
-                      }
-                    >
-                      <Ionicons
-                        name="close"
-                        size={18}
-                        color={colors.red}
-                      />
-                    </Pressable>
+                    />
                   </View>
-                ) : (
-                  <>
-                    <View
-                      style={styles.inputWrapper}
-                    >
-                      <Ionicons
-                        name="search-outline"
-                        size={18}
-                        color={colors.muted}
-                      />
 
-                      <TextInput
-                        value={
-                          customerSearch
+                  <Pressable
+                    onPress={() => {
+                      setSelectedCustomer(
+                        null,
+                      );
+
+                      setShowCustomers(
+                        false,
+                      );
+                    }}
+                    style={
+                      styles.dropdownRow
+                    }
+                  >
+                    <Text
+                      style={
+                        styles.dropdownTitle
+                      }
+                    >
+                      Walk-in Customer
+                    </Text>
+
+                    <Text
+                      style={
+                        styles.dropdownMeta
+                      }
+                    >
+                      Cash counter customer
+                    </Text>
+                  </Pressable>
+
+                  {filteredCustomers.map(
+                    (customer) => (
+                      <Pressable
+                        key={
+                          customer.id
                         }
-                        onChangeText={(text) => {
-                          setCustomerSearch(
-                            text,
-                          );
-                          setShowCustomers(
-                            true,
-                          );
-                        }}
-                        onFocus={() =>
-                          setShowCustomers(
-                            true,
+                        onPress={() =>
+                          selectCustomer(
+                            customer,
                           )
                         }
-                        placeholder="Search customer or mobile"
-                        placeholderTextColor={
-                          colors.muted
-                        }
-                        style={styles.input}
-                      />
-                    </View>
-
-                    {showCustomers && (
-                      <View
                         style={
-                          styles.customerResults
+                          styles.dropdownRow
                         }
                       >
-                        <Pressable
+                        <Text
                           style={
-                            styles.walkInRow
+                            styles.dropdownTitle
                           }
-                          onPress={() => {
-                            setSelectedCustomer(
-                              null,
-                            );
-                            setCustomerSearch(
-                              '',
-                            );
-                            setShowCustomers(
-                              false,
-                            );
-                          }}
                         >
-                          <View
-                            style={
-                              styles.walkInIcon
-                            }
-                          >
-                            <Ionicons
-                              name="person"
-                              size={18}
-                              color={
-                                colors.teal
-                              }
-                            />
-                          </View>
+                          {
+                            customer.name
+                          }
+                        </Text>
 
-                          <View>
-                            <Text
-                              style={
-                                styles.resultName
-                              }
-                            >
-                              Walk-in Customer
-                            </Text>
-                            <Text
-                              style={
-                                styles.resultMeta
-                              }
-                            >
-                              Cash counter customer
-                            </Text>
-                          </View>
-                        </Pressable>
+                        <Text
+                          style={
+                            styles.dropdownMeta
+                          }
+                        >
+                          {
+                            customer.mobile
+                          }
+                        </Text>
+                      </Pressable>
+                    ),
+                  )}
+                </View>
+              )}
+            </View>
 
-                        {filteredCustomers.map(
-                          (customer) => (
-                            <Pressable
-                              key={
-                                customer.id
-                              }
-                              style={
-                                styles.customerResult
-                              }
-                              onPress={() =>
-                                selectCustomer(
-                                  customer,
-                                )
-                              }
-                            >
-                              <View
-                                style={
-                                  styles.smallAvatar
-                                }
-                              >
-                                <Text
-                                  style={
-                                    styles.smallAvatarText
-                                  }
-                                >
-                                  {customer.name
-                                    .charAt(
-                                      0,
-                                    )
-                                    .toUpperCase()}
-                                </Text>
-                              </View>
+            {/*        
+                DOCUMENT DATE + DUE DATE
+                    */}
 
-                              <View
-                                style={
-                                  styles.resultInfo
-                                }
-                              >
-                                <Text
-                                  style={
-                                    styles.resultName
-                                  }
-                                >
-                                  {
-                                    customer.name
-                                  }
-                                </Text>
-                                <Text
-                                  style={
-                                    styles.resultMeta
-                                  }
-                                >
-                                  {
-                                    customer.mobile
-                                  }
-                                </Text>
-                              </View>
-                            </Pressable>
-                          ),
-                        )}
-                      </View>
+            <View
+              style={[
+                styles.twoColumn,
+
+                !isWide &&
+                  styles.twoColumnMobile,
+              ]}
+            >
+              <View
+                style={
+                  styles.columnField
+                }
+              >
+                <FieldLabel>
+                  DOCUMENT DATE
+                </FieldLabel>
+
+                <Pressable
+                  style={
+                    styles.inputShell
+                  }
+                >
+                  <Text
+                    style={
+                      styles.dateText
+                    }
+                  >
+                    {displayDate(
+                      documentDate,
                     )}
-                  </>
-                )}
+                  </Text>
+
+                  <Ionicons
+                    name="calendar-outline"
+                    size={16}
+                    color="#263746"
+                  />
+                </Pressable>
               </View>
 
-              {/* PRODUCT SEARCH */}
-              <View style={styles.card}>
-                <View style={styles.sectionHeader}>
+              <View
+                style={
+                  styles.columnField
+                }
+              >
+                <FieldLabel>
+                  DUE DATE
+                </FieldLabel>
+
+                <Pressable
+                  style={
+                    styles.inputShell
+                  }
+                >
+                  <Text
+                    style={
+                      styles.dateText
+                    }
+                  >
+                    {displayDate(
+                      dueDate,
+                    )}
+                  </Text>
+
+                  <Ionicons
+                    name="calendar-outline"
+                    size={16}
+                    color="#263746"
+                  />
+                </Pressable>
+              </View>
+            </View>
+
+            {/*        
+                SUPPLY
+                    */}
+
+            <View
+              style={
+                styles.fieldBlock
+              }
+            >
+              <FieldLabel>
+                SUPPLY
+              </FieldLabel>
+
+              <Pressable
+                style={
+                  styles.selectField
+                }
+              >
+                <View
+                  style={
+                    styles.selectLeft
+                  }
+                >
                   <View
-                    style={styles.sectionIcon}
+                    style={
+                      styles.fieldIcon
+                    }
                   >
                     <Ionicons
-                      name="cube-outline"
-                      size={18}
+                      name="location-outline"
+                      size={15}
                       color={colors.teal}
                     />
                   </View>
 
-                  <View>
-                    <Text
-                      style={styles.sectionTitle}
-                    >
-                      Add Products
-                    </Text>
+                  <Text
+                    style={
+                      styles.selectText
+                    }
+                    numberOfLines={1}
+                  >
+                    {supply}
+                  </Text>
+                </View>
+
+                <Ionicons
+                  name="chevron-down"
+                  size={15}
+                  color="#66727A"
+                />
+              </Pressable>
+            </View>
+
+            {/*        
+                BRANCH / SALESPERSON
+                    */}
+
+            <View
+              style={[
+                styles.twoColumn,
+
+                !isWide &&
+                  styles.twoColumnMobile,
+              ]}
+            >
+              <View
+                style={
+                  styles.columnField
+                }
+              >
+                <FieldLabel>
+                  COUNTER / BRANCH
+                </FieldLabel>
+
+                <FormInput
+                  value={branch}
+                  onChangeText={
+                    setBranch
+                  }
+                  placeholder="Counter or branch"
+                />
+              </View>
+
+              <View
+                style={
+                  styles.columnField
+                }
+              >
+                <FieldLabel>
+                  SALESPERSON
+                </FieldLabel>
+
+                <FormInput
+                  value={
+                    salesperson
+                  }
+                  onChangeText={
+                    setSalesperson
+                  }
+                  placeholder="Salesperson"
+                />
+              </View>
+            </View>
+
+            {/*        
+                DELIVERY
+                    */}
+
+            <View
+              style={
+                styles.fieldBlock
+              }
+            >
+              <FieldLabel>
+                DELIVERY / PICKUP
+              </FieldLabel>
+
+              <FormInput
+                value={delivery}
+                onChangeText={
+                  setDelivery
+                }
+                placeholder="Delivery or pickup"
+              />
+            </View>
+
+            {/*        
+                ITEM SECTION
+                    */}
+
+            <View
+              style={
+                styles.itemCard
+              }
+            >
+              <View
+                style={
+                  styles.itemHeader
+                }
+              >
+                <View>
+                  <Text
+                    style={
+                      styles.itemCardTitle
+                    }
+                  >
+                    Add item
+                  </Text>
+
+                  <Text
+                    style={
+                      styles.itemCardSubtitle
+                    }
+                  >
+                    Add product or service
+                  </Text>
+                </View>
+
+                <View
+                  style={
+                    styles.itemBadge
+                  }
+                >
+                  <Text
+                    style={
+                      styles.itemBadgeText
+                    }
+                  >
+                    {cart.length} line
+                    {cart.length === 1
+                      ? ""
+                      : "s"}
+                  </Text>
+                </View>
+              </View>
+
+              {/* ITEM + QTY */}
+
+              <View
+                style={
+                  styles.itemTopRow
+                }
+              >
+                <View
+                  style={
+                    styles.itemProductColumn
+                  }
+                >
+                  <FieldLabel>
+                    ITEM
+                  </FieldLabel>
+
+                  <Pressable
+                    onPress={() =>
+                      setShowProducts(
+                        (value) =>
+                          !value,
+                      )
+                    }
+                    style={
+                      styles.selectField
+                    }
+                  >
                     <Text
                       style={
-                        styles.sectionSubtitle
+                        styles.selectText
                       }
+                      numberOfLines={1}
                     >
-                      Search products and add to cart
+                      {selectedProduct
+                        ? selectedProduct.name
+                        : "Select item"}
                     </Text>
-                  </View>
-                </View>
 
-                <View
-                  style={styles.searchContainer}
-                >
-                  <Ionicons
-                    name="search-outline"
-                    size={20}
-                    color={colors.muted}
-                  />
+                    <Ionicons
+                      name="chevron-down"
+                      size={15}
+                      color="#66727A"
+                    />
+                  </Pressable>
 
-                  <TextInput
-                    value={search}
-                    onChangeText={
-                      setSearch
-                    }
-                    placeholder="Search product, barcode or HSN"
-                    placeholderTextColor={
-                      colors.muted
-                    }
-                    style={styles.input}
-                  />
-                </View>
-
-                <View
-                  style={styles.productList}
-                >
-                  {filteredProducts.length ===
-                  0 ? (
+                  {showProducts && (
                     <View
                       style={
-                        styles.emptyProducts
+                        styles.productDropdown
                       }
                     >
-                      <Ionicons
-                        name="cube-outline"
-                        size={30}
-                        color={colors.muted}
-                      />
-
-                      <Text
+                      <View
                         style={
-                          styles.emptyTitle
+                          styles.dropdownSearch
                         }
                       >
-                        No products found
-                      </Text>
+                        <Ionicons
+                          name="search-outline"
+                          size={15}
+                          color="#7B858D"
+                        />
 
-                      <Text
-                        style={
-                          styles.emptyText
-                        }
-                      >
-                        Add products first from Products.
-                      </Text>
-                    </View>
-                  ) : (
-                    filteredProducts.map(
-                      (product) => (
-                        <Pressable
-                          key={product.id}
+                        <TextInput
+                          value={
+                            productSearch
+                          }
+                          onChangeText={
+                            setProductSearch
+                          }
+                          placeholder="Search product"
+                          placeholderTextColor="#8B9298"
                           style={
-                            styles.productRow
+                            styles.dropdownSearchInput
                           }
-                          onPress={() =>
-                            addProduct(
-                              product,
-                            )
-                          }
-                        >
-                          <View
+                        />
+                      </View>
+
+                      {filteredProducts.map(
+                        (product) => (
+                          <Pressable
+                            key={
+                              product.id
+                            }
+                            onPress={() =>
+                              selectProduct(
+                                product,
+                              )
+                            }
                             style={
-                              styles.productIcon
+                              styles.productDropdownRow
                             }
                           >
-                            <Ionicons
-                              name="cube"
-                              size={18}
-                              color={
-                                colors.teal
-                              }
-                            />
-                          </View>
-
-                          <View
-                            style={
-                              styles.productInfo
-                            }
-                          >
-                            <Text
+                            <View
                               style={
-                                styles.productName
-                              }
-                              numberOfLines={1}
-                            >
-                              {product.name}
-                            </Text>
-
-                            <Text
-                              style={
-                                styles.productMeta
+                                styles.productDropdownInfo
                               }
                             >
-                              {product.unit}
-                              {'  •  '}
-                              GST {product.gstRate}%
-                              {product.barcode
-                                ? `  •  ${product.barcode}`
-                                : ''}
-                            </Text>
-                          </View>
+                              <Text
+                                style={
+                                  styles.dropdownTitle
+                                }
+                                numberOfLines={1}
+                              >
+                                {
+                                  product.name
+                                }
+                              </Text>
 
-                          <View
-                            style={
-                              styles.productPrice
-                            }
-                          >
+                              <Text
+                                style={
+                                  styles.dropdownMeta
+                                }
+                              >
+                                {
+                                  product.unit
+                                }{" "}
+                                • GST{" "}
+                                {
+                                  product.gstRate
+                                }
+                                %
+                              </Text>
+                            </View>
+
                             <Text
                               style={
-                                styles.priceText
+                                styles.productDropdownPrice
                               }
                             >
                               {formatCurrency(
                                 product.salePrice,
                               )}
                             </Text>
+                          </Pressable>
+                        ),
+                      )}
+                    </View>
+                  )}
+                </View>
 
-                            <View
+                <View
+                  style={
+                    styles.qtyColumn
+                  }
+                >
+                  <FieldLabel>
+                    QTY
+                  </FieldLabel>
+
+                  <FormInput
+                    value={quantity}
+                    onChangeText={
+                      setQuantity
+                    }
+                    placeholder="1"
+                    keyboardType="numeric"
+                  />
+                </View>
+              </View>
+
+              {/* RATE + GST */}
+
+              <View
+                style={
+                  styles.itemTopRow
+                }
+              >
+                <View
+                  style={
+                    styles.itemProductColumn
+                  }
+                >
+                  <FieldLabel>
+                    RATE
+                  </FieldLabel>
+
+                  <FormInput
+                    value={rate}
+                    onChangeText={
+                      setRate
+                    }
+                    placeholder="0"
+                    keyboardType="decimal-pad"
+                  />
+                </View>
+
+                <View
+                  style={
+                    styles.qtyColumn
+                  }
+                >
+                  <FieldLabel>
+                    GST %
+                  </FieldLabel>
+
+                  <FormInput
+                    value={gstRate}
+                    onChangeText={
+                      setGstRate
+                    }
+                    placeholder="0"
+                    keyboardType="decimal-pad"
+                  />
+                </View>
+              </View>
+
+              {/* ADD BUTTON */}
+
+              <Pressable
+                onPress={
+                  handleAddLine
+                }
+                style={({ pressed }) => [
+                  styles.addLineButton,
+
+                  pressed &&
+                    styles.buttonPressed,
+                ]}
+              >
+                <Ionicons
+                  name="add-circle-outline"
+                  size={17}
+                  color="#FFFFFF"
+                />
+
+                <Text
+                  style={
+                    styles.addLineButtonText
+                  }
+                >
+                  Add line
+                </Text>
+              </Pressable>
+
+              {/* CART */}
+
+              {cart.length === 0 ? (
+                <View
+                  style={
+                    styles.emptyLineBox
+                  }
+                >
+                  <Ionicons
+                    name="receipt-outline"
+                    size={18}
+                    color="#9AA5AD"
+                  />
+
+                  <Text
+                    style={
+                      styles.noLinesText
+                    }
+                  >
+                    No lines added
+                  </Text>
+                </View>
+              ) : (
+                <View
+                  style={
+                    styles.cartList
+                  }
+                >
+                  {cart.map(
+                    (item) => {
+                      const calculated =
+                        calculateItem(
+                          item,
+                        );
+
+                      return (
+                        <View
+                          key={
+                            item.product
+                              .id
+                          }
+                          style={
+                            styles.cartRow
+                          }
+                        >
+                          <View
+                            style={
+                              styles.cartInfo
+                            }
+                          >
+                            <Text
                               style={
-                                styles.addIcon
+                                styles.cartName
+                              }
+                              numberOfLines={
+                                1
+                              }
+                            >
+                              {
+                                item.product
+                                  .name
+                              }
+                            </Text>
+
+                            <Text
+                              style={
+                                styles.cartMeta
+                              }
+                            >
+                              {
+                                item.quantity
+                              }{" "}
+                              ×{" "}
+                              {formatCurrency(
+                                item.product
+                                  .salePrice,
+                              )}{" "}
+                              • GST{" "}
+                              {
+                                item.product
+                                  .gstRate
+                              }
+                              %
+                            </Text>
+                          </View>
+
+                          <View
+                            style={
+                              styles.cartRight
+                            }
+                          >
+                            <Text
+                              style={
+                                styles.cartAmount
+                              }
+                            >
+                              {formatCurrency(
+                                calculated.totalAmount,
+                              )}
+                            </Text>
+
+                            <Pressable
+                              onPress={() =>
+                                removeItem(
+                                  item.product
+                                    .id,
+                                )
+                              }
+                              style={
+                                styles.deleteButton
                               }
                             >
                               <Ionicons
-                                name="add"
-                                size={18}
-                                color="#FFFFFF"
+                                name="trash-outline"
+                                size={14}
+                                color="#C94740"
                               />
-                            </View>
+                            </Pressable>
                           </View>
-                        </Pressable>
-                      ),
-                    )
-                  )}
-                </View>
-              </View>
-
-              {/* CART */}
-              <View style={styles.card}>
-                <View style={styles.sectionHeader}>
-                  <View
-                    style={styles.sectionIcon}
-                  >
-                    <Ionicons
-                      name="cart-outline"
-                      size={18}
-                      color={colors.teal}
-                    />
-                  </View>
-
-                  <View>
-                    <Text
-                      style={styles.sectionTitle}
-                    >
-                      Current Sale
-                    </Text>
-                    <Text
-                      style={
-                        styles.sectionSubtitle
-                      }
-                    >
-                      {cart.length} item
-                      {cart.length === 1
-                        ? ''
-                        : 's'} in cart
-                    </Text>
-                  </View>
-                </View>
-
-                {cart.length === 0 ? (
-                  <View
-                    style={
-                      styles.emptyCart
-                    }
-                  >
-                    <Ionicons
-                      name="cart-outline"
-                      size={38}
-                      color={colors.line}
-                    />
-
-                    <Text
-                      style={
-                        styles.emptyTitle
-                      }
-                    >
-                      Cart is empty
-                    </Text>
-
-                    <Text
-                      style={
-                        styles.emptyText
-                      }
-                    >
-                      Search and tap a product above to add it.
-                    </Text>
-                  </View>
-                ) : (
-                  cart.map((item) => {
-                    const calculated =
-                      calculateItem(item);
-
-                    return (
-                      <View
-                        key={
-                          item.product.id
-                        }
-                        style={
-                          styles.cartRow
-                        }
-                      >
-                        <View
-                          style={
-                            styles.cartProductInfo
-                          }
-                        >
-                          <Text
-                            style={
-                              styles.cartProductName
-                            }
-                            numberOfLines={1}
-                          >
-                            {item.product.name}
-                          </Text>
-
-                          <Text
-                            style={
-                              styles.cartProductMeta
-                            }
-                          >
-                            {formatCurrency(
-                              item.product.salePrice,
-                            )}{' '}
-                            × {item.quantity}
-                            {'  •  '}
-                            GST {item.product.gstRate}%
-                          </Text>
                         </View>
-
-                        <View
-                          style={
-                            styles.quantityControl
-                          }
-                        >
-                          <Pressable
-                            style={
-                              styles.quantityButton
-                            }
-                            onPress={() =>
-                              updateQuantity(
-                                item.product.id,
-                                item.quantity -
-                                  1,
-                              )
-                            }
-                          >
-                            <Ionicons
-                              name="remove"
-                              size={15}
-                              color={
-                                colors.navy
-                              }
-                            />
-                          </Pressable>
-
-                          <Text
-                            style={
-                              styles.quantityText
-                            }
-                          >
-                            {item.quantity}
-                          </Text>
-
-                          <Pressable
-                            style={
-                              styles.quantityButton
-                            }
-                            onPress={() =>
-                              updateQuantity(
-                                item.product.id,
-                                item.quantity +
-                                  1,
-                              )
-                            }
-                          >
-                            <Ionicons
-                              name="add"
-                              size={15}
-                              color={
-                                colors.navy
-                              }
-                            />
-                          </Pressable>
-                        </View>
-
-                        <View
-                          style={
-                            styles.cartAmount
-                          }
-                        >
-                          <Text
-                            style={
-                              styles.cartTotal
-                            }
-                          >
-                            {formatCurrency(
-                              calculated.totalAmount,
-                            )}
-                          </Text>
-
-                          <Pressable
-                            onPress={() =>
-                              removeItem(
-                                item.product.id,
-                              )
-                            }
-                          >
-                            <Ionicons
-                              name="trash-outline"
-                              size={17}
-                              color={
-                                colors.red
-                              }
-                            />
-                          </Pressable>
-                        </View>
-                      </View>
-                    );
-                  })
-                )}
-              </View>
-            </View>
-
-            {/* RIGHT / SUMMARY */}
-            <View
-              style={[
-                styles.rightColumn,
-                isLargeScreen &&
-                  styles.rightColumnLarge,
-              ]}
-            >
-              {/* TOTALS */}
-              <View style={styles.summaryCard}>
-                <Text
-                  style={styles.summaryTitle}
-                >
-                  Sale Summary
-                </Text>
-
-                <View
-                  style={styles.summaryRow}
-                >
-                  <Text
-                    style={
-                      styles.summaryLabel
-                    }
-                  >
-                    Subtotal
-                  </Text>
-
-                  <Text
-                    style={
-                      styles.summaryValue
-                    }
-                  >
-                    {formatCurrency(
-                      subtotal,
-                    )}
-                  </Text>
-                </View>
-
-                <View
-                  style={styles.summaryRow}
-                >
-                  <Text
-                    style={
-                      styles.summaryLabel
-                    }
-                  >
-                    GST
-                  </Text>
-
-                  <Text
-                    style={
-                      styles.summaryValue
-                    }
-                  >
-                    {formatCurrency(
-                      gstAmount,
-                    )}
-                  </Text>
-                </View>
-
-                <View
-                  style={styles.summaryDivider}
-                />
-
-                <View
-                  style={styles.totalRow}
-                >
-                  <Text
-                    style={styles.totalLabel}
-                  >
-                    Total
-                  </Text>
-
-                  <Text
-                    style={styles.totalValue}
-                  >
-                    {formatCurrency(
-                      totalAmount,
-                    )}
-                  </Text>
-                </View>
-              </View>
-
-              {/* PAYMENT */}
-              <View style={styles.card}>
-                <View style={styles.sectionHeader}>
-                  <View
-                    style={styles.sectionIcon}
-                  >
-                    <Ionicons
-                      name="wallet-outline"
-                      size={18}
-                      color={colors.teal}
-                    />
-                  </View>
-
-                  <View>
-                    <Text
-                      style={styles.sectionTitle}
-                    >
-                      Payment
-                    </Text>
-                    <Text
-                      style={
-                        styles.sectionSubtitle
-                      }
-                    >
-                      Select payment method
-                    </Text>
-                  </View>
-                </View>
-
-                <View
-                  style={styles.paymentGrid}
-                >
-                  {PAYMENT_METHODS.map(
-                    (method) => {
-                      const active =
-                        paymentMethod ===
-                        method.value;
-
-                      return (
-                        <Pressable
-                          key={
-                            method.value
-                          }
-                          style={[
-                            styles.paymentMethod,
-                            active &&
-                              styles.paymentMethodActive,
-                          ]}
-                          onPress={() =>
-                            setPaymentMethod(
-                              method.value,
-                            )
-                          }
-                        >
-                          <Ionicons
-                            name={
-                              method.icon
-                            }
-                            size={19}
-                            color={
-                              active
-                                ? colors.teal
-                                : colors.muted
-                            }
-                          />
-
-                          <Text
-                            style={[
-                              styles.paymentLabel,
-                              active &&
-                                styles.paymentLabelActive,
-                            ]}
-                          >
-                            {method.label}
-                          </Text>
-                        </Pressable>
                       );
                     },
                   )}
                 </View>
+              )}
+            </View>
 
+            {/*        
+                SUMMARY
+                    */}
+
+            <View
+              style={
+                styles.summaryCard
+              }
+            >
+              <View
+                style={
+                  styles.summaryRow
+                }
+              >
                 <Text
-                  style={styles.fieldLabel}
-                >
-                  Amount Paid
-                </Text>
-
-                <View
-                  style={styles.amountInput}
-                >
-                  <Text
-                    style={
-                      styles.currencyPrefix
-                    }
-                  >
-                    ₹
-                  </Text>
-
-                  <TextInput
-                    value={paidAmount}
-                    onChangeText={
-                      setPaidAmount
-                    }
-                    keyboardType="decimal-pad"
-                    placeholder="0.00"
-                    placeholderTextColor={
-                      colors.muted
-                    }
-                    style={
-                      styles.amountTextInput
-                    }
-                  />
-
-                  <Pressable
-                    onPress={() =>
-                      setPaidAmount(
-                        totalAmount.toFixed(
-                          2,
-                        ),
-                      )
-                    }
-                    style={
-                      styles.fullPaidButton
-                    }
-                  >
-                    <Text
-                      style={
-                        styles.fullPaidText
-                      }
-                    >
-                      FULL
-                    </Text>
-                  </Pressable>
-                </View>
-
-                <View
-                  style={styles.paymentStatusBox}
-                >
-                  <View>
-                    <Text
-                      style={
-                        styles.statusLabel
-                      }
-                    >
-                      Payment Status
-                    </Text>
-
-                    <Text
-                      style={
-                        styles.statusValue
-                      }
-                    >
-                      {paymentStatus}
-                    </Text>
-                  </View>
-
-                  <View
-                    style={styles.dueBlock}
-                  >
-                    <Text
-                      style={
-                        styles.statusLabel
-                      }
-                    >
-                      Due
-                    </Text>
-
-                    <Text
-                      style={[
-                        styles.dueValue,
-                        dueAmount === 0 &&
-                          styles.paidValue,
-                      ]}
-                    >
-                      {formatCurrency(
-                        dueAmount,
-                      )}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-
-              {/* NOTES */}
-              <View style={styles.card}>
-                <Text
-                  style={styles.fieldLabel}
-                >
-                  Notes
-                </Text>
-
-                <TextInput
-                  value={notes}
-                  onChangeText={setNotes}
-                  placeholder="Optional sale notes"
-                  placeholderTextColor={
-                    colors.muted
+                  style={
+                    styles.summaryLabel
                   }
-                  multiline
-                  textAlignVertical="top"
-                  style={styles.notesInput}
-                />
+                >
+                  Taxable value
+                </Text>
+
+                <Text
+                  style={
+                    styles.summaryValue
+                  }
+                >
+                  {formatCurrency(
+                    subtotal,
+                  )}
+                </Text>
               </View>
 
-              {/* SAVE */}
+              <View
+                style={
+                  styles.summaryRow
+                }
+              >
+                <Text
+                  style={
+                    styles.summaryLabel
+                  }
+                >
+                  GST
+                </Text>
+
+                <Text
+                  style={
+                    styles.summaryValue
+                  }
+                >
+                  {formatCurrency(
+                    gstAmount,
+                  )}
+                </Text>
+              </View>
+
+              <View
+                style={
+                  styles.summaryDivider
+                }
+              />
+
+              <View
+                style={
+                  styles.totalRow
+                }
+              >
+                <Text
+                  style={
+                    styles.totalLabel
+                  }
+                >
+                  Total
+                </Text>
+
+                <Text
+                  style={
+                    styles.totalValue
+                  }
+                >
+                  {formatCurrency(
+                    totalAmount,
+                  )}
+                </Text>
+              </View>
+            </View>
+
+            {/*        
+                NOTES
+                    */}
+
+            <View
+              style={
+                styles.fieldBlock
+              }
+            >
+              <FieldLabel>
+                NOTES
+              </FieldLabel>
+
+              <TextInput
+                value={notes}
+                onChangeText={
+                  setNotes
+                }
+                placeholder="Optional reference or terms"
+                placeholderTextColor="#8B9298"
+                multiline
+                textAlignVertical="top"
+                style={
+                  styles.notesInput
+                }
+              />
+            </View>
+
+            {/*        
+                ACTION BUTTONS
+                    */}
+
+            <View
+              style={
+                styles.actionRow
+              }
+            >
               <Pressable
-                style={[
-                  styles.saveButton,
-                  (saving ||
-                    !cart.length) &&
-                    styles.saveButtonDisabled,
+                onPress={() =>
+                  router.back()
+                }
+                style={({ pressed }) => [
+                  styles.cancelButton,
+
+                  pressed &&
+                    styles.buttonPressed,
                 ]}
+              >
+                <Text
+                  style={
+                    styles.cancelButtonText
+                  }
+                >
+                  Cancel
+                </Text>
+              </Pressable>
+
+              <Pressable
                 disabled={
-                  saving || !cart.length
+                  saving ||
+                  !cart.length
                 }
                 onPress={
                   handleSaveSale
                 }
+                style={({ pressed }) => [
+                  styles.saveButton,
+
+                  (saving ||
+                    !cart.length) &&
+                    styles.saveButtonDisabled,
+
+                  pressed &&
+                    !saving &&
+                    styles.buttonPressed,
+                ]}
               >
-                <Ionicons
-                  name={
-                    saving
-                      ? 'hourglass-outline'
-                      : 'checkmark-circle-outline'
-                  }
-                  size={21}
-                  color="#FFFFFF"
-                />
+                {saving && (
+                  <Ionicons
+                    name="hourglass-outline"
+                    size={16}
+                    color="#FFFFFF"
+                  />
+                )}
 
                 <Text
                   style={
@@ -1438,16 +1826,10 @@ export default function POSScreen() {
                   }
                 >
                   {saving
-                    ? 'Saving Sale...'
-                    : 'Save Sale'}
+                    ? "Saving..."
+                    : "Save invoice"}
                 </Text>
               </Pressable>
-
-              <Text
-                style={styles.invoiceHint}
-              >
-                Sale will be stored locally in this device.
-              </Text>
             </View>
           </View>
         </ScrollView>
@@ -1456,10 +1838,18 @@ export default function POSScreen() {
   );
 }
 
+/*         =
+   STYLES
+        = */
+
 const styles = StyleSheet.create({
+  /*        ======
+     ROOT
+         ====== */
+
   safeArea: {
     flex: 1,
-    backgroundColor: colors.bg,
+    backgroundColor: "#0D3550",
   },
 
   flex: {
@@ -1468,631 +1858,796 @@ const styles = StyleSheet.create({
 
   scroll: {
     flex: 1,
+    backgroundColor: "#EEF3F6",
   },
 
-  content: {
-    padding: 14,
-    paddingBottom: 30,
+  scrollContent: {
+    flexGrow: 1,
+    paddingTop: 6,
   },
 
-  contentLarge: {
-    alignSelf: 'center',
-    width: '100%',
-    maxWidth: 1200,
+  scrollContentWide: {
+    paddingHorizontal: 20,
   },
 
-  header: {
-    minHeight: 70,
+  /*        ======
+     FORM
+         ====== */
+
+  formContainer: {
+    width: "100%",
+    maxWidth: 720,
+
+    alignSelf: "center",
+
+    backgroundColor: "#F7F9FB",
+
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
+
     paddingHorizontal: 16,
-    paddingVertical: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: colors.line,
+    paddingTop: 16,
+    paddingBottom: 20,
+
+    minHeight: "100%",
   },
 
-  backButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 13,
-    backgroundColor: colors.bg,
-    alignItems: 'center',
-    justifyContent: 'center',
+  formContainerSmall: {
+    paddingHorizontal: 11,
+    paddingTop: 13,
+
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
   },
 
-  headerText: {
-    flex: 1,
-    marginLeft: 12,
+  /*        ======
+     HEADER
+         ====== */
+
+  topRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+
+    marginBottom: 14,
   },
 
-  headerTitle: {
-    color: colors.navy,
-    fontSize: 20,
-    fontWeight: '800',
-  },
-
-  headerSubtitle: {
-    marginTop: 2,
-    color: colors.muted,
-    fontSize: 11,
-  },
-
-  headerIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 13,
-    backgroundColor: colors.teal,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  mainLayout: {
-    gap: 14,
-  },
-
-  mainLayoutLarge: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-
-  leftColumn: {
-    gap: 14,
-  },
-
-  leftColumnLarge: {
-    flex: 1.55,
-  },
-
-  rightColumn: {
-    gap: 14,
-  },
-
-  rightColumnLarge: {
-    flex: 0.9,
-  },
-
-  card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: colors.line,
-    padding: 15,
-  },
-
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 13,
-  },
-
-  sectionIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    backgroundColor: '#E8F6F4',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 10,
-  },
-
-  sectionTitle: {
-    color: colors.ink,
-    fontSize: 15,
-    fontWeight: '800',
-  },
-
-  sectionSubtitle: {
-    color: colors.muted,
-    fontSize: 10,
-    marginTop: 2,
-  },
-
-  inputWrapper: {
-    minHeight: 46,
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FAFCFD',
-  },
-
-  searchContainer: {
-    minHeight: 48,
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: 13,
-    paddingHorizontal: 13,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FAFCFD',
-  },
-
-  input: {
-    flex: 1,
-    minHeight: 44,
-    marginLeft: 9,
-    color: colors.ink,
-    fontSize: 13,
-  },
-
-  customerResults: {
-    marginTop: 7,
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: 13,
-    overflow: 'hidden',
-  },
-
-  walkInRow: {
-    padding: 11,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F4FAF9',
-    borderBottomWidth: 1,
-    borderBottomColor: colors.line,
-  },
-
-  walkInIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    backgroundColor: '#DDF2EF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 10,
-  },
-
-  customerResult: {
-    padding: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: colors.line,
-    backgroundColor: '#FFFFFF',
-  },
-
-  smallAvatar: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: '#EAF1F5',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 10,
-  },
-
-  smallAvatarText: {
-    color: colors.navy,
-    fontSize: 14,
-    fontWeight: '800',
-  },
-
-  resultInfo: {
-    flex: 1,
-  },
-
-  resultName: {
-    color: colors.ink,
-    fontSize: 12,
-    fontWeight: '700',
-  },
-
-  resultMeta: {
-    color: colors.muted,
-    fontSize: 10,
-    marginTop: 2,
-  },
-
-  selectedCustomer: {
-    minHeight: 58,
-    borderRadius: 13,
-    backgroundColor: '#F3FAF8',
-    borderWidth: 1,
-    borderColor: '#D6ECE8',
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 9,
-  },
-
-  customerAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 13,
-    backgroundColor: colors.teal,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 10,
-  },
-
-  customerAvatarText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '800',
-  },
-
-  customerInfo: {
-    flex: 1,
-  },
-
-  customerName: {
-    color: colors.ink,
-    fontSize: 13,
-    fontWeight: '800',
-  },
-
-  customerMobile: {
-    color: colors.muted,
-    fontSize: 10,
-    marginTop: 2,
-  },
-
-  clearButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    backgroundColor: '#FFF0EF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  productList: {
-    marginTop: 8,
-  },
-
-  productRow: {
-    minHeight: 62,
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#EDF1F3',
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-
-  productIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 11,
-    backgroundColor: '#E8F6F4',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 10,
-  },
-
-  productInfo: {
-    flex: 1,
-  },
-
-  productName: {
-    color: colors.ink,
-    fontSize: 12,
-    fontWeight: '800',
-  },
-
-  productMeta: {
-    color: colors.muted,
-    fontSize: 9,
-    marginTop: 3,
-  },
-
-  productPrice: {
-    alignItems: 'flex-end',
-    marginLeft: 8,
-  },
-
-  priceText: {
-    color: colors.navy,
-    fontSize: 12,
-    fontWeight: '800',
-    marginBottom: 5,
-  },
-
-  addIcon: {
-    width: 27,
-    height: 27,
-    borderRadius: 9,
-    backgroundColor: colors.teal,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  emptyProducts: {
-    paddingVertical: 28,
-    alignItems: 'center',
-  },
-
-  emptyCart: {
-    paddingVertical: 30,
-    alignItems: 'center',
-  },
-
-  emptyTitle: {
-    color: colors.ink,
-    fontSize: 13,
-    fontWeight: '800',
-    marginTop: 8,
-  },
-
-  emptyText: {
-    color: colors.muted,
-    fontSize: 10,
-    textAlign: 'center',
-    marginTop: 4,
-  },
-
-  cartRow: {
-    minHeight: 68,
-    paddingVertical: 9,
-    borderBottomWidth: 1,
-    borderBottomColor: '#EDF1F3',
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-
-  cartProductInfo: {
+  titleArea: {
     flex: 1,
     minWidth: 0,
   },
 
-  cartProductName: {
-    color: colors.ink,
-    fontSize: 12,
-    fontWeight: '800',
+  pageTitle: {
+    color: "#152536",
+    fontSize: 21,
+    fontWeight: "900",
   },
 
-  cartProductMeta: {
-    color: colors.muted,
+  pageTitleSmall: {
+    fontSize: 18,
+  },
+
+  pageSubtitle: {
+    color: "#7B858E",
+    fontSize: 10,
+    marginTop: 2,
+  },
+
+  pageSubtitleSmall: {
     fontSize: 9,
-    marginTop: 3,
   },
 
-  quantityControl: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: 7,
+  closeButton: {
+    width: 36,
+    height: 36,
+
+    borderRadius: 18,
+
+    backgroundColor: "#EDF0F2",
+
+    alignItems: "center",
+    justifyContent: "center",
+
+    marginLeft: 8,
   },
 
-  quantityButton: {
+  pressed: {
+    opacity: 0.72,
+
+    transform: [
+      {
+        scale: 0.97,
+      },
+    ],
+  },
+
+  /*        ======
+     INFO
+         ====== */
+
+  infoBox: {
+    minHeight: 40,
+
+    flexDirection: "row",
+    alignItems: "center",
+
+    gap: 7,
+
+    backgroundColor: "#EAF6FE",
+
+    borderWidth: 1,
+    borderColor: "#C5E0EF",
+
+    borderRadius: 11,
+
+    paddingHorizontal: 11,
+
+    marginBottom: 12,
+  },
+
+  infoText: {
+    color: "#3D718B",
+    fontSize: 10,
+    fontWeight: "600",
+  },
+
+  /*        ======
+     FIELDS
+         ====== */
+
+  fieldBlock: {
+    width: "100%",
+    marginBottom: 10,
+  },
+
+  fieldLabel: {
+    color: "#3B4B58",
+
+    fontSize: 8.5,
+    fontWeight: "900",
+
+    marginBottom: 4,
+
+    letterSpacing: 0.3,
+  },
+
+  /*        ======
+     INPUTS
+         ====== */
+
+  inputShell: {
+    width: "100%",
+
+    minHeight: 43,
+
+    flexDirection: "row",
+    alignItems: "center",
+
+    backgroundColor: "#FFFFFF",
+
+    borderWidth: 1,
+    borderColor: "#D7E0E6",
+
+    borderRadius: 11,
+
+    paddingHorizontal: 10,
+  },
+
+  formInput: {
+    flex: 1,
+
+    minHeight: 40,
+
+    color: "#253544",
+
+    fontSize: 13,
+
+    paddingVertical: 0,
+  },
+
+  dateText: {
+    flex: 1,
+
+    color: "#253544",
+
+    fontSize: 13,
+    fontWeight: "500",
+  },
+
+  /*        ======
+     SELECT
+         ====== */
+
+  selectField: {
+    minHeight: 43,
+
+    flexDirection: "row",
+
+    alignItems: "center",
+
+    justifyContent: "space-between",
+
+    backgroundColor: "#FFFFFF",
+
+    borderWidth: 1,
+    borderColor: "#D7E0E6",
+
+    borderRadius: 11,
+
+    paddingHorizontal: 10,
+
+    gap: 7,
+  },
+
+  selectLeft: {
+    flex: 1,
+
+    minWidth: 0,
+
+    flexDirection: "row",
+    alignItems: "center",
+
+    gap: 8,
+  },
+
+  fieldIcon: {
     width: 27,
     height: 27,
+
     borderRadius: 8,
-    backgroundColor: '#F0F4F6',
-    alignItems: 'center',
-    justifyContent: 'center',
+
+    backgroundColor: "#E8F6F4",
+
+    alignItems: "center",
+    justifyContent: "center",
   },
 
-  quantityText: {
-    minWidth: 28,
-    textAlign: 'center',
-    color: colors.ink,
+  selectText: {
+    flex: 1,
+
+    minWidth: 0,
+
+    color: "#253544",
+
+    fontSize: 13,
+    fontWeight: "500",
+  },
+
+  /*        ======
+     RESPONSIVE COLUMNS
+         ====== */
+
+  twoColumn: {
+    flexDirection: "row",
+    gap: 10,
+  },
+
+  twoColumnMobile: {
+    flexDirection: "column",
+    gap: 0,
+  },
+
+  columnField: {
+    flex: 1,
+    marginBottom: 10,
+  },
+
+  /*        ======
+     DROPDOWN
+         ====== */
+
+  dropdown: {
+    marginTop: 5,
+
+    backgroundColor: "#FFFFFF",
+
+    borderWidth: 1,
+    borderColor: "#D8E1E7",
+
+    borderRadius: 11,
+
+    overflow: "hidden",
+
+    elevation: 5,
+
+    shadowColor: "#000000",
+
+    shadowOffset: {
+      width: 0,
+      height: 3,
+    },
+
+    shadowOpacity: 0.09,
+    shadowRadius: 8,
+  },
+
+  dropdownSearch: {
+    height: 39,
+
+    flexDirection: "row",
+    alignItems: "center",
+
+    paddingHorizontal: 10,
+
+    gap: 7,
+
+    borderBottomWidth: 1,
+    borderBottomColor: "#EEF1F3",
+  },
+
+  dropdownSearchInput: {
+    flex: 1,
+
+    height: 38,
+
+    color: "#253544",
+
+    fontSize: 11,
+  },
+
+  dropdownRow: {
+    paddingHorizontal: 11,
+    paddingVertical: 8,
+
+    borderBottomWidth: 1,
+    borderBottomColor: "#EEF1F3",
+  },
+
+  dropdownTitle: {
+    color: "#253544",
+
+    fontSize: 11,
+
+    fontWeight: "800",
+  },
+
+  dropdownMeta: {
+    color: "#83909A",
+
+    fontSize: 8,
+
+    marginTop: 2,
+  },
+
+  /*        ======
+     ITEM CARD
+         ====== */
+
+  itemCard: {
+    backgroundColor: "#FFFFFF",
+
+    borderWidth: 1,
+    borderColor: "#E0E7EC",
+
+    borderRadius: 15,
+
+    padding: 11,
+
+    marginTop: 1,
+    marginBottom: 12,
+
+    shadowColor: "#183243",
+
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+
+    shadowOpacity: 0.04,
+    shadowRadius: 7,
+
+    elevation: 1,
+  },
+
+  itemHeader: {
+    flexDirection: "row",
+
+    justifyContent: "space-between",
+
+    alignItems: "center",
+
+    marginBottom: 8,
+  },
+
+  itemCardTitle: {
+    color: "#203141",
+
+    fontSize: 13,
+
+    fontWeight: "900",
+  },
+
+  itemCardSubtitle: {
+    color: "#7F8991",
+
+    fontSize: 8,
+
+    marginTop: 1,
+  },
+
+  itemBadge: {
+    backgroundColor: "#E8F6F4",
+
+    borderRadius: 99,
+
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+
+  itemBadgeText: {
+    color: colors.teal,
+
+    fontSize: 7,
+
+    fontWeight: "900",
+  },
+
+  itemTopRow: {
+    flexDirection: "row",
+
+    gap: 7,
+
+    marginBottom: 7,
+
+    alignItems: "flex-end",
+  },
+
+  itemProductColumn: {
+    flex: 1,
+
+    minWidth: 0,
+  },
+
+  qtyColumn: {
+    width: 78,
+  },
+
+  /*        ======
+     PRODUCT DROPDOWN
+         ====== */
+
+  productDropdown: {
+    marginTop: 4,
+
+    borderWidth: 1,
+    borderColor: "#D8E1E7",
+
+    borderRadius: 10,
+
+    overflow: "hidden",
+
+    backgroundColor: "#FFFFFF",
+
+    maxHeight: 250,
+  },
+
+  productDropdownRow: {
+    minHeight: 46,
+
+    flexDirection: "row",
+
+    alignItems: "center",
+
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+
+    borderBottomWidth: 1,
+    borderBottomColor: "#EDF1F3",
+  },
+
+  productDropdownInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  productDropdownPrice: {
+    color: colors.teal,
+
+    fontSize: 10,
+
+    fontWeight: "900",
+
+    marginLeft: 7,
+  },
+
+  /*        ======
+     ADD LINE
+         ====== */
+
+  addLineButton: {
+    minHeight: 43,
+
+    flexDirection: "row",
+
+    alignItems: "center",
+
+    justifyContent: "center",
+
+    gap: 5,
+
+    backgroundColor: "#0A968C",
+
+    borderRadius: 11,
+
+    marginTop: 1,
+  },
+
+  addLineButtonText: {
+    color: "#FFFFFF",
+
     fontSize: 12,
-    fontWeight: '800',
+
+    fontWeight: "900",
+  },
+
+  buttonPressed: {
+    opacity: 0.8,
+
+    transform: [
+      {
+        scale: 0.985,
+      },
+    ],
+  },
+
+  /*        ======
+     EMPTY LINE
+         ====== */
+
+  emptyLineBox: {
+    flexDirection: "row",
+    alignItems: "center",
+
+    gap: 6,
+
+    paddingTop: 10,
+  },
+
+  noLinesText: {
+    color: "#8A949C",
+
+    fontSize: 9,
+  },
+
+  /*        ======
+     CART
+         ====== */
+
+  cartList: {
+    marginTop: 9,
+
+    borderTopWidth: 1,
+    borderTopColor: "#EEF1F3",
+  },
+
+  cartRow: {
+    minHeight: 54,
+
+    flexDirection: "row",
+
+    alignItems: "center",
+
+    paddingVertical: 7,
+
+    borderBottomWidth: 1,
+    borderBottomColor: "#EEF1F3",
+  },
+
+  cartInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  cartName: {
+    color: "#203141",
+
+    fontSize: 11,
+
+    fontWeight: "900",
+  },
+
+  cartMeta: {
+    color: "#7B858D",
+
+    fontSize: 8,
+
+    marginTop: 2,
+  },
+
+  cartRight: {
+    alignItems: "flex-end",
+
+    gap: 4,
+
+    marginLeft: 7,
   },
 
   cartAmount: {
-    alignItems: 'flex-end',
-    minWidth: 76,
+    color: "#203141",
+
+    fontSize: 10,
+
+    fontWeight: "900",
   },
 
-  cartTotal: {
-    color: colors.navy,
-    fontSize: 11,
-    fontWeight: '800',
-    marginBottom: 4,
+  deleteButton: {
+    width: 26,
+    height: 26,
+
+    borderRadius: 8,
+
+    backgroundColor: "#FFF0EF",
+
+    alignItems: "center",
+    justifyContent: "center",
   },
+
+  /*        ======
+     SUMMARY
+         ====== */
 
   summaryCard: {
-    backgroundColor: colors.navy,
-    borderRadius: 18,
-    padding: 17,
-  },
+    width: "100%",
 
-  summaryTitle: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '800',
-    marginBottom: 15,
+    alignSelf: "flex-end",
+
+    backgroundColor: "#FFFFFF",
+
+    borderRadius: 14,
+
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+
+    marginBottom: 12,
+
+    borderWidth: 1,
+    borderColor: "#E7ECEF",
   },
 
   summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 9,
+    flexDirection: "row",
+
+    justifyContent: "space-between",
+
+    alignItems: "center",
+
+    marginBottom: 7,
   },
 
   summaryLabel: {
-    color: '#C9D9E2',
-    fontSize: 11,
+    color: "#4C5963",
+
+    fontSize: 9.5,
   },
 
   summaryValue: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '700',
+    color: "#203141",
+
+    fontSize: 9.5,
+
+    fontWeight: "900",
   },
 
   summaryDivider: {
     height: 1,
-    backgroundColor: 'rgba(255,255,255,0.14)',
-    marginVertical: 5,
-  },
 
-  totalRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 5,
-  },
+    backgroundColor: "#E3E8EC",
 
-  totalLabel: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '800',
-  },
-
-  totalValue: {
-    color: '#FFFFFF',
-    fontSize: 22,
-    fontWeight: '900',
-  },
-
-  paymentGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 7,
-    marginBottom: 15,
-  },
-
-  paymentMethod: {
-    minWidth: 72,
-    flex: 1,
-    minHeight: 54,
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: 11,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 6,
-  },
-
-  paymentMethodActive: {
-    backgroundColor: '#E8F6F4',
-    borderColor: colors.teal,
-  },
-
-  paymentLabel: {
-    color: colors.muted,
-    fontSize: 9,
-    fontWeight: '700',
-    marginTop: 4,
-  },
-
-  paymentLabelActive: {
-    color: colors.teal,
-  },
-
-  fieldLabel: {
-    color: colors.ink,
-    fontSize: 11,
-    fontWeight: '700',
     marginBottom: 7,
   },
 
-  amountInput: {
-    height: 48,
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingLeft: 12,
-    backgroundColor: '#FAFCFD',
+  totalRow: {
+    flexDirection: "row",
+
+    justifyContent: "space-between",
+
+    alignItems: "center",
   },
 
-  currencyPrefix: {
-    color: colors.navy,
-    fontSize: 15,
-    fontWeight: '800',
-  },
+  totalLabel: {
+    color: "#152333",
 
-  amountTextInput: {
-    flex: 1,
-    height: 46,
-    paddingHorizontal: 8,
-    color: colors.ink,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-
-  fullPaidButton: {
-    height: 32,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-    backgroundColor: '#E8F6F4',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 8,
-  },
-
-  fullPaidText: {
-    color: colors.teal,
-    fontSize: 9,
-    fontWeight: '900',
-  },
-
-  paymentStatusBox: {
-    marginTop: 12,
-    padding: 11,
-    borderRadius: 12,
-    backgroundColor: '#F5F8FA',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-
-  statusLabel: {
-    color: colors.muted,
-    fontSize: 9,
-  },
-
-  statusValue: {
-    color: colors.ink,
-    fontSize: 11,
-    fontWeight: '800',
-    marginTop: 3,
-  },
-
-  dueBlock: {
-    alignItems: 'flex-end',
-  },
-
-  dueValue: {
-    color: colors.red,
     fontSize: 13,
-    fontWeight: '900',
-    marginTop: 3,
+
+    fontWeight: "900",
   },
 
-  paidValue: {
-    color: colors.green,
+  totalValue: {
+    color: "#152333",
+
+    fontSize: 13,
+
+    fontWeight: "900",
   },
+
+  /*        ======
+     NOTES
+         ====== */
 
   notesInput: {
-    minHeight: 80,
+    minHeight: 66,
+
+    backgroundColor: "#FFFFFF",
+
     borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: 12,
-    padding: 11,
-    color: colors.ink,
+    borderColor: "#D7E0E6",
+
+    borderRadius: 11,
+
+    paddingHorizontal: 10,
+    paddingTop: 9,
+    paddingBottom: 9,
+
+    color: "#253544",
+
     fontSize: 12,
-    backgroundColor: '#FAFCFD',
+  },
+
+  /*        ======
+     ACTIONS
+         ====== */
+
+  actionRow: {
+    flexDirection: "row",
+
+    justifyContent: "flex-end",
+
+    alignItems: "center",
+
+    gap: 8,
+
+    marginTop: 2,
+  },
+
+  cancelButton: {
+    minHeight: 43,
+
+    paddingHorizontal: 17,
+
+    backgroundColor: "#E8F6F4",
+
+    borderRadius: 11,
+
+    alignItems: "center",
+
+    justifyContent: "center",
+  },
+
+  cancelButtonText: {
+    color: "#087E75",
+
+    fontSize: 12,
+
+    fontWeight: "900",
   },
 
   saveButton: {
-    minHeight: 54,
-    borderRadius: 15,
-    backgroundColor: colors.teal,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
+    minHeight: 43,
+
+    flexDirection: "row",
+
+    alignItems: "center",
+
+    justifyContent: "center",
+
+    gap: 5,
+
+    paddingHorizontal: 17,
+
+    backgroundColor: "#0A968C",
+
+    borderRadius: 11,
   },
 
   saveButtonDisabled: {
-    opacity: 0.5,
+    opacity: 0.45,
   },
 
   saveButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '900',
-  },
+    color: "#FFFFFF",
 
-  invoiceHint: {
-    color: colors.muted,
-    fontSize: 9,
-    textAlign: 'center',
-    marginTop: -5,
+    fontSize: 12,
+
+    fontWeight: "900",
   },
 });

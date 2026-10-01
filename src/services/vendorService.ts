@@ -92,9 +92,9 @@ function normalizeVendorInput(
 }
 
 
-/* =================================
+/*     =====
    CREATE VENDOR
-================================= */
+    ===== */
 
 export async function saveVendor(
   input: CreateVendorInput,
@@ -160,9 +160,9 @@ export async function saveVendor(
 }
 
 
-/* =================================
+/*     =====
    LOAD ALL VENDORS
-================================= */
+    ===== */
 
 export async function loadVendors(): Promise<Vendor[]> {
 
@@ -179,9 +179,9 @@ export async function loadVendors(): Promise<Vendor[]> {
 }
 
 
-/* =================================
+/*     =====
    LOAD SINGLE VENDOR
-================================= */
+    ===== */
 
 export async function loadVendor(
   vendorId: string,
@@ -197,9 +197,9 @@ export async function loadVendor(
 }
 
 
-/* =================================
+/*     =====
    UPDATE VENDOR
-================================= */
+    ===== */
 
 export async function editVendor(
   vendor: Vendor,
@@ -287,9 +287,9 @@ export async function editVendor(
 }
 
 
-/* =================================
+/*     =====
    DELETE VENDOR
-================================= */
+    ===== */
 
 export async function removeVendor(
   vendorId: string,

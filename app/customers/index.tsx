@@ -77,9 +77,9 @@ const STATES = [
 ];
 
 
-/* =========================================================
+/*         =
    CUSTOMER FORM
-   ========================================================= */
+           = */
 
 interface CustomerFormProps {
   customer?: Customer | null;
@@ -110,9 +110,9 @@ function CustomerForm({
   const [saving, setSaving] = useState(false);
 
 
-  /* =========================================================
+  /*         =
      LOAD / RESET FORM
-     ========================================================= */
+             = */
 
   useEffect(() => {
     if (customer) {
@@ -155,9 +155,9 @@ function CustomerForm({
   }, [customer]);
 
 
-  /* =========================================================
+  /*         =
      CLOSE
-     ========================================================= */
+             = */
 
   const handleClose = () => {
     if (saving) {
@@ -168,9 +168,9 @@ function CustomerForm({
   };
 
 
-  /* =========================================================
+  /*         =
      SAVE CUSTOMER
-     ========================================================= */
+             = */
 
   const handleSave = async () => {
     const customerName = name.trim();
@@ -281,9 +281,9 @@ function CustomerForm({
   };
 
 
-  /* =========================================================
+  /*         =
      SCREEN
-     ========================================================= */
+             = */
 
   return (
     <SafeAreaView
@@ -694,10 +694,10 @@ function CustomerForm({
 }
 
 
-/* =========================================================
+/*         =
    CUSTOMER ROUTE
    app/customers/index.tsx
-   ========================================================= */
+           = */
 
 export default function CustomersScreen() {
   const { customerId } =
@@ -848,9 +848,9 @@ export default function CustomersScreen() {
 }
 
 
-/* =========================================================
+/*         =
    STYLES
-   ========================================================= */
+           = */
 
 const styles = StyleSheet.create({
 

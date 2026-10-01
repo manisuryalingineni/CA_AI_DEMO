@@ -135,9 +135,9 @@ export default function AddProductScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.container}>
-          {/* =================================
+          {/*     =====
               HEADER
-          ================================= */}
+              ===== */}
 
           <View style={styles.header}>
             <View style={styles.headerLeft}>
@@ -173,9 +173,9 @@ export default function AddProductScreen() {
             </View>
           </View>
 
-          {/* =================================
+          {/*     =====
               BASIC INFORMATION
-          ================================= */}
+              ===== */}
 
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>Basic Information</Text>
@@ -213,9 +213,9 @@ export default function AddProductScreen() {
             />
           </View>
 
-          {/* =================================
+          {/*     =====
               PRICING & TAX
-          ================================= */}
+              ===== */}
 
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>Pricing & Tax</Text>
@@ -268,9 +268,9 @@ export default function AddProductScreen() {
             />
           </View>
 
-          {/* =================================
+          {/*     =====
               OPENING STOCK
-          ================================= */}
+              ===== */}
 
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>Opening Stock</Text>
@@ -287,9 +287,9 @@ export default function AddProductScreen() {
             />
           </View>
 
-          {/* =================================
+          {/*     =====
               RETAIL DETAILS
-          ================================= */}
+              ===== */}
 
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>Retail Details</Text>
@@ -328,9 +328,9 @@ export default function AddProductScreen() {
             />
           </View>
 
-          {/* =================================
+          {/*     =====
               ACTIONS
-          ================================= */}
+              ===== */}
 
           <View style={styles.actions}>
             <Pressable
@@ -362,9 +362,9 @@ export default function AddProductScreen() {
 }
 
 const styles = StyleSheet.create({
-  /* =================================
+  /*     =====
      SCREEN
-  ================================= */
+      ===== */
 
   screen: {
     flex: 1,
@@ -381,10 +381,10 @@ const styles = StyleSheet.create({
     alignSelf: "center",
   },
 
-  /* =================================
+  /*     =====
      HEADER
      SAME AS CUSTOMERS
-  ================================= */
+      ===== */
 
   header: {
     minHeight: 76,
@@ -469,9 +469,9 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
 
-  /* =================================
+  /*     =====
      CARDS
-  ================================= */
+      ===== */
 
   card: {
     backgroundColor: colors.card,
@@ -490,9 +490,9 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
 
-  /* =================================
+  /*     =====
      FIELDS
-  ================================= */
+      ===== */
 
   label: {
     fontSize: 12,
@@ -523,9 +523,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  /* =================================
+  /*     =====
      CURRENCY
-  ================================= */
+      ===== */
 
   currencyInput: {
     minHeight: 46,
@@ -553,9 +553,9 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
   },
 
-  /* =================================
+  /*     =====
      ACTIONS
-  ================================= */
+      ===== */
 
   actions: {
     flexDirection: "row",

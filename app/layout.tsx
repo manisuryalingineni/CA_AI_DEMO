@@ -1,4 +1,4 @@
-import { Stack } from 'expo-router';
+import { Stack } from "expo-router";
 
 export default function RootLayout() {
   return (
@@ -6,6 +6,42 @@ export default function RootLayout() {
       screenOptions={{
         headerShown: false,
       }}
-    />
+    >
+      <Stack.Screen
+        name="index"
+        options={{
+          headerShown: false,
+        }}
+      />
+
+      <Stack.Screen
+        name="dashboard"
+        options={{
+          headerShown: false,
+        }}
+      />
+
+      <Stack.Screen
+        name="pos"
+        options={{
+          headerShown: false,
+        }}
+      />
+
+      <Stack.Screen
+        name="invoice-preview"
+        options={{
+          headerShown: false,
+
+          presentation: "transparentModal",
+
+          animation: "fade",
+
+          contentStyle: {
+            backgroundColor: "transparent",
+          },
+        }}
+      />
+    </Stack>
   );
 }
