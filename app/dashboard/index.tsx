@@ -24,12 +24,15 @@ import {
 } from "../../src/services/dashboardService";
 
 /*         =
+
    FORMATTERS
+
         = */
 
 function formatCurrency(value: number): string {
   return `₹${value.toLocaleString("en-IN", {
     minimumFractionDigits: 2,
+
     maximumFractionDigits: 2,
   })}`;
 }
@@ -49,7 +52,9 @@ function formatDate(value: string): string {
 }
 
 /*         =
+
    QUICK ACTION
+
         = */
 
 type QuickActionProps = {
@@ -88,7 +93,9 @@ function QuickAction({ icon, title, description, onPress }: QuickActionProps) {
 }
 
 /*         =
+
    QUICK ENTRY
+
         = */
 
 type QuickEntryProps = {
@@ -126,7 +133,9 @@ function QuickEntry({ icon, title, onPress }: QuickEntryProps) {
 }
 
 /*         =
+
    FLOW STEP
+
         = */
 
 type FlowStepProps = {
@@ -157,7 +166,9 @@ function FlowStep({ number, title, description, onPress }: FlowStepProps) {
 }
 
 /*         =
+
    RECENT DOCUMENT
+
         = */
 
 function RecentDocumentCard({ document }: { document: RecentDocument }) {
@@ -178,17 +189,25 @@ function RecentDocumentCard({ document }: { document: RecentDocument }) {
       <View style={styles.documentContent}>
         <Text style={styles.documentTitle} numberOfLines={1}>
           {document.documentNumber}
+
           {" • "}
+
           {document.partyName}
         </Text>
 
         <Text style={styles.documentMeta} numberOfLines={1}>
           {isSale ? "Tax invoice" : "Purchase bill"}
+
           {" • "}
+
           {formatDate(document.documentDate)}
+
           {" • "}
+
           {document.lineCount}
+
           {" line"}
+
           {document.lineCount === 1 ? "" : "s"}
         </Text>
 
@@ -217,6 +236,7 @@ function RecentDocumentCard({ document }: { document: RecentDocument }) {
         <Pressable
           style={({ pressed }) => [
             styles.pdfButton,
+
             pressed && styles.cardPressed,
           ]}
           onPress={() => {
@@ -225,6 +245,17 @@ function RecentDocumentCard({ document }: { document: RecentDocument }) {
                 pathname: "/invoice-preview",
                 params: {
                   saleId: document.id,
+                },
+              });
+
+              return;
+            }
+
+            if (document.type === "PURCHASE") {
+              router.push({
+                pathname: "/purchase-preview",
+                params: {
+                  purchaseId: document.id,
                 },
               });
             }
@@ -238,7 +269,9 @@ function RecentDocumentCard({ document }: { document: RecentDocument }) {
 }
 
 /*         =
+
    DASHBOARD
+
         = */
 
 export default function DashboardScreen() {
@@ -251,7 +284,9 @@ export default function DashboardScreen() {
   const selectedRole = "Business Owner";
 
   /*        ======
+
      DASHBOARD DATA
+
          ====== */
 
   const [dashboardData, setDashboardData] = useState<DashboardData>({
@@ -271,7 +306,9 @@ export default function DashboardScreen() {
   const [loadingDashboard, setLoadingDashboard] = useState(false);
 
   /*        ======
+
      REFRESH FROM SQLITE
+
          ====== */
 
   const refreshDashboard = useCallback(async () => {
@@ -295,7 +332,9 @@ export default function DashboardScreen() {
   );
 
   /*        ======
+
      UI
+
          ====== */
 
   return (
@@ -303,7 +342,9 @@ export default function DashboardScreen() {
       <StatusBar style="light" />
 
       {/*        ====
+
           TOP HEADER
+
              ==== */}
 
       <View
@@ -347,7 +388,9 @@ export default function DashboardScreen() {
       </View>
 
       {/*        ====
+
           MAIN
+
              ==== */}
 
       <ScrollView
@@ -362,7 +405,9 @@ export default function DashboardScreen() {
       >
         <View style={[styles.main, isLargeScreen && styles.mainLarge]}>
           {/*        
+
               HERO
+
                   */}
 
           <View style={styles.hero}>
@@ -470,7 +515,9 @@ export default function DashboardScreen() {
           </View>
 
           {/*        
+
               QUICK ENTRY
+
                   */}
 
           <View style={styles.sectionHeader}>
@@ -498,7 +545,7 @@ export default function DashboardScreen() {
             <QuickEntry
               icon="👤"
               title="Customer"
-              onPress={() => router.push("/customers")}
+              onPress={() => router.push("/customers/add")}
             />
 
             <QuickEntry
@@ -516,21 +563,18 @@ export default function DashboardScreen() {
             <QuickEntry
               icon="📥"
               title="Purchase"
- 
-             // onPress={() => router.push("/purchases")}
- 
-              onPress={() =>
-                router.push(
-                  "/purchases/add",
-                )
-              }
-  
+              // onPress={() => router.push("/purchases")}
+
+              onPress={() => router.push("/purchases/add")}
             />
 
-            <QuickEntry icon="💰" title="Money"
-            onPress={()=>{
-              router.push("/payments")
-            }} />
+            <QuickEntry
+              icon="💰"
+              title="Money"
+              onPress={() => {
+                router.push("/payments");
+              }}
+            />
 
             <QuickEntry icon="🏦" title="Bank" />
 
@@ -544,7 +588,9 @@ export default function DashboardScreen() {
           </View>
 
           {/*        
+
               RETAIL WORK SHOP
+
                   */}
 
           <View style={styles.sectionHeader}>
@@ -562,7 +608,7 @@ export default function DashboardScreen() {
               icon="👤"
               title="Customer"
               description="Add customer or walk-in party"
-              onPress={() => router.push("/customers")}
+              onPress={() => router.push("/customers/add")}
             />
 
             <QuickAction
@@ -576,15 +622,9 @@ export default function DashboardScreen() {
               icon="📥"
               title="Buy stock"
               description="Purchase bill and inward stock"
- 
               //onPress={() => router.push("/purchases")}
- 
-              onPress={() =>
-                router.push(
-                  "/purchases/add",
-                )
-              }
-  
+
+              onPress={() => router.push("/purchases/add")}
             />
 
             <QuickAction
@@ -610,7 +650,9 @@ export default function DashboardScreen() {
           </View>
 
           {/*        
+
               BUSINESS FLOW
+
                   */}
 
           <View style={styles.sectionHeader}>
@@ -632,7 +674,7 @@ export default function DashboardScreen() {
               number="1"
               title="Create party"
               description="Customer or vendor"
-              onPress={() => router.push("/customers")}
+              onPress={() => router.push("/customers/add")}
             />
 
             <FlowStep
@@ -646,15 +688,9 @@ export default function DashboardScreen() {
               number="3"
               title="Purchase"
               description="Purchase and inward stock"
- 
-             // onPress={() => router.push("/purchases")}
- 
-              onPress={() =>
-                router.push(
-                  "/purchases/add",
-                )
-              }
-  
+              // onPress={() => router.push("/purchases")}
+
+              onPress={() => router.push("/purchases/add")}
             />
 
             <FlowStep
@@ -668,19 +704,21 @@ export default function DashboardScreen() {
               number="5"
               title="Payment"
               description="Receipt or vendor payment"
-              onPress={() => router.push("/all-operations")}
+              onPress={() => router.push("/payments")}
             />
 
             <FlowStep
               number="6"
               title="Reports"
               description="Business reports"
-              onPress={() => router.push("/sales")}
+              onPress={() => router.push("/reports")}
             />
           </ScrollView>
 
           {/*        
+
               RECENT DOCUMENTS
+
                   */}
 
           <View style={styles.sectionHeader}>
@@ -733,7 +771,9 @@ export default function DashboardScreen() {
       </ScrollView>
 
       {/*        ====
+
           BOTTOM NAV
+
              ==== */}
 
       <View
@@ -786,7 +826,9 @@ export default function DashboardScreen() {
 }
 
 /*         =
+
    STYLES
+
         = */
 
 const styles = StyleSheet.create({
@@ -807,6 +849,7 @@ const styles = StyleSheet.create({
 
     shadowOffset: {
       width: 0,
+
       height: 3,
     },
 
@@ -976,6 +1019,7 @@ const styles = StyleSheet.create({
 
     shadowOffset: {
       width: 0,
+
       height: 9,
     },
 
@@ -1285,6 +1329,7 @@ const styles = StyleSheet.create({
 
     shadowOffset: {
       width: 0,
+
       height: 2,
     },
 
@@ -1372,6 +1417,7 @@ const styles = StyleSheet.create({
 
     shadowOffset: {
       width: 0,
+
       height: 4,
     },
 
@@ -1523,7 +1569,9 @@ const styles = StyleSheet.create({
   },
 
   /*        ====
+
        RECENT DOCUMENTS
+
            ==== */
 
   documentsList: {
@@ -1557,6 +1605,7 @@ const styles = StyleSheet.create({
 
     shadowOffset: {
       width: 0,
+
       height: 3,
     },
 
@@ -1790,6 +1839,7 @@ const styles = StyleSheet.create({
 
     shadowOffset: {
       width: 0,
+
       height: 12,
     },
 

@@ -42,8 +42,7 @@ function OperationCard({
 }: OperationCardProps) {
   const isSmall = screenSize === "small";
 
-  const isTablet =
-    screenSize === "tablet" || screenSize === "desktop";
+  const isTablet = screenSize === "tablet" || screenSize === "desktop";
 
   return (
     <Pressable
@@ -118,19 +117,9 @@ function OperationCard({
 
       {/* OPEN BADGE */}
 
-      <View
-        style={[
-          styles.openBadge,
-
-          isSmall && styles.openBadgeSmall,
-        ]}
-      >
+      <View style={[styles.openBadge, isSmall && styles.openBadgeSmall]}>
         <Text
-          style={[
-            styles.openBadgeText,
-
-            isSmall && styles.openBadgeTextSmall,
-          ]}
+          style={[styles.openBadgeText, isSmall && styles.openBadgeTextSmall]}
         >
           OPEN
         </Text>
@@ -163,12 +152,9 @@ export default function AllOperationsScreen() {
 
   const isSmall = screenSize === "small";
 
-  const isTablet =
-    screenSize === "tablet" ||
-    screenSize === "desktop";
+  const isTablet = screenSize === "tablet" || screenSize === "desktop";
 
-  const isDesktop =
-    screenSize === "desktop";
+  const isDesktop = screenSize === "desktop";
 
   /*
    * SMALL PHONE  = 2 cards
@@ -177,12 +163,11 @@ export default function AllOperationsScreen() {
    * DESKTOP      = 4 cards
    */
 
-  const cardWidth: `${number}%` =
-    isDesktop
-      ? "23.8%"
-      : isTablet
-        ? "31.5%"
-        : "48.2%";
+  const cardWidth: `${number}%` = isDesktop
+    ? "23.8%"
+    : isTablet
+      ? "31.5%"
+      : "48.2%";
 
   return (
     <View style={styles.container}>
@@ -204,11 +189,9 @@ export default function AllOperationsScreen() {
           style={[
             styles.headerInner,
 
-            isSmall &&
-              styles.headerInnerSmall,
+            isSmall && styles.headerInnerSmall,
 
-            isTablet &&
-              styles.headerInnerLarge,
+            isTablet && styles.headerInnerLarge,
           ]}
         >
           {/* BACK */}
@@ -218,19 +201,16 @@ export default function AllOperationsScreen() {
             style={({ pressed }) => [
               styles.backButton,
 
-              isSmall &&
-                styles.backButtonSmall,
+              isSmall && styles.backButtonSmall,
 
-              pressed &&
-                styles.pressed,
+              pressed && styles.pressed,
             ]}
           >
             <Text
               style={[
                 styles.backButtonText,
 
-                isSmall &&
-                  styles.backButtonTextSmall,
+                isSmall && styles.backButtonTextSmall,
               ]}
             >
               ‹
@@ -239,54 +219,26 @@ export default function AllOperationsScreen() {
 
           {/* LOGO */}
 
-          <View
-            style={[
-              styles.logo,
-
-              isSmall &&
-                styles.logoSmall,
-            ]}
-          >
-            <Text
-              style={[
-                styles.logoText,
-
-                isSmall &&
-                  styles.logoTextSmall,
-              ]}
-            >
+          <View style={[styles.logo, isSmall && styles.logoSmall]}>
+            <Text style={[styles.logoText, isSmall && styles.logoTextSmall]}>
               CA
             </Text>
           </View>
 
           {/* APP DETAILS */}
 
-          <View
-            style={
-              styles.headerTextArea
-            }
-          >
+          <View style={styles.headerTextArea}>
             <Text
-              style={[
-                styles.appTitle,
-
-                isSmall &&
-                  styles.appTitleSmall,
-              ]}
+              style={[styles.appTitle, isSmall && styles.appTitleSmall]}
               numberOfLines={1}
               adjustsFontSizeToFit
               minimumFontScale={0.65}
             >
-              CA AI Business 
+              CA AI Business
             </Text>
 
             <Text
-              style={[
-                styles.appSubtitle,
-
-                isSmall &&
-                  styles.appSubtitleSmall,
-              ]}
+              style={[styles.appSubtitle, isSmall && styles.appSubtitleSmall]}
               numberOfLines={1}
               adjustsFontSizeToFit
               minimumFontScale={0.7}
@@ -295,40 +247,19 @@ export default function AllOperationsScreen() {
             </Text>
           </View>
 
-          <View
-            style={
-              styles.headerSpacer
-            }
-          />
+          <View style={styles.headerSpacer} />
 
           {/* OWNER */}
 
           <View
-            style={[
-              styles.ownerButton,
-
-              isSmall &&
-                styles.ownerButtonSmall,
-            ]}
+            style={[styles.ownerButton, isSmall && styles.ownerButtonSmall]}
           >
-            <Text
-              style={[
-                styles.ownerIcon,
-
-                isSmall &&
-                  styles.ownerIconSmall,
-              ]}
-            >
+            <Text style={[styles.ownerIcon, isSmall && styles.ownerIconSmall]}>
               👤
             </Text>
 
             {!isSmall && (
-              <Text
-                style={
-                  styles.ownerText
-                }
-                numberOfLines={1}
-              >
+              <Text style={styles.ownerText} numberOfLines={1}>
                 Business Owner
               </Text>
             )}
@@ -341,15 +272,12 @@ export default function AllOperationsScreen() {
              ==== */}
 
       <ScrollView
-        showsVerticalScrollIndicator={
-          false
-        }
+        showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.scrollContent,
 
           {
-            paddingBottom:
-              85 + insets.bottom,
+            paddingBottom: 85 + insets.bottom,
           },
         ]}
       >
@@ -357,39 +285,24 @@ export default function AllOperationsScreen() {
           style={[
             styles.mainContent,
 
-            isSmall &&
-              styles.mainContentSmall,
+            isSmall && styles.mainContentSmall,
 
-            isTablet &&
-              styles.mainContentLarge,
+            isTablet && styles.mainContentLarge,
           ]}
         >
           {/*        
               PAGE HEADING
                   */}
 
-          <View
-            style={[
-              styles.headingRow,
-
-              isSmall &&
-                styles.headingRowSmall,
-            ]}
-          >
-            <View
-              style={
-                styles.headingTextArea
-              }
-            >
+          <View style={[styles.headingRow, isSmall && styles.headingRowSmall]}>
+            <View style={styles.headingTextArea}>
               <Text
                 style={[
                   styles.pageTitle,
 
-                  isSmall &&
-                    styles.pageTitleSmall,
+                  isSmall && styles.pageTitleSmall,
 
-                  isTablet &&
-                    styles.pageTitleTablet,
+                  isTablet && styles.pageTitleTablet,
                 ]}
               >
                 Retail Shop operations
@@ -399,39 +312,30 @@ export default function AllOperationsScreen() {
                 style={[
                   styles.pageSubtitle,
 
-                  isSmall &&
-                    styles.pageSubtitleSmall,
+                  isSmall && styles.pageSubtitleSmall,
                 ]}
               >
-                End-to-end buttons designed
-                for this business type
+                End-to-end buttons designed for this business type
               </Text>
             </View>
 
             {/* CHANGE BUSINESS */}
 
             <Pressable
-              onPress={() =>
-                router.push(
-                  "/business-selection"
-                )
-              }
+              onPress={() => router.push("/business-selection")}
               style={({ pressed }) => [
                 styles.changeBusinessButton,
 
-                isSmall &&
-                  styles.changeBusinessButtonSmall,
+                isSmall && styles.changeBusinessButtonSmall,
 
-                pressed &&
-                  styles.pressed,
+                pressed && styles.pressed,
               ]}
             >
               <Text
                 style={[
                   styles.changeBusinessText,
 
-                  isSmall &&
-                    styles.changeBusinessTextSmall,
+                  isSmall && styles.changeBusinessTextSmall,
                 ]}
               >
                 Change{"\n"}business
@@ -443,92 +347,62 @@ export default function AllOperationsScreen() {
               OPERATIONS EXPERT
                   */}
 
-          <View
-            style={[
-              styles.expertCard,
-
-              isSmall &&
-                styles.expertCardSmall,
-            ]}
-          >
-            <View
-              style={
-                styles.expertLeft
-              }
-            >
+          <View style={[styles.expertCard, isSmall && styles.expertCardSmall]}>
+            <View style={styles.expertLeft}>
               <View
-                style={[
-                  styles.expertIcon,
-
-                  isSmall &&
-                    styles.expertIconSmall,
-                ]}
+                style={[styles.expertIcon, isSmall && styles.expertIconSmall]}
               >
                 <Text
                   style={[
                     styles.expertIconText,
 
-                    isSmall &&
-                      styles.expertIconTextSmall,
+                    isSmall && styles.expertIconTextSmall,
                   ]}
                 >
                   🧭
                 </Text>
               </View>
 
-              <View
-                style={
-                  styles.expertTextArea
-                }
-              >
+              <View style={styles.expertTextArea}>
                 <Text
                   style={[
                     styles.expertTitle,
 
-                    isSmall &&
-                      styles.expertTitleSmall,
+                    isSmall && styles.expertTitleSmall,
                   ]}
                   numberOfLines={2}
                 >
-                  Operations Expert: Clear
-                  pending payments
+                  Operations Expert: Clear pending payments
                 </Text>
 
                 <Text
                   style={[
                     styles.expertDescription,
 
-                    isSmall &&
-                      styles.expertDescriptionSmall,
+                    isSmall && styles.expertDescriptionSmall,
                   ]}
                   numberOfLines={2}
                 >
-                  2 invoice or bill balance(s)
-                  need collection or payment.
+                  2 invoice or bill balance(s) need collection or payment.
                 </Text>
               </View>
             </View>
 
             <Pressable
-              onPress={() =>
-                router.push("/sales")
-              }
+              onPress={() => router.push("/sales")}
               style={({ pressed }) => [
                 styles.doNowButton,
 
-                isSmall &&
-                  styles.doNowButtonSmall,
+                isSmall && styles.doNowButtonSmall,
 
-                pressed &&
-                  styles.doNowButtonPressed,
+                pressed && styles.doNowButtonPressed,
               ]}
             >
               <Text
                 style={[
                   styles.doNowButtonText,
 
-                  isSmall &&
-                    styles.doNowButtonTextSmall,
+                  isSmall && styles.doNowButtonTextSmall,
                 ]}
               >
                 Do now
@@ -541,12 +415,7 @@ export default function AllOperationsScreen() {
                   */}
 
           <View
-            style={[
-              styles.operationGrid,
-
-              isSmall &&
-                styles.operationGridSmall,
-            ]}
+            style={[styles.operationGrid, isSmall && styles.operationGridSmall]}
           >
             <OperationCard
               width={cardWidth}
@@ -554,9 +423,7 @@ export default function AllOperationsScreen() {
               icon="👤"
               title="Customer"
               description="Add customer or walk-in party"
-              onPress={() =>
-                router.push("/customers")
-              }
+              onPress={() => router.push("/customers")}
             />
 
             <OperationCard
@@ -565,9 +432,7 @@ export default function AllOperationsScreen() {
               icon="🧾"
               title="POS sale"
               description="GST invoice and counter sale"
-              onPress={() =>
-                router.push("/pos")
-              }
+              onPress={() => router.push("/pos")}
             />
 
             <OperationCard
@@ -576,9 +441,7 @@ export default function AllOperationsScreen() {
               icon="📥"
               title="Buy stock"
               description="Purchase bill and inward stock"
-              onPress={() =>
-                router.push("/purchases")
-              }
+              onPress={() => router.push("/purchases")}
             />
 
             <OperationCard
@@ -587,9 +450,7 @@ export default function AllOperationsScreen() {
               icon="📦"
               title="Stock check"
               description="Quantity, cost and reorder view"
-              onPress={() =>
-                router.push("/products")
-              }
+              onPress={() => router.push("/products")}
             />
 
             <OperationCard
@@ -598,9 +459,7 @@ export default function AllOperationsScreen() {
               icon="💳"
               title="Receive money"
               description="Cash, UPI, card or cheque"
-              onPress={() =>
-                router.push("/sales")
-              }
+              onPress={() => router.push("/sales")}
             />
 
             <OperationCard
@@ -609,9 +468,7 @@ export default function AllOperationsScreen() {
               icon="📈"
               title="Daily sales"
               description="Live sales register PDF"
-              onPress={() =>
-                router.push("/sales")
-              }
+              onPress={() => router.push("/sales")}
             />
           </View>
         </View>
@@ -625,57 +482,32 @@ export default function AllOperationsScreen() {
         style={[
           styles.bottomNavigation,
 
-          isSmall &&
-            styles.bottomNavigationSmall,
+          isSmall && styles.bottomNavigationSmall,
 
           {
-            bottom: Math.max(
-              6,
-              insets.bottom
-            ),
+            bottom: Math.max(6, insets.bottom),
           },
 
-          isTablet &&
-            styles.bottomNavigationLarge,
+          isTablet && styles.bottomNavigationLarge,
         ]}
       >
         {/* HOME */}
 
         <Pressable
-          onPress={() =>
-            router.replace(
-              "/dashboard"
-            )
-          }
+          onPress={() => router.replace("/dashboard")}
           style={({ pressed }) => [
             styles.navButton,
 
-            isSmall &&
-              styles.navButtonSmall,
+            isSmall && styles.navButtonSmall,
 
-            pressed &&
-              styles.navPressed,
+            pressed && styles.navPressed,
           ]}
         >
-          <Text
-            style={[
-              styles.navIcon,
-
-              isSmall &&
-                styles.navIconSmall,
-            ]}
-          >
+          <Text style={[styles.navIcon, isSmall && styles.navIconSmall]}>
             ⌂
           </Text>
 
-          <Text
-            style={[
-              styles.navText,
-
-              isSmall &&
-                styles.navTextSmall,
-            ]}
-          >
+          <Text style={[styles.navText, isSmall && styles.navTextSmall]}>
             Home
           </Text>
         </Pressable>
@@ -683,38 +515,20 @@ export default function AllOperationsScreen() {
         {/* SALES */}
 
         <Pressable
-          onPress={() =>
-            router.push("/sales")
-          }
+          onPress={() => router.push("/sales")}
           style={({ pressed }) => [
             styles.navButton,
 
-            isSmall &&
-              styles.navButtonSmall,
+            isSmall && styles.navButtonSmall,
 
-            pressed &&
-              styles.navPressed,
+            pressed && styles.navPressed,
           ]}
         >
-          <Text
-            style={[
-              styles.navIcon,
-
-              isSmall &&
-                styles.navIconSmall,
-            ]}
-          >
+          <Text style={[styles.navIcon, isSmall && styles.navIconSmall]}>
             🧾
           </Text>
 
-          <Text
-            style={[
-              styles.navText,
-
-              isSmall &&
-                styles.navTextSmall,
-            ]}
-          >
+          <Text style={[styles.navText, isSmall && styles.navTextSmall]}>
             Sales
           </Text>
         </Pressable>
@@ -722,40 +536,20 @@ export default function AllOperationsScreen() {
         {/* PURCHASES */}
 
         <Pressable
-          onPress={() =>
-            router.push(
-              "/purchases"
-            )
-          }
+          onPress={() => router.push("/purchases")}
           style={({ pressed }) => [
             styles.navButton,
 
-            isSmall &&
-              styles.navButtonSmall,
+            isSmall && styles.navButtonSmall,
 
-            pressed &&
-              styles.navPressed,
+            pressed && styles.navPressed,
           ]}
         >
-          <Text
-            style={[
-              styles.navIcon,
-
-              isSmall &&
-                styles.navIconSmall,
-            ]}
-          >
+          <Text style={[styles.navIcon, isSmall && styles.navIconSmall]}>
             📥
           </Text>
 
-          <Text
-            style={[
-              styles.navText,
-
-              isSmall &&
-                styles.navTextSmall,
-            ]}
-          >
+          <Text style={[styles.navText, isSmall && styles.navTextSmall]}>
             Purchases
           </Text>
         </Pressable>
@@ -763,38 +557,20 @@ export default function AllOperationsScreen() {
         {/* MORE */}
 
         <Pressable
-          onPress={() =>
-            router.push("/stock")
-          }
+          onPress={() => router.push("/stock")}
           style={({ pressed }) => [
             styles.navButton,
 
-            isSmall &&
-              styles.navButtonSmall,
+            isSmall && styles.navButtonSmall,
 
-            pressed &&
-              styles.navPressed,
+            pressed && styles.navPressed,
           ]}
         >
-          <Text
-            style={[
-              styles.navIcon,
-
-              isSmall &&
-                styles.navIconSmall,
-            ]}
-          >
+          <Text style={[styles.navIcon, isSmall && styles.navIconSmall]}>
             ▦
           </Text>
 
-          <Text
-            style={[
-              styles.navText,
-
-              isSmall &&
-                styles.navTextSmall,
-            ]}
-          >
+          <Text style={[styles.navText, isSmall && styles.navTextSmall]}>
             More
           </Text>
         </Pressable>
@@ -888,8 +664,7 @@ const styles = StyleSheet.create({
 
     borderRadius: 8,
 
-    backgroundColor:
-      "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(255,255,255,0.08)",
   },
 
   backButtonSmall: {
@@ -1001,13 +776,11 @@ const styles = StyleSheet.create({
 
     alignItems: "center",
 
-    backgroundColor:
-      "rgba(255,255,255,0.11)",
+    backgroundColor: "rgba(255,255,255,0.11)",
 
     borderWidth: 1,
 
-    borderColor:
-      "rgba(255,255,255,0.2)",
+    borderColor: "rgba(255,255,255,0.2)",
 
     borderRadius: 17,
 
@@ -1089,8 +862,7 @@ const styles = StyleSheet.create({
 
     alignItems: "center",
 
-    justifyContent:
-      "space-between",
+    justifyContent: "space-between",
 
     gap: 10,
 
@@ -1202,8 +974,7 @@ const styles = StyleSheet.create({
 
     alignItems: "center",
 
-    justifyContent:
-      "space-between",
+    justifyContent: "space-between",
 
     backgroundColor: "#FFFDF1",
 
@@ -1373,8 +1144,7 @@ const styles = StyleSheet.create({
 
     flexWrap: "wrap",
 
-    justifyContent:
-      "space-between",
+    justifyContent: "space-between",
 
     rowGap: 9,
   },
@@ -1616,105 +1386,104 @@ const styles = StyleSheet.create({
    BOTTOM NAVIGATION
        ====== */
 
-bottomNavigation: {
-  position: "absolute",
+  bottomNavigation: {
+    position: "absolute",
 
-  left: 9,
-  right: 9,
+    left: 9,
+    right: 9,
 
-  flexDirection: "row",
+    flexDirection: "row",
 
-  gap: 4,
+    gap: 4,
 
-  padding: 6,
+    padding: 6,
 
-  backgroundColor: "#FFFFFF",
+    backgroundColor: "#FFFFFF",
 
-  borderWidth: 1,
-  borderColor: colors.border,
+    borderWidth: 1,
+    borderColor: colors.border,
 
-  borderRadius: 20,
+    borderRadius: 20,
 
-  shadowColor: colors.primary,
+    shadowColor: colors.primary,
 
-  shadowOffset: {
-    width: 0,
-    height: 12,
+    shadowOffset: {
+      width: 0,
+      height: 12,
+    },
+
+    shadowOpacity: 0.2,
+    shadowRadius: 25,
+
+    elevation: 10,
   },
 
-  shadowOpacity: 0.2,
-  shadowRadius: 25,
+  bottomNavigationSmall: {
+    left: 9,
+    right: 9,
+  },
 
-  elevation: 10,
-},
+  bottomNavigationLarge: {
+    maxWidth: 620,
 
-bottomNavigationSmall: {
-  left: 9,
-  right: 9,
-},
+    width: "60%",
 
-bottomNavigationLarge: {
-  maxWidth: 620,
+    alignSelf: "center",
 
-  width: "60%",
+    left: undefined,
+    right: undefined,
+  },
 
-  alignSelf: "center",
+  navButton: {
+    flex: 1,
 
-  left: undefined,
-  right: undefined,
-},
+    minHeight: 48,
 
-navButton: {
-  flex: 1,
+    borderRadius: 14,
 
-  minHeight: 48,
+    alignItems: "center",
+    justifyContent: "center",
+  },
 
-  borderRadius: 14,
+  navButtonSmall: {
+    minHeight: 48,
+  },
 
-  alignItems: "center",
-  justifyContent: "center",
-},
+  navButtonActive: {
+    backgroundColor: "#E5F5F2",
+  },
 
-navButtonSmall: {
-  minHeight: 48,
-},
+  navPressed: {
+    opacity: 0.75,
+  },
 
-navButtonActive: {
-  backgroundColor: "#E5F5F2",
-},
+  navIcon: {
+    color: colors.mutedText,
 
-navPressed: {
-  opacity: 0.75,
-},
+    fontSize: 19,
 
-navIcon: {
-  color: colors.mutedText,
+    marginBottom: 2,
+  },
 
-  fontSize: 19,
+  navIconSmall: {
+    fontSize: 19,
+  },
 
-  marginBottom: 2,
-},
+  navActiveText: {
+    color: colors.teal,
 
-navIconSmall: {
-  fontSize: 19,
-},
+    fontSize: 9,
+    fontWeight: "800",
+  },
 
-navActiveText: {
-  color: colors.teal,
+  navText: {
+    color: colors.mutedText,
 
-  fontSize: 9,
-  fontWeight: "800",
-},
+    fontSize: 9,
+    fontWeight: "800",
+  },
 
-navText: {
-  color: colors.mutedText,
-
-  fontSize: 9,
-  fontWeight: "800",
-},
-
-navTextSmall: {
-  fontSize: 9,
-},
-
+  navTextSmall: {
+    fontSize: 9,
+  },
 });

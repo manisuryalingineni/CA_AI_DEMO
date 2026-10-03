@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 import {
   Alert,
@@ -14,76 +14,127 @@ import {
   useWindowDimensions,
 } from "react-native";
 
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 
 import { Picker } from "@react-native-picker/picker";
 
-import { Ionicons } from "@expo/vector-icons";
-
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { saveVendor } from "../../src/services/vendorService";
+import { Ionicons } from "@expo/vector-icons";
 
-import type { CreateVendorInput } from "../../src/types/vendor";
+import { saveCustomer, editCustomer } from "../../src/services/customerService";
+
+import { getCustomerById } from "../../src/repositories/customerRepository";
+
+import type { CreateCustomerInput, Customer } from "../../src/types/customer";
 
 import { colors } from "../../src/theme/colors";
 
 /*         =
+
    STATES
+
         = */
 
 const STATES = [
   "Andhra Pradesh",
+
   "Arunachal Pradesh",
+
   "Assam",
+
   "Bihar",
+
   "Chhattisgarh",
+
   "Goa",
+
   "Gujarat",
+
   "Haryana",
+
   "Himachal Pradesh",
+
   "Jharkhand",
+
   "Karnataka",
+
   "Kerala",
+
   "Madhya Pradesh",
+
   "Maharashtra",
+
   "Manipur",
+
   "Meghalaya",
+
   "Mizoram",
+
   "Nagaland",
+
   "Odisha",
+
   "Punjab",
+
   "Rajasthan",
+
   "Sikkim",
+
   "Tamil Nadu",
+
   "Telangana",
+
   "Tripura",
+
   "Uttar Pradesh",
+
   "Uttarakhand",
+
   "West Bengal",
-  "Delhi",
-  "Jammu and Kashmir",
-  "Ladakh",
-  "Puducherry",
-  "Chandigarh",
+
   "Andaman and Nicobar Islands",
+
+  "Chandigarh",
+
   "Dadra and Nagar Haveli and Daman and Diu",
+
+  "Delhi",
+
+  "Jammu and Kashmir",
+
+  "Ladakh",
+
   "Lakshadweep",
+
+  "Puducherry",
 ];
 
 /*         =
-   ADD VENDOR
+
+   CUSTOMER FORM
+
         = */
 
-export default function AddVendorScreen() {
+interface CustomerFormProps {
+  customer?: Customer | null;
+
+  onClose: () => void;
+
+  onSaved: () => void;
+}
+
+function CustomerForm({ customer, onClose, onSaved }: CustomerFormProps) {
   const { width } = useWindowDimensions();
+
+  const isEditMode = Boolean(customer);
 
   const isLargeForm = width >= 700;
 
-  const isSmall = width < 370;
-
   /*        ======
+
      FORM STATE
+
          ====== */
 
   const [name, setName] = useState("");
@@ -105,14 +156,26 @@ export default function AddVendorScreen() {
   const [saving, setSaving] = useState(false);
 
   /*        ======
+
      TOAST
+
          ====== */
 
   const [toastVisible, setToastVisible] = useState(false);
 
+  const [toastTitle, setToastTitle] = useState("Customer saved");
+
+  const [toastMessage, setToastMessage] = useState(
+    "Customer saved successfully",
+  );
+
   const toastOpacity = useRef(new Animated.Value(0)).current;
 
-  const showSuccessToast = () => {
+  const showSuccessToast = (title: string, message: string) => {
+    setToastTitle(title);
+
+    setToastMessage(message);
+
     toastOpacity.stopAnimation();
 
     toastOpacity.setValue(0);
@@ -141,27 +204,67 @@ export default function AddVendorScreen() {
   };
 
   /*        ======
-     BACK / CANCEL
+
+     LOAD / RESET FORM
+
          ====== */
 
-  const handleBack = () => {
+  useEffect(() => {
+    if (customer) {
+      setName(customer.name ?? "");
+
+      setMobile(customer.mobile ?? "");
+
+      setGstin(customer.gstin ?? "");
+
+      setState(customer.state || "Andhra Pradesh");
+
+      setCreditDays(String(customer.creditDays ?? 0));
+
+      setOpeningBalance(String(customer.openingBalance ?? 0));
+
+      setBusinessDetail(customer.businessDetail ?? "");
+
+      setAddress(customer.address ?? "");
+
+      return;
+    }
+
+    setName("");
+
+    setMobile("");
+
+    setGstin("");
+
+    setState("Andhra Pradesh");
+
+    setCreditDays("0");
+
+    setOpeningBalance("0");
+
+    setBusinessDetail("");
+
+    setAddress("");
+  }, [customer]);
+
+  /*        ======
+
+     CLOSE
+
+         ====== */
+
+  const handleClose = () => {
     if (saving) {
       return;
     }
 
-    router.back();
-  };
-
-  const handleCancel = () => {
-    if (saving) {
-      return;
-    }
-
-    router.replace("/dashboard");
+    onClose();
   };
 
   /*        ======
-     SAVE
+
+     SAVE CUSTOMER
+
          ====== */
 
   const handleSave = async () => {
@@ -169,29 +272,33 @@ export default function AddVendorScreen() {
       return;
     }
 
-    const vendorName = name.trim();
+    const customerName = name.trim();
 
-    const vendorMobile = mobile.trim();
+    const customerMobile = mobile.trim();
 
     /*        ==
+
          NAME
+
              == */
 
-    if (!vendorName) {
+    if (!customerName) {
       Alert.alert(
         "Required",
 
-        "Please enter vendor name.",
+        "Please enter customer name.",
       );
 
       return;
     }
 
     /*        ==
+
          MOBILE
+
              == */
 
-    if (!vendorMobile) {
+    if (!customerMobile) {
       Alert.alert(
         "Required",
 
@@ -201,7 +308,7 @@ export default function AddVendorScreen() {
       return;
     }
 
-    if (!/^\d{10}$/.test(vendorMobile)) {
+    if (!/^\d{10}$/.test(customerMobile)) {
       Alert.alert(
         "Invalid mobile number",
 
@@ -212,7 +319,9 @@ export default function AddVendorScreen() {
     }
 
     /*        ==
+
          GSTIN
+
              == */
 
     const cleanedGstin = gstin.trim().toUpperCase();
@@ -228,10 +337,14 @@ export default function AddVendorScreen() {
     }
 
     /*        ==
-         CREDIT DAYS
+
+         NUMERIC VALUES
+
              == */
 
     const parsedCreditDays = Number(creditDays) || 0;
+
+    const parsedOpeningBalance = Number(openingBalance) || 0;
 
     if (parsedCreditDays < 0) {
       Alert.alert(
@@ -243,12 +356,6 @@ export default function AddVendorScreen() {
       return;
     }
 
-    /*        ==
-         OPENING BALANCE
-             == */
-
-    const parsedOpeningBalance = Number(openingBalance) || 0;
-
     if (parsedOpeningBalance < 0) {
       Alert.alert(
         "Invalid opening balance",
@@ -259,42 +366,89 @@ export default function AddVendorScreen() {
       return;
     }
 
-    const input: CreateVendorInput = {
-      name: vendorName,
-
-      mobile: vendorMobile,
-
-      gstin: cleanedGstin || undefined,
-
-      state,
-
-      creditDays: parsedCreditDays,
-
-      openingBalance: parsedOpeningBalance,
-
-      businessDetail: businessDetail.trim() || undefined,
-
-      address: address.trim() || undefined,
-    };
-
     try {
       setSaving(true);
 
-      await saveVendor(input);
+      /*        
 
-      showSuccessToast();
+           UPDATE CUSTOMER
+
+                */
+
+      if (customer) {
+        await editCustomer({
+          ...customer,
+
+          name: customerName,
+
+          mobile: customerMobile,
+
+          gstin: cleanedGstin || undefined,
+
+          state,
+
+          creditDays: parsedCreditDays,
+
+          openingBalance: parsedOpeningBalance,
+
+          businessDetail: businessDetail.trim() || undefined,
+
+          address: address.trim() || undefined,
+        });
+
+        showSuccessToast(
+          "Customer updated",
+
+          "Customer updated successfully",
+        );
+      } else {
+        /*        
+
+           CREATE CUSTOMER
+
+                */
+
+        const input: CreateCustomerInput = {
+          name: customerName,
+
+          mobile: customerMobile,
+
+          gstin: cleanedGstin || undefined,
+
+          state,
+
+          creditDays: parsedCreditDays,
+
+          openingBalance: parsedOpeningBalance,
+
+          businessDetail: businessDetail.trim() || undefined,
+
+          address: address.trim() || undefined,
+        };
+
+        await saveCustomer(input);
+
+        showSuccessToast(
+          "Customer saved",
+
+          "Customer saved successfully",
+        );
+      }
 
       /*
-       * Give the user enough time
-       * to see the success toast.
+
+       * Keep screen visible briefly so
+
+       * user can see success toast.
+
        */
 
       setTimeout(() => {
-        router.replace("/dashboard");
+        onSaved();
       }, 1200);
     } catch (error) {
       Alert.alert(
-        "Unable to save vendor",
+        isEditMode ? "Unable to update" : "Unable to save",
 
         error instanceof Error ? error.message : "Something went wrong.",
       );
@@ -304,36 +458,40 @@ export default function AddVendorScreen() {
   };
 
   /*        ======
-     UI
+
+     SCREEN
+
          ====== */
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
+    <SafeAreaView style={styles.formSafeArea} edges={["top", "bottom"]}>
       <KeyboardAvoidingView
-        style={styles.keyboard}
+        style={styles.formKeyboard}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        <View style={styles.container}>
+        <View style={styles.formScreen}>
           {/*        
+
               HEADER
+
                   */}
 
-          <View style={styles.header}>
-            <View style={styles.headerLeft}>
-              {/* BACK */}
+          <View style={styles.formHeader}>
+            <View style={styles.formHeaderLeft}>
+              {/* BACK BUTTON */}
 
               <Pressable
-                onPress={handleBack}
+                onPress={handleClose}
                 disabled={saving}
                 hitSlop={10}
                 accessibilityRole="button"
                 accessibilityLabel="Go back"
                 style={({ pressed }) => [
-                  styles.backButton,
+                  styles.formBackButton,
 
-                  pressed && !saving && styles.backButtonPressed,
+                  pressed && !saving && styles.formBackButtonPressed,
 
-                  saving && styles.backButtonDisabled,
+                  saving && styles.formBackButtonDisabled,
                 ]}
               >
                 <Ionicons name="arrow-back" size={19} color={colors.primary} />
@@ -341,79 +499,72 @@ export default function AddVendorScreen() {
 
               {/* TITLE */}
 
-              <View style={styles.headerText}>
-                <Text
-                  style={[
-                    styles.headerTitle,
-
-                    isSmall && styles.headerTitleSmall,
-                  ]}
-                  numberOfLines={1}
-                >
-                  Add Vendor
+              <View style={styles.formHeaderText}>
+                <Text style={styles.formHeaderTitle} numberOfLines={1}>
+                  {isEditMode ? "Edit Customer" : "Add Customer"}
                 </Text>
 
-                <Text style={styles.headerSubtitle} numberOfLines={1}>
-                  Create a new retail vendor
+                <Text style={styles.formHeaderSubtitle} numberOfLines={1}>
+                  {isEditMode
+                    ? "Update retail customer details"
+                    : "Create a new retail customer"}
                 </Text>
               </View>
             </View>
 
             {/* LOGO */}
 
-            <View style={styles.logo}>
-              <Text style={styles.logoText}>CA</Text>
+            <View style={styles.formLogo}>
+              <Text style={styles.formLogoText}>CA</Text>
             </View>
           </View>
 
           {/*        
+
               FORM
+
                   */}
 
           <ScrollView
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={[
-              styles.scrollContent,
+              styles.formScroll,
 
-              isLargeForm && styles.scrollContentLarge,
+              isLargeForm && styles.formScrollLarge,
             ]}
           >
             <View
               style={[styles.formCard, isLargeForm && styles.formCardLarge]}
             >
-              <Text style={styles.formTitle}>Vendor Information</Text>
+              <Text style={styles.formTitle}>Customer Information</Text>
 
               <Text style={styles.formDescription}>
-                Enter the vendor&apos;s basic and account details.
+                Enter the customer&apos;s basic and account details.
               </Text>
 
               {/*        
+
                   NAME / MOBILE
+
                       */}
 
               <View style={[styles.formRow, !isLargeForm && styles.formColumn]}>
-                {/* NAME */}
-
                 <View style={styles.formField}>
                   <Text style={styles.label}>
-                    Vendor Name <Text style={styles.required}>*</Text>
+                    Customer Name <Text style={styles.required}>*</Text>
                   </Text>
 
                   <TextInput
                     value={name}
                     onChangeText={setName}
-                    placeholder="Enter vendor name"
+                    placeholder="Enter customer name"
                     placeholderTextColor={colors.mutedText}
-                    autoCapitalize="words"
-                    autoComplete="off"
-                    importantForAutofill="no"
-                    editable={!saving}
                     style={styles.input}
+                    autoCapitalize="words"
+                    editable={!saving}
                   />
                 </View>
-
-                {/* MOBILE */}
 
                 <View style={styles.formField}>
                   <Text style={styles.label}>
@@ -428,23 +579,23 @@ export default function AddVendorScreen() {
                     placeholder="10-digit mobile number"
                     placeholderTextColor={colors.mutedText}
                     keyboardType="phone-pad"
+                    maxLength={10}
+                    style={styles.input}
                     textContentType="telephoneNumber"
                     autoComplete="tel"
                     importantForAutofill="yes"
-                    maxLength={10}
                     editable={!saving}
-                    style={styles.input}
                   />
                 </View>
               </View>
 
               {/*        
+
                   GST / STATE
+
                       */}
 
               <View style={[styles.formRow, !isLargeForm && styles.formColumn]}>
-                {/* GSTIN */}
-
                 <View style={styles.formField}>
                   <Text style={styles.label}>GSTIN</Text>
 
@@ -458,15 +609,11 @@ export default function AddVendorScreen() {
                     placeholder="Optional GSTIN"
                     placeholderTextColor={colors.mutedText}
                     autoCapitalize="characters"
-                    autoComplete="off"
-                    importantForAutofill="no"
-                    editable={!saving}
-                    maxLength={15}
                     style={styles.input}
+                    maxLength={15}
+                    editable={!saving}
                   />
                 </View>
-
-                {/* STATE */}
 
                 <View style={styles.formField}>
                   <Text style={styles.label}>State</Text>
@@ -488,8 +635,8 @@ export default function AddVendorScreen() {
                       <Picker
                         selectedValue={state}
                         onValueChange={(value: string) => setState(value)}
-                        enabled={!saving}
                         style={styles.hiddenPicker}
+                        enabled={!saving}
                       >
                         {STATES.map((item) => (
                           <Picker.Item key={item} label={item} value={item} />
@@ -501,12 +648,12 @@ export default function AddVendorScreen() {
               </View>
 
               {/*        
-                  CREDIT / OPENING BALANCE
+
+                  CREDIT DAYS / OPENING BALANCE
+
                       */}
 
               <View style={[styles.formRow, !isLargeForm && styles.formColumn]}>
-                {/* CREDIT DAYS */}
-
                 <View style={styles.formField}>
                   <Text style={styles.label}>Credit Days</Text>
 
@@ -517,16 +664,14 @@ export default function AddVendorScreen() {
                     }
                     placeholder="0"
                     placeholderTextColor={colors.mutedText}
-                    keyboardType="number-pad"
-                    autoComplete="off"
+                    keyboardType="numeric"
+                    style={styles.input}
                     textContentType="none"
+                    autoComplete="off"
                     importantForAutofill="no"
                     editable={!saving}
-                    style={styles.input}
                   />
                 </View>
-
-                {/* OPENING BALANCE */}
 
                 <View style={styles.formField}>
                   <Text style={styles.label}>Opening Balance</Text>
@@ -547,36 +692,38 @@ export default function AddVendorScreen() {
                     placeholder="0"
                     placeholderTextColor={colors.mutedText}
                     keyboardType="decimal-pad"
-                    autoComplete="off"
+                    style={styles.input}
                     textContentType="none"
+                    autoComplete="off"
                     importantForAutofill="no"
                     editable={!saving}
-                    style={styles.input}
                   />
                 </View>
               </View>
 
               {/*        
-                  VENDOR DETAILS
+
+                  CUSTOMER CATEGORY
+
                       */}
 
               <View style={styles.fullField}>
-                <Text style={styles.label}>Vendor Details</Text>
+                <Text style={styles.label}>Customer Category / Loyalty ID</Text>
 
                 <TextInput
                   value={businessDetail}
                   onChangeText={setBusinessDetail}
-                  placeholder="Example: Distributor / wholesaler"
+                  placeholder="Example: Retail customer"
                   placeholderTextColor={colors.mutedText}
-                  autoComplete="off"
-                  importantForAutofill="no"
-                  editable={!saving}
                   style={styles.input}
+                  editable={!saving}
                 />
               </View>
 
               {/*        
+
                   ADDRESS
+
                       */}
 
               <View style={styles.fullField}>
@@ -585,39 +732,44 @@ export default function AddVendorScreen() {
                 <TextInput
                   value={address}
                   onChangeText={setAddress}
-                  placeholder="Vendor address"
+                  placeholder="Customer address"
                   placeholderTextColor={colors.mutedText}
-                  autoComplete="street-address"
-                  importantForAutofill="no"
                   multiline
                   numberOfLines={4}
                   textAlignVertical="top"
-                  editable={!saving}
                   style={[styles.input, styles.addressInput]}
+                  editable={!saving}
                 />
               </View>
             </View>
 
             {/*        
-                ACTIONS
+
+                ACTION BUTTONS
+
                     */}
 
-            <View style={[styles.actions, isLargeForm && styles.actionsLarge]}>
+            <View
+              style={[
+                styles.formActions,
+
+                isLargeForm && styles.formActionsLarge,
+              ]}
+            >
               <Pressable
-                onPress={handleCancel}
-                disabled={saving}
+                onPress={handleClose}
                 style={({ pressed }) => [
                   styles.cancelButton,
 
                   pressed && !saving && styles.buttonPressed,
                 ]}
+                disabled={saving}
               >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </Pressable>
 
               <Pressable
                 onPress={handleSave}
-                disabled={saving}
                 style={({ pressed }) => [
                   styles.saveButton,
 
@@ -625,16 +777,23 @@ export default function AddVendorScreen() {
 
                   pressed && !saving && styles.buttonPressed,
                 ]}
+                disabled={saving}
               >
                 <Text style={styles.saveButtonText}>
-                  {saving ? "Saving..." : "Save Vendor"}
+                  {saving
+                    ? "Saving..."
+                    : isEditMode
+                      ? "Update Customer"
+                      : "Save Customer"}
                 </Text>
               </Pressable>
             </View>
           </ScrollView>
 
           {/*        
+
               SUCCESS TOAST
+
                   */}
 
           {toastVisible && (
@@ -664,11 +823,9 @@ export default function AddVendorScreen() {
                 </View>
 
                 <View style={styles.toastTextContainer}>
-                  <Text style={styles.toastTitle}>Vendor saved</Text>
+                  <Text style={styles.toastTitle}>{toastTitle}</Text>
 
-                  <Text style={styles.toastMessage}>
-                    Vendor saved successfully
-                  </Text>
+                  <Text style={styles.toastMessage}>{toastMessage}</Text>
                 </View>
               </View>
             </Animated.View>
@@ -679,28 +836,113 @@ export default function AddVendorScreen() {
   );
 }
 
+/* =========================================================
+   CUSTOMER ADD / EDIT ROUTE
+   app/customers/add.tsx
+========================================================= */
+
+export default function AddCustomerScreen() {
+  const { customerId } = useLocalSearchParams<{ customerId?: string }>();
+  const [customer, setCustomer] = useState<Customer | null>(null);
+  const [loading, setLoading] = useState(Boolean(customerId));
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadCustomer = async () => {
+      if (!customerId) {
+        if (mounted) {
+          setCustomer(null);
+          setLoading(false);
+        }
+        return;
+      }
+
+      try {
+        const result = await getCustomerById(customerId);
+        if (mounted) setCustomer(result);
+      } catch (error) {
+        if (mounted) {
+          Alert.alert(
+            "Unable to load customer",
+            error instanceof Error ? error.message : "Something went wrong.",
+          );
+        }
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+
+    void loadCustomer();
+    return () => {
+      mounted = false;
+    };
+  }, [customerId]);
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.formSafeArea} edges={["top", "bottom"]}>
+        <View style={styles.loadingScreen}>
+          <Text style={styles.loadingText}>Loading customer...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (customerId && !customer) {
+    return (
+      <SafeAreaView style={styles.formSafeArea} edges={["top", "bottom"]}>
+        <View style={styles.notFoundScreen}>
+          <Text style={styles.formTitle}>Customer not found</Text>
+          <Text style={styles.formDescription}>
+            This customer could not be loaded.
+          </Text>
+          <Pressable
+            onPress={() => router.replace("/customers")}
+            style={[styles.saveButton, styles.notFoundButton]}
+          >
+            <Text style={styles.saveButtonText}>Back to Customers</Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <CustomerForm
+      customer={customer}
+      onClose={() => router.back()}
+      onSaved={() => router.replace("/customers")}
+    />
+  );
+}
+
 /*         =
+
    STYLES
+
         = */
 
 const styles = StyleSheet.create({
   /*        ====
+
        ROOT
+
            ==== */
 
-  safeArea: {
+  formSafeArea: {
     flex: 1,
 
     backgroundColor: colors.background,
   },
 
-  keyboard: {
+  formKeyboard: {
     flex: 1,
 
     width: "100%",
   },
 
-  container: {
+  formScreen: {
     flex: 1,
 
     width: "100%",
@@ -709,10 +951,12 @@ const styles = StyleSheet.create({
   },
 
   /*        ====
+
        HEADER
+
            ==== */
 
-  header: {
+  formHeader: {
     minHeight: 76,
 
     backgroundColor: colors.primary,
@@ -733,6 +977,7 @@ const styles = StyleSheet.create({
 
     shadowOffset: {
       width: 0,
+
       height: 2,
     },
 
@@ -741,7 +986,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
 
-  headerLeft: {
+  formHeaderLeft: {
     flex: 1,
 
     flexDirection: "row",
@@ -752,10 +997,12 @@ const styles = StyleSheet.create({
   },
 
   /*        ====
-       BACK BUTTON
+
+       CONSISTENT BACK BUTTON
+
            ==== */
 
-  backButton: {
+  formBackButton: {
     width: 34,
 
     height: 34,
@@ -782,6 +1029,7 @@ const styles = StyleSheet.create({
 
     shadowOffset: {
       width: 0,
+
       height: 1,
     },
 
@@ -790,7 +1038,7 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
   },
 
-  backButtonPressed: {
+  formBackButtonPressed: {
     opacity: 0.72,
 
     transform: [
@@ -800,17 +1048,17 @@ const styles = StyleSheet.create({
     ],
   },
 
-  backButtonDisabled: {
+  formBackButtonDisabled: {
     opacity: 0.5,
   },
 
-  headerText: {
+  formHeaderText: {
     flex: 1,
 
     minWidth: 0,
   },
 
-  headerTitle: {
+  formHeaderTitle: {
     color: "#FFFFFF",
 
     fontSize: 18,
@@ -818,22 +1066,20 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
 
-  headerTitleSmall: {
-    fontSize: 16,
-  },
-
-  headerSubtitle: {
+  formHeaderSubtitle: {
     color: "#D6E3EC",
 
     fontSize: 11,
 
     marginTop: 3,
+
+    marginBottom: 2,
   },
 
-  logo: {
+  formLogo: {
     width: 42,
 
-    height: 42,
+    height: 40,
 
     flexShrink: 0,
 
@@ -846,9 +1092,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
 
     marginLeft: 10,
+
+    marginTop: 3,
   },
 
-  logoText: {
+  formLogoText: {
     color: colors.primary,
 
     fontSize: 14,
@@ -857,26 +1105,24 @@ const styles = StyleSheet.create({
   },
 
   /*        ====
-       SCROLL
+
+       SCROLL / FORM CARD
+
            ==== */
 
-  scrollContent: {
+  formScroll: {
     padding: 16,
 
-    paddingBottom: 30,
+    paddingBottom: 40,
 
     flexGrow: 1,
   },
 
-  scrollContentLarge: {
+  formScrollLarge: {
     paddingHorizontal: 24,
 
     paddingTop: 24,
   },
-
-  /*        ====
-       FORM CARD
-           ==== */
 
   formCard: {
     width: "100%",
@@ -917,7 +1163,9 @@ const styles = StyleSheet.create({
   },
 
   /*        ====
+
        FORM FIELDS
+
            ==== */
 
   formRow: {
@@ -983,7 +1231,9 @@ const styles = StyleSheet.create({
   },
 
   /*        ====
-       STATE
+
+       STATE PICKER
+
            ==== */
 
   stateField: {
@@ -1059,10 +1309,12 @@ const styles = StyleSheet.create({
   },
 
   /*        ====
+
        ACTIONS
+
            ==== */
 
-  actions: {
+  formActions: {
     width: "100%",
 
     flexDirection: "row",
@@ -1074,7 +1326,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
 
-  actionsLarge: {
+  formActionsLarge: {
     maxWidth: 850,
 
     alignSelf: "center",
@@ -1120,16 +1372,16 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
+  disabledButton: {
+    opacity: 0.6,
+  },
+
   saveButtonText: {
     color: "#FFFFFF",
 
     fontSize: 13,
 
     fontWeight: "800",
-  },
-
-  disabledButton: {
-    opacity: 0.6,
   },
 
   buttonPressed: {
@@ -1143,13 +1395,16 @@ const styles = StyleSheet.create({
   },
 
   /*        ====
-       TOAST
+
+       SUCCESS TOAST
+
            ==== */
 
   toastContainer: {
     position: "absolute",
 
     left: 14,
+
     right: 14,
 
     bottom: 18,
@@ -1188,6 +1443,7 @@ const styles = StyleSheet.create({
 
     shadowOffset: {
       width: 0,
+
       height: 4,
     },
 
@@ -1232,5 +1488,57 @@ const styles = StyleSheet.create({
     fontWeight: "600",
 
     marginTop: 2,
+  },
+
+  /*        ====
+
+       LOADING
+
+           ==== */
+
+  loadingScreen: {
+    flex: 1,
+
+    alignItems: "center",
+
+    justifyContent: "center",
+
+    backgroundColor: colors.background,
+  },
+
+  loadingText: {
+    color: colors.mutedText,
+
+    fontSize: 14,
+
+    fontWeight: "600",
+  },
+
+  /*        ====
+
+       NOT FOUND
+
+           ==== */
+
+  notFoundScreen: {
+    flex: 1,
+
+    alignItems: "center",
+
+    justifyContent: "center",
+
+    padding: 20,
+
+    backgroundColor: colors.background,
+  },
+
+  notFoundButton: {
+    width: "100%",
+
+    maxWidth: 400,
+
+    marginTop: 16,
+
+    flex: 0,
   },
 });
