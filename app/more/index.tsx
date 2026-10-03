@@ -19,6 +19,8 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { colors } from "../../src/theme/colors";
 
+
+
 /*         =
    TYPES
         = */
@@ -135,7 +137,7 @@ const tools: ToolItem[] = [
 
     description: "Receipts, payments and allocation",
 
-    route: "/all-operations",
+    route: "/payments",
 
     accent: "#D6A422",
   },
@@ -469,7 +471,7 @@ export default function MoreScreen() {
             </Text>
 
             <Text style={styles.appSubtitle} numberOfLines={1}>
-              • Retail Shop
+              Retail Shop
             </Text>
           </View>
 
@@ -527,7 +529,7 @@ export default function MoreScreen() {
                 pressed && styles.cardPressed,
               ]}
             >
-              <Text style={styles.switchButtonText}>Switch user</Text>
+              <Text style={styles.switchButtonText}>Switch Business</Text>
             </Pressable>
           </View>
 
@@ -753,7 +755,7 @@ const styles = StyleSheet.create({
   ownerText: {
     color: "#FFFFFF",
 
-    fontSize: 8.5,
+    fontSize: 9,
 
     fontWeight: "800",
   },
@@ -819,7 +821,7 @@ const styles = StyleSheet.create({
   pageSubtitle: {
     color: "#75838D",
 
-    fontSize: 8,
+    fontSize: 10,
 
     lineHeight: 11,
 
@@ -827,23 +829,27 @@ const styles = StyleSheet.create({
   },
 
   switchButton: {
+    height: 40,
+    width: 120,
     flexShrink: 0,
 
-    paddingHorizontal: 9,
+    paddingHorizontal: 11,
 
     paddingVertical: 7,
 
-    backgroundColor: "#E7F5F3",
+    backgroundColor: "#087E75",
 
     borderRadius: 10,
   },
 
   switchButtonText: {
-    color: "#087E75",
-
-    fontSize: 8,
-
-    fontWeight: "900",
+    color: "#E7F5F3",
+    display: "flex",
+    fontSize: 10,
+    alignSelf: "center",
+    alignItems: "center",
+    marginTop: 5,
+    fontWeight: "800",
   },
 
   /*        ====
@@ -879,7 +885,7 @@ const styles = StyleSheet.create({
 
     color: "#456875",
 
-    fontSize: 7.5,
+    fontSize: 11,
 
     lineHeight: 11,
   },
@@ -911,7 +917,7 @@ const styles = StyleSheet.create({
            ==== */
 
   toolCard: {
-    minHeight: 118,
+    minHeight: 140,
 
     backgroundColor: "#FFFFFF",
 
@@ -955,13 +961,13 @@ const styles = StyleSheet.create({
   },
 
   toolIcon: {
-    width: 36,
+    width: 50,
 
-    height: 36,
+    height: 50,
 
-    borderRadius: 11,
+    borderRadius: 20,
 
-    backgroundColor: "#EDF8F6",
+    backgroundColor: "#ebf8f6",
 
     alignItems: "center",
 
@@ -985,7 +991,7 @@ const styles = StyleSheet.create({
 
     color: "#172938",
 
-    fontSize: 10.5,
+    fontSize: 12,
 
     lineHeight: 13,
 
@@ -994,7 +1000,7 @@ const styles = StyleSheet.create({
   },
 
   toolTitleCompact: {
-    fontSize: 9.5,
+    fontSize: 10,
 
     lineHeight: 12,
   },
@@ -1004,7 +1010,7 @@ const styles = StyleSheet.create({
 
     color: "#7B878F",
 
-    fontSize: 7,
+    fontSize: 9,
 
     lineHeight: 10,
 
@@ -1015,7 +1021,7 @@ const styles = StyleSheet.create({
   },
 
   toolDescriptionCompact: {
-    fontSize: 6.5,
+    fontSize: 8,
 
     lineHeight: 9,
   },
@@ -1037,7 +1043,7 @@ const styles = StyleSheet.create({
   openBadgeText: {
     color: "#168F6B",
 
-    fontSize: 6,
+    fontSize: 9,
 
     fontWeight: "900",
   },
