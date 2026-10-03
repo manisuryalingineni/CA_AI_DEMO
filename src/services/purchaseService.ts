@@ -4,20 +4,36 @@ import {
 
 import {
   createPurchase,
+  createPurchaseRfq,
   deletePurchase,
+  deletePurchaseRfq,
   getPurchaseById,
   getPurchaseDashboardTotals,
   getPurchaseItems,
+  getPurchaseRfqById,
+  getPurchaseRfqItems,
+  getPurchaseRfqs,
   getPurchases,
+  createWorkflowDocument,
+getWorkflowDocument,
+getPurchaseWorkflow,
+makePurchaseKey,
 } from '../repositories/purchaseRepository';
 
 import type {
   PurchaseDashboardTotals,
   PurchaseItemRow,
   PurchaseListRow,
+  PurchaseRfqItemRow,
+  PurchaseRfqListRow,
+  PurchaseRfqRow,
   PurchaseRow,
   PurchaseStatus,
   SupplyType,
+  DocumentType,
+SaveDocumentInput,
+WorkflowDetail,
+WorkflowDocument,
 } from '../repositories/purchaseRepository';
 
 
@@ -91,6 +107,43 @@ export interface CreatePurchaseInput {
   items: CreatePurchaseItemInput[];
 }
 
+/*      ======
+   RFQ INPUT TYPE
+     ====== */
+
+export interface CreatePurchaseRfqInput {
+  vendorId: string;
+
+  rfqDate: string;
+
+  validUntil?: string;
+
+  supplyType: SupplyType;
+
+  counterBranch?: string;
+
+  salesperson?: string;
+
+  deliveryMethod?: string;
+
+  subtotal: number;
+
+  gstAmount: number;
+
+  cgstAmount: number;
+
+  sgstAmount: number;
+
+  igstAmount: number;
+
+  discount: number;
+
+  totalAmount: number;
+
+  notes?: string;
+
+  items: CreatePurchaseItemInput[];
+}
 
 /*      ======
    ID GENERATORS
@@ -157,7 +210,87 @@ function generatePurchaseNumber(): string {
   );
 }
 
+function generatePurchaseRfqId(): string {
+  return (
+    `purchase_rfq_${Date.now()}_` +
+    Math.random()
+      .toString(36)
+      .slice(2, 8)
+  );
+}
 
+
+function generatePurchaseRfqItemId(): string {
+  return (
+    `purchase_rfq_item_${Date.now()}_` +
+    Math.random()
+      .toString(36)
+      .slice(2, 8)
+  );
+}
+
+
+function generatePurchaseRfqNumber(): string {
+  const now =
+    new Date();
+
+
+  const yy =
+    String(
+      now.getFullYear(),
+    ).slice(-2);
+
+
+  const mm =
+    String(
+      now.getMonth() + 1,
+    ).padStart(
+      2,
+      '0',
+    );
+
+
+  const dd =
+    String(
+      now.getDate(),
+    ).padStart(
+      2,
+      '0',
+    );
+
+
+  const hh =
+    String(
+      now.getHours(),
+    ).padStart(
+      2,
+      '0',
+    );
+
+
+  const min =
+    String(
+      now.getMinutes(),
+    ).padStart(
+      2,
+      '0',
+    );
+
+
+  const sec =
+    String(
+      now.getSeconds(),
+    ).padStart(
+      2,
+      '0',
+    );
+
+
+  return (
+    `RFQ-${yy}${mm}${dd}-` +
+    `${hh}${min}${sec}`
+  );
+}
 /*      ======
    NORMALISE
      ====== */
@@ -874,5 +1007,599 @@ export async function removePurchase(
 
   await deletePurchase(
     purchaseId,
+  );
+}
+
+
+/*      ======
+   SAVE PURCHASE RFQ
+     ====== */
+
+export async function savePurchaseRfq(
+  input: CreatePurchaseRfqInput,
+): Promise<PurchaseRfqRow> {
+
+  const vendorId =
+    input.vendorId
+      .trim();
+
+
+  const rfqDate =
+    input.rfqDate
+      .trim();
+
+
+  const validUntil =
+    input.validUntil
+      ?.trim() ||
+    undefined;
+
+
+  if (!vendorId) {
+    throw new Error(
+      'Please select a vendor.',
+    );
+  }
+
+
+  if (!rfqDate) {
+    throw new Error(
+      'RFQ date is required.',
+    );
+  }
+
+
+  if (
+    input.supplyType !==
+      'WITHIN_STATE' &&
+    input.supplyType !==
+      'OTHER_STATE'
+  ) {
+    throw new Error(
+      'Please select a valid supply type.',
+    );
+  }
+
+
+  if (
+    input.totalAmount <= 0
+  ) {
+    throw new Error(
+      'RFQ total must be greater than zero.',
+    );
+  }
+
+
+  if (
+    !input.items.length
+  ) {
+    throw new Error(
+      'Add at least one RFQ item.',
+    );
+  }
+
+
+  for (
+    const item of input.items
+  ) {
+    if (!item.productId) {
+      throw new Error(
+        'Every RFQ line must have a product.',
+      );
+    }
+
+
+    if (!item.productName) {
+      throw new Error(
+        'Every RFQ line must have a product name.',
+      );
+    }
+
+
+    if (
+      Number(
+        item.quantity,
+      ) <= 0
+    ) {
+      throw new Error(
+        `${item.productName}: quantity must be greater than zero.`,
+      );
+    }
+
+
+    if (
+      Number(
+        item.unitPrice,
+      ) < 0
+    ) {
+      throw new Error(
+        `${item.productName}: rate cannot be negative.`,
+      );
+    }
+
+
+    if (
+      Number(
+        item.gstRate,
+      ) < 0
+    ) {
+      throw new Error(
+        `${item.productName}: GST rate cannot be negative.`,
+      );
+    }
+  }
+
+
+  const business =
+    await getBusiness();
+
+
+  if (!business) {
+    throw new Error(
+      'Business setup is required before creating an RFQ.',
+    );
+  }
+
+
+  const now =
+    new Date()
+      .toISOString();
+
+
+  const rfqId =
+    generatePurchaseRfqId();
+
+
+  const rfq:
+    PurchaseRfqRow = {
+
+      id:
+        rfqId,
+
+      business_id:
+        business.id,
+
+      rfq_number:
+        generatePurchaseRfqNumber(),
+
+      vendor_id:
+        vendorId,
+
+      rfq_date:
+        rfqDate,
+
+      valid_until:
+        validUntil ??
+        null,
+
+      supply_type:
+        input.supplyType,
+
+      counter_branch:
+        input.counterBranch
+          ?.trim() ||
+        null,
+
+      salesperson:
+        input.salesperson
+          ?.trim() ||
+        null,
+
+      delivery_method:
+        input.deliveryMethod
+          ?.trim() ||
+        null,
+
+      subtotal:
+        Number(
+          input.subtotal,
+        ) || 0,
+
+      gst_amount:
+        Number(
+          input.gstAmount,
+        ) || 0,
+
+      cgst_amount:
+        Number(
+          input.cgstAmount,
+        ) || 0,
+
+      sgst_amount:
+        Number(
+          input.sgstAmount,
+        ) || 0,
+
+      igst_amount:
+        Number(
+          input.igstAmount,
+        ) || 0,
+
+      discount:
+        Number(
+          input.discount,
+        ) || 0,
+
+      total_amount:
+        Number(
+          input.totalAmount,
+        ) || 0,
+
+      notes:
+        input.notes
+          ?.trim() ||
+        null,
+
+      created_at:
+        now,
+
+      updated_at:
+        now,
+  };
+
+
+  const items:
+    PurchaseRfqItemRow[] =
+    input.items.map(
+      item => ({
+
+        id:
+          generatePurchaseRfqItemId(),
+
+        rfq_id:
+          rfqId,
+
+        product_id:
+          item.productId
+            .trim(),
+
+        product_name:
+          item.productName
+            .trim(),
+
+        hsn:
+          item.hsn
+            ?.trim() ||
+          null,
+
+        unit:
+          item.unit
+            ?.trim() ||
+          null,
+
+        quantity:
+          Number(
+            item.quantity,
+          ) || 0,
+
+        unit_price:
+          Number(
+            item.unitPrice,
+          ) || 0,
+
+        gst_rate:
+          Number(
+            item.gstRate,
+          ) || 0,
+
+        gst_amount:
+          Number(
+            item.gstAmount,
+          ) || 0,
+
+        discount:
+          Number(
+            item.discount,
+          ) || 0,
+
+        total_amount:
+          Number(
+            item.totalAmount,
+          ) || 0,
+
+        created_at:
+          now,
+      }),
+    );
+
+
+  await createPurchaseRfq(
+    rfq,
+    items,
+  );
+
+
+  return rfq;
+}
+
+
+/*      ======
+   LOAD PURCHASE RFQS
+     ====== */
+
+export async function loadPurchaseRfqs():
+  Promise<PurchaseRfqListRow[]> {
+
+  const business =
+    await getBusiness();
+
+
+  if (!business) {
+    return [];
+  }
+
+
+  return getPurchaseRfqs(
+    business.id,
+  );
+}
+
+
+/*      ======
+   LOAD ONE PURCHASE RFQ
+     ====== */
+
+export async function loadPurchaseRfq(
+  rfqId: string,
+): Promise<PurchaseRfqRow | null> {
+
+  if (!rfqId) {
+    return null;
+  }
+
+
+  const business =
+    await getBusiness();
+
+
+  if (!business) {
+    return null;
+  }
+
+
+  const rfq =
+    await getPurchaseRfqById(
+      rfqId,
+    );
+
+
+  if (!rfq) {
+    return null;
+  }
+
+
+  if (
+    rfq.business_id !==
+    business.id
+  ) {
+    return null;
+  }
+
+
+  return rfq;
+}
+
+
+/*      ======
+   LOAD PURCHASE RFQ ITEMS
+     ====== */
+
+export async function loadPurchaseRfqItems(
+  rfqId: string,
+): Promise<PurchaseRfqItemRow[]> {
+
+  const rfq =
+    await loadPurchaseRfq(
+      rfqId,
+    );
+
+
+  if (!rfq) {
+    return [];
+  }
+
+
+  return getPurchaseRfqItems(
+    rfqId,
+  );
+}
+
+
+/*      ======
+   PURCHASE RFQ + ITEMS
+     ====== */
+
+export interface PurchaseRfqWithItems {
+  rfq: PurchaseRfqRow;
+
+  items: PurchaseRfqItemRow[];
+}
+
+
+export async function loadPurchaseRfqWithItems(
+  rfqId: string,
+): Promise<PurchaseRfqWithItems | null> {
+
+  const rfq =
+    await loadPurchaseRfq(
+      rfqId,
+    );
+
+
+  if (!rfq) {
+    return null;
+  }
+
+
+  const items =
+    await loadPurchaseRfqItems(
+      rfqId,
+    );
+
+
+  return {
+    rfq,
+    items,
+  };
+}
+
+
+/*      ======
+   DELETE PURCHASE RFQ
+     ====== */
+
+export async function removePurchaseRfq(
+  rfqId: string,
+): Promise<void> {
+
+  const business =
+    await getBusiness();
+
+
+  if (!business) {
+    throw new Error(
+      'Business setup is required.',
+    );
+  }
+
+
+  const rfq =
+    await getPurchaseRfqById(
+      rfqId,
+    );
+
+
+  if (!rfq) {
+    throw new Error(
+      'RFQ not found.',
+    );
+  }
+
+
+  if (
+    rfq.business_id !==
+    business.id
+  ) {
+    throw new Error(
+      'You cannot delete an RFQ from another business.',
+    );
+  }
+
+
+  await deletePurchaseRfq(
+    rfqId,
+  );
+}
+
+/*      ======
+   PURCHASE WORKFLOW
+     ====== */
+
+export interface SavePurchaseWorkflowInput
+  extends Omit<
+    SaveDocumentInput,
+    'id'
+  > {
+
+  id?: string;
+}
+
+
+/*      ======
+   SAVE WORKFLOW DOCUMENT
+     ====== */
+
+export async function savePurchaseWorkflow(
+  input: SavePurchaseWorkflowInput,
+): Promise<WorkflowDetail> {
+
+  const business =
+    await getBusiness();
+
+
+  if (!business) {
+
+    throw new Error(
+      'Business setup is required before creating a purchase document.',
+    );
+  }
+
+
+  const id =
+    input.id?.trim() ||
+    makePurchaseKey(
+      input.documentType
+        .toLowerCase(),
+    );
+
+
+  return createWorkflowDocument(
+    business.id,
+    {
+      ...input,
+
+      id,
+    },
+  );
+}
+
+
+/*      ======
+   LOAD COMPLETE WORKFLOW
+     ====== */
+
+export async function loadPurchaseWorkflow():
+  Promise<WorkflowDocument[]> {
+
+  const business =
+    await getBusiness();
+
+
+  if (!business) {
+
+    return [];
+  }
+
+
+  return getPurchaseWorkflow(
+    business.id,
+  );
+}
+
+
+/*      ======
+   LOAD ONE WORKFLOW DOCUMENT
+     ====== */
+
+export async function loadPurchaseWorkflowDocument(
+  documentType:
+    DocumentType,
+
+  documentId:
+    string,
+): Promise<WorkflowDetail | null> {
+
+  if (
+    !documentId.trim()
+  ) {
+
+    return null;
+  }
+
+
+  const business =
+    await getBusiness();
+
+
+  if (!business) {
+
+    return null;
+  }
+
+
+  return getWorkflowDocument(
+    business.id,
+    documentType,
+    documentId,
   );
 }

@@ -19,9 +19,9 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { colors } from "../../src/theme/colors";
 
-/* =========================================================
+/*         =
    TYPES
-========================================================= */
+        = */
 
 type ToolItem = {
   id: string;
@@ -37,9 +37,9 @@ type ToolItem = {
   accent?: string;
 };
 
-/* =========================================================
+/*         =
    TOOLS
-========================================================= */
+        = */
 
 const tools: ToolItem[] = [
   {
@@ -351,9 +351,9 @@ const tools: ToolItem[] = [
   },
 ];
 
-/* =========================================================
+/*         =
    TOOL CARD
-========================================================= */
+        = */
 
 function ToolCard({
   item,
@@ -420,9 +420,9 @@ function ToolCard({
   );
 }
 
-/* =========================================================
+/*         =
    SCREEN
-========================================================= */
+        = */
 
 export default function MoreScreen() {
   const { width } = useWindowDimensions();
@@ -445,9 +445,9 @@ export default function MoreScreen() {
     <View style={styles.container}>
       <StatusBar style="light" />
 
-      {/* =====================================================
+      {/*        ====
           HEADER
-      ===================================================== */}
+             ==== */}
 
       <View
         style={[
@@ -487,9 +487,9 @@ export default function MoreScreen() {
         </View>
       </View>
 
-      {/* =====================================================
+      {/*        ====
           CONTENT
-      ===================================================== */}
+             ==== */}
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -502,9 +502,9 @@ export default function MoreScreen() {
         ]}
       >
         <View style={[styles.main, isTablet && styles.mainLarge]}>
-          {/* =================================================
+          {/*        
               TITLE
-          ================================================= */}
+                  */}
 
           <View style={styles.titleRow}>
             <View style={styles.titleContent}>
@@ -531,9 +531,9 @@ export default function MoreScreen() {
             </Pressable>
           </View>
 
-          {/* =================================================
+          {/*        
               BUSINESS INFO
-          ================================================= */}
+                  */}
 
           <View style={styles.infoCard}>
             <Ionicons
@@ -547,9 +547,9 @@ export default function MoreScreen() {
             </Text>
           </View>
 
-          {/* =================================================
+          {/*        
               TOOL GRID
-          ================================================= */}
+                  */}
 
           <View style={styles.toolGrid}>
             {tools.map((item) => (
@@ -564,9 +564,9 @@ export default function MoreScreen() {
         </View>
       </ScrollView>
 
-      {/* =====================================================
+      {/*        ====
           BOTTOM NAV
-      ===================================================== */}
+             ==== */}
 
       <View
         style={[
@@ -620,14 +620,14 @@ export default function MoreScreen() {
   );
 }
 
-/* =========================================================
+/*         =
    STYLES
-========================================================= */
+        = */
 
 const styles = StyleSheet.create({
-  /* =====================================================
+  /*        ====
        ROOT
-    ===================================================== */
+           ==== */
 
   container: {
     flex: 1,
@@ -635,9 +635,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#F2F7F9",
   },
 
-  /* =====================================================
+  /*        ====
        HEADER
-    ===================================================== */
+           ==== */
 
   topHeader: {
     width: "100%",
@@ -758,9 +758,9 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
 
-  /* =====================================================
+  /*        ====
        CONTENT
-    ===================================================== */
+           ==== */
 
   scrollContent: {
     flexGrow: 1,
@@ -782,9 +782,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
 
-  /* =====================================================
+  /*        ====
        TITLE
-    ===================================================== */
+           ==== */
 
   titleRow: {
     flexDirection: "row",
@@ -846,9 +846,9 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
 
-  /* =====================================================
+  /*        ====
        INFO
-    ===================================================== */
+           ==== */
 
   infoCard: {
     width: "100%",
@@ -890,9 +890,9 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
 
-  /* =====================================================
+  /*        ====
        GRID
-    ===================================================== */
+           ==== */
 
   toolGrid: {
     width: "100%",
@@ -906,9 +906,9 @@ const styles = StyleSheet.create({
     rowGap: 8,
   },
 
-  /* =====================================================
+  /*        ====
        CARD
-    ===================================================== */
+           ==== */
 
   toolCard: {
     minHeight: 118,
@@ -1052,9 +1052,9 @@ const styles = StyleSheet.create({
     ],
   },
 
-  /* =====================================================
+  /*        ====
        BOTTOM NAVIGATION
-    ===================================================== */
+           ==== */
 
   bottomNavigation: {
     position: "absolute",

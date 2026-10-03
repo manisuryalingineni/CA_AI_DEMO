@@ -30,9 +30,9 @@ import type { ReportData, ReportField, ReportId } from "../../src/types/report";
 
 import { colors } from "../../src/theme/colors";
 
-/* =========================================================
+/*         =
    REPORT IDS
-========================================================= */
+        = */
 
 const REPORT_IDS: ReportId[] = [
   "sales-register",
@@ -53,9 +53,9 @@ const REPORT_IDS: ReportId[] = [
   "counter-product-branch",
 ];
 
-/* =========================================================
+/*         =
    FORMAT HELPERS
-========================================================= */
+        = */
 
 function money(value: unknown): string {
   return `₹${Number(value || 0).toLocaleString("en-IN", {
@@ -85,9 +85,9 @@ function formatValue(
   }
 }
 
-/* =========================================================
+/*         =
    SCREEN
-========================================================= */
+        = */
 
 export default function ReportViewerScreen() {
   const { reportId } = useLocalSearchParams<{
@@ -102,9 +102,9 @@ export default function ReportViewerScreen() {
 
   const isTablet = width >= 700;
 
-  /* =======================================================
+  /*        ======
      STATE
-  ======================================================= */
+         ====== */
 
   const [loading, setLoading] = useState(true);
 
@@ -114,17 +114,17 @@ export default function ReportViewerScreen() {
 
   const [printBusy, setPrintBusy] = useState(false);
 
-  /* =======================================================
+  /*        ======
      VALID REPORT
-  ======================================================= */
+         ====== */
 
   const validReportId = REPORT_IDS.includes(reportId as ReportId)
     ? (reportId as ReportId)
     : null;
 
-  /* =======================================================
+  /*        ======
      LOAD REPORT
-  ======================================================= */
+         ====== */
 
   const refresh = useCallback(async () => {
     if (!validReportId) {
@@ -158,9 +158,9 @@ export default function ReportViewerScreen() {
     }, [refresh]),
   );
 
-  /* =======================================================
+  /*        ======
      SAVE PDF
-  ======================================================= */
+         ====== */
 
   const handlePdf = async () => {
     if (!report || pdfBusy) {
@@ -205,9 +205,9 @@ export default function ReportViewerScreen() {
     }
   };
 
-  /* =======================================================
+  /*        ======
      PRINT
-  ======================================================= */
+         ====== */
 
   const handlePrint = async () => {
     if (!report || printBusy) {
@@ -231,9 +231,9 @@ export default function ReportViewerScreen() {
     }
   };
 
-  /* =======================================================
+  /*        ======
      INVALID REPORT
-  ======================================================= */
+         ====== */
 
   if (!validReportId) {
     return (
@@ -270,16 +270,16 @@ export default function ReportViewerScreen() {
     );
   }
 
-  /* =======================================================
+  /*        ======
      UI
-  ======================================================= */
+         ====== */
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
       <View style={styles.container}>
-        {/* =================================================
+        {/*        
             HEADER
-        ================================================= */}
+                */}
 
         <View style={styles.header}>
           {/* BACK */}
@@ -320,9 +320,9 @@ export default function ReportViewerScreen() {
           </View>
         </View>
 
-        {/* =================================================
+        {/*        
             CONTENT
-        ================================================= */}
+                */}
 
         <ScrollView
           showsVerticalScrollIndicator={false}
@@ -392,9 +392,9 @@ export default function ReportViewerScreen() {
               </Text>
             </View>
           ) : (
-            /* =================================================
+            /*        
                REPORT RECORDS
-            ================================================= */
+                    */
 
             <View style={styles.recordsContainer}>
               {report.rows.map((row, rowIndex) => (
@@ -413,9 +413,9 @@ export default function ReportViewerScreen() {
                     </View>
                   )}
 
-                  {/* =================================================
+                  {/*        
                         RESPONSIVE 2 COLUMN GRID
-                    ================================================= */}
+                            */}
 
                   <View style={styles.fieldGrid}>
                     {report.fields.map((field, fieldIndex) => {
@@ -465,9 +465,9 @@ export default function ReportViewerScreen() {
             </View>
           )}
 
-          {/* =================================================
+          {/*        
               SUMMARY
-          ================================================= */}
+                  */}
 
           {report &&
             report.summaryLabel &&
@@ -496,9 +496,9 @@ export default function ReportViewerScreen() {
             )}
         </ScrollView>
 
-        {/* =================================================
+        {/*        
             FIXED ACTION BAR
-        ================================================= */}
+                */}
 
         <View
           style={[
@@ -572,14 +572,14 @@ export default function ReportViewerScreen() {
   );
 }
 
-/* =========================================================
+/*         =
    STYLES
-========================================================= */
+        = */
 
 const styles = StyleSheet.create({
-  /* =====================================================
+  /*        ====
        ROOT
-    ===================================================== */
+           ==== */
 
   safeArea: {
     flex: 1,
@@ -605,9 +605,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#F3F7F9",
   },
 
-  /* =====================================================
+  /*        ====
        HEADER
-    ===================================================== */
+           ==== */
 
   header: {
     minHeight: 68,
@@ -639,9 +639,9 @@ const styles = StyleSheet.create({
     shadowRadius: 5,
   },
 
-  /* =====================================================
+  /*        ====
        BACK BUTTON
-    ===================================================== */
+           ==== */
 
   backButton: {
     width: 34,
@@ -737,9 +737,9 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
 
-  /* =====================================================
+  /*        ====
        CONTENT
-    ===================================================== */
+           ==== */
 
   content: {
     width: "100%",
@@ -761,9 +761,9 @@ const styles = StyleSheet.create({
     gap: 10,
   },
 
-  /* =====================================================
+  /*        ====
        RECORD
-    ===================================================== */
+           ==== */
 
   recordCard: {
     width: "100%",
@@ -841,9 +841,9 @@ const styles = StyleSheet.create({
     letterSpacing: 0.35,
   },
 
-  /* =====================================================
+  /*        ====
        RESPONSIVE 2 COLUMN TABLE
-    ===================================================== */
+           ==== */
 
   fieldGrid: {
     width: "100%",
@@ -905,9 +905,9 @@ const styles = StyleSheet.create({
     marginTop: 5,
   },
 
-  /* =====================================================
+  /*        ====
        SUMMARY
-    ===================================================== */
+           ==== */
 
   summaryBox: {
     minHeight: 68,
@@ -979,9 +979,9 @@ const styles = StyleSheet.create({
     textAlign: "right",
   },
 
-  /* =====================================================
+  /*        ====
        EMPTY / INVALID
-    ===================================================== */
+           ==== */
 
   emptyState: {
     minHeight: 240,
@@ -1057,9 +1057,9 @@ const styles = StyleSheet.create({
     maxWidth: 320,
   },
 
-  /* =====================================================
+  /*        ====
        BOTTOM ACTIONS
-    ===================================================== */
+           ==== */
 
   bottomActions: {
     minHeight: 60,
@@ -1191,9 +1191,9 @@ const styles = StyleSheet.create({
     ],
   },
 
-  /* =====================================================
+  /*        ====
        PRIMARY BUTTON
-    ===================================================== */
+           ==== */
 
   primaryButton: {
     minHeight: 42,

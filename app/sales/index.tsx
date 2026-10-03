@@ -9,7 +9,10 @@ import {
   FlatList,
 
   RefreshControl,
+ 
 
+ 
+  
   StyleSheet,
 
   Text,
@@ -34,9 +37,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 
 import { useFocusEffect, useRouter } from 'expo-router';
-
-
-
+  
 import { loadSales } from '../../src/services/saleService';
 
 import { loadCustomers } from '../../src/services/customerService';
@@ -952,11 +953,11 @@ export default function SalesRegisterScreen() {
 
 
 
-        {/* =====================================================
+        {/*        ====
 
             BOTTOM NAVIGATION
 
-        ===================================================== */}
+               ==== */}
 
 
 
@@ -1914,11 +1915,11 @@ const styles = StyleSheet.create({
 
 
 
-  /* =========================================================
+  /*         =
 
    BOTTOM NAVIGATION
 
-\========================================================= */
+\        = */
 
 
 

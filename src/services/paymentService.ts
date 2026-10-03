@@ -11,9 +11,9 @@ import type {
   SavePaymentInput,
 } from "../types/payment";
 
-/* =========================================================
+/*         =
    IDS
-========================================================= */
+        = */
 
 function generatePaymentId():
   string {
@@ -22,9 +22,9 @@ function generatePaymentId():
     .slice(2, 8)}`;
 }
 
-/* =========================================================
+/*         =
    NORMALIZE
-========================================================= */
+        = */
 
 function normalizePayment(
   input: SavePaymentInput,
@@ -69,9 +69,9 @@ function normalizePayment(
   };
 }
 
-/* =========================================================
+/*         =
    VALIDATION
-========================================================= */
+        = */
 
 function validateMode(
   mode: PaymentMode,
@@ -96,27 +96,27 @@ function validateMode(
   }
 }
 
-/* =========================================================
+/*         =
    LOAD OPEN DOCUMENTS
-========================================================= */
+        = */
 
 export async function loadOpenPaymentDocuments():
   Promise<OpenPaymentDocument[]> {
   return getOpenPaymentDocuments();
 }
 
-/* =========================================================
+/*         =
    LOAD PAYMENT HISTORY
-========================================================= */
+        = */
 
 export async function loadPayments():
   Promise<PaymentRecord[]> {
   return getPayments();
 }
 
-/* =========================================================
+/*         =
    SAVE
-========================================================= */
+        = */
 
 export async function savePayment(
   input: SavePaymentInput,

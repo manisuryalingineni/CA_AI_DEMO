@@ -30,9 +30,9 @@ import { saveReportPdf } from "../../src/services/reportPdfService";
 
 import type { ReportId, ReportsDashboardSummary } from "../../src/types/report";
 
-/* =========================================================
+/*         =
    TYPES
-========================================================= */
+        = */
 
 type ReportItem = {
   id: ReportId;
@@ -44,9 +44,9 @@ type ReportItem = {
   icon: string;
 };
 
-/* =========================================================
+/*         =
    REPORT MODULES
-========================================================= */
+        = */
 
 const REPORTS: ReportItem[] = [
   {
@@ -210,9 +210,9 @@ const REPORTS: ReportItem[] = [
   },
 ];
 
-/* =========================================================
+/*         =
    HELPERS
-========================================================= */
+        = */
 
 function formatCurrency(value: number): string {
   return `₹${Number(value || 0).toLocaleString("en-IN", {
@@ -221,9 +221,9 @@ function formatCurrency(value: number): string {
   })}`;
 }
 
-/* =========================================================
+/*         =
    SCREEN
-========================================================= */
+        = */
 
 export default function ReportsScreen() {
   const { width } = useWindowDimensions();
@@ -234,9 +234,9 @@ export default function ReportsScreen() {
 
   const isTablet = width >= 700;
 
-  /* =======================================================
+  /*        ======
      STATE
-  ======================================================= */
+         ====== */
 
   const [summary, setSummary] = useState<ReportsDashboardSummary>({
     netSales: 0,
@@ -252,9 +252,9 @@ export default function ReportsScreen() {
 
   const [creatingProfitPdf, setCreatingProfitPdf] = useState(false);
 
-  /* =======================================================
+  /*        ======
      LOAD SUMMARY
-  ======================================================= */
+         ====== */
 
   const refreshSummary = useCallback(async () => {
     try {
@@ -286,17 +286,17 @@ export default function ReportsScreen() {
     }, [refreshSummary]),
   );
 
-  /* =======================================================
+  /*        ======
      OPEN REPORT
-  ======================================================= */
+         ====== */
 
   const openReport = (report: ReportItem) => {
     router.push(`/reports/${report.id}` as any);
   };
 
-  /* =======================================================
+  /*        ======
      SAVE PROFIT / LOSS PDF
-  ======================================================= */
+         ====== */
 
   const handleProfitLossPdf = async () => {
     if (creatingProfitPdf) {
@@ -360,16 +360,16 @@ export default function ReportsScreen() {
     }
   };
 
-  /* =======================================================
+  /*        ======
      UI
-  ======================================================= */
+         ====== */
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
       <View style={styles.container}>
-        {/* =================================================
+        {/*        
             HEADER
-        ================================================= */}
+                */}
 
         <View style={styles.topHeader}>
           {/* BACK BUTTON */}
@@ -421,9 +421,9 @@ export default function ReportsScreen() {
           )}
         </View>
 
-        {/* =================================================
+        {/*        
             CONTENT
-        ================================================= */}
+                */}
 
         <ScrollView
           showsVerticalScrollIndicator={false}
@@ -437,9 +437,9 @@ export default function ReportsScreen() {
             },
           ]}
         >
-          {/* =================================================
+          {/*        
               PAGE HEADING
-          ================================================= */}
+                  */}
 
           <View style={styles.pageHeadingRow}>
             <View style={styles.pageHeadingText}>
@@ -454,9 +454,9 @@ export default function ReportsScreen() {
               </Text>
             </View>
 
-            {/* =================================================
+            {/*        
                 PROFIT / LOSS SAVE PDF
-            ================================================= */}
+                    */}
 
             <Pressable
               onPress={handleProfitLossPdf}
@@ -489,9 +489,9 @@ export default function ReportsScreen() {
             </Pressable>
           </View>
 
-          {/* =================================================
+          {/*        
               SUMMARY BANNER
-          ================================================= */}
+                  */}
 
           <View style={styles.summaryCard}>
             <View style={styles.summaryGrid}>
@@ -547,9 +547,9 @@ export default function ReportsScreen() {
             </View>
           </View>
 
-          {/* =================================================
+          {/*        
               REPORT MODULE GRID
-          ================================================= */}
+                  */}
 
           <View style={styles.reportGrid}>
             {REPORTS.map((report) => (
@@ -607,12 +607,12 @@ export default function ReportsScreen() {
           </View>
         </ScrollView>
 
-        {/* =================================================
+        {/*        
             BOTTOM NAVIGATION
 
             Reports belongs to Quick Entry,
             therefore no navigation item is active.
-        ================================================= */}
+                */}
 
         <View
           style={[
@@ -688,14 +688,14 @@ export default function ReportsScreen() {
   );
 }
 
-/* =========================================================
+/*         =
    STYLES
-========================================================= */
+        = */
 
 const styles = StyleSheet.create({
-  /* =====================================================
+  /*        ====
        ROOT
-    ===================================================== */
+           ==== */
 
   safeArea: {
     flex: 1,
@@ -709,9 +709,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#F2F7FA",
   },
 
-  /* =====================================================
+  /*        ====
        HEADER
-    ===================================================== */
+           ==== */
 
   topHeader: {
     minHeight: 58,
@@ -865,9 +865,9 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 
-  /* =====================================================
+  /*        ====
        SCROLL
-    ===================================================== */
+           ==== */
 
   scrollContent: {
     width: "100%",
@@ -885,9 +885,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
 
-  /* =====================================================
+  /*        ====
        PAGE HEADING
-    ===================================================== */
+           ==== */
 
   pageHeadingRow: {
     flexDirection: "row",
@@ -927,9 +927,9 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
-  /* =====================================================
+  /*        ====
        PROFIT LOSS PDF
-    ===================================================== */
+           ==== */
 
   profitPdfButton: {
     minWidth: 108,
@@ -986,9 +986,9 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 
-  /* =====================================================
+  /*        ====
        SUMMARY BANNER
-    ===================================================== */
+           ==== */
 
   summaryCard: {
     width: "100%",
@@ -1062,9 +1062,9 @@ const styles = StyleSheet.create({
     color: "#FFD6D0",
   },
 
-  /* =====================================================
+  /*        ====
        REPORT GRID
-    ===================================================== */
+           ==== */
 
   reportGrid: {
     flexDirection: "row",
@@ -1127,9 +1127,9 @@ const styles = StyleSheet.create({
     ],
   },
 
-  /* =====================================================
+  /*        ====
        REPORT ICON
-    ===================================================== */
+           ==== */
 
   iconBox: {
     width: 40,
@@ -1159,9 +1159,9 @@ const styles = StyleSheet.create({
     fontSize: 19,
   },
 
-  /* =====================================================
+  /*        ====
        REPORT TEXT
-    ===================================================== */
+           ==== */
 
   reportTitle: {
     width: "100%",
@@ -1235,9 +1235,9 @@ const styles = StyleSheet.create({
     ],
   },
 
-  /* =====================================================
+  /*        ====
        BOTTOM NAVIGATION
-    ===================================================== */
+           ==== */
 
   bottomNavigation: {
     position: "absolute",

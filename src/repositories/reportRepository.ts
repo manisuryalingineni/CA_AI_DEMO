@@ -13,9 +13,9 @@ import type {
   ReportsDashboardSummary,
 } from "../types/report";
 
-/* =========================================================
+/*         =
    HELPERS
-========================================================= */
+        = */
 
 function numberValue(
   value: unknown,
@@ -71,9 +71,9 @@ function createRows(
   );
 }
 
-/* =========================================================
+/*         =
    DASHBOARD SUMMARY
-========================================================= */
+        = */
 
 export async function getReportsDashboardSummary():
   Promise<ReportsDashboardSummary> {
@@ -187,9 +187,9 @@ export async function getReportsDashboardSummary():
   };
 }
 
-/* =========================================================
+/*         =
    SALES REGISTER
-========================================================= */
+        = */
 
 async function salesRegister(
   businessId: string,
@@ -349,9 +349,9 @@ async function salesRegister(
   };
 }
 
-/* =========================================================
+/*         =
    PURCHASE REGISTER
-========================================================= */
+        = */
 
 async function purchaseRegister(
   businessId: string,
@@ -515,9 +515,9 @@ async function purchaseRegister(
   };
 }
 
-/* =========================================================
+/*         =
    STOCK REPORT
-========================================================= */
+        = */
 
 async function stockReport(
   businessId: string,
@@ -678,9 +678,9 @@ async function stockReport(
   };
 }
 
-/* =========================================================
+/*         =
    RECEIVABLES
-========================================================= */
+        = */
 
 async function receivables(
   businessId: string,
@@ -826,9 +826,9 @@ async function receivables(
   };
 }
 
-/* =========================================================
+/*         =
    PAYABLES
-========================================================= */
+        = */
 
 async function payables(
   businessId: string,
@@ -976,9 +976,9 @@ async function payables(
   };
 }
 
-/* =========================================================
+/*         =
    PAYMENT REGISTER
-========================================================= */
+        = */
 
 async function paymentRegister(
   businessId: string,
@@ -1145,9 +1145,9 @@ async function paymentRegister(
   };
 }
 
-/* =========================================================
+/*         =
    CASH FLOW
-========================================================= */
+        = */
 
 async function cashFlow(
   businessId: string,
@@ -1307,9 +1307,9 @@ async function cashFlow(
   };
 }
 
-/* =========================================================
+/*         =
    BANK RECONCILIATION
-========================================================= */
+        = */
 
 async function bankReconciliation(
   businessId: string,
@@ -1430,9 +1430,9 @@ async function bankReconciliation(
   };
 }
 
-/* =========================================================
+/*         =
    GST WORKING
-========================================================= */
+        = */
 
 async function gstWorking(
   businessId: string,
@@ -1582,9 +1582,9 @@ async function gstWorking(
   };
 }
 
-/* =========================================================
+/*         =
    GST READINESS
-========================================================= */
+        = */
 
 async function gstReadiness(
   businessId: string,
@@ -1713,9 +1713,9 @@ async function gstReadiness(
   };
 }
 
-/* =========================================================
+/*         =
    PROFIT & LOSS
-========================================================= */
+        = */
 
 async function profitLoss(
   businessId: string,
@@ -1784,9 +1784,9 @@ async function profitLoss(
   };
 }
 
-/* =========================================================
+/*         =
    DAY BOOK
-========================================================= */
+        = */
 
 async function dayBook(
   businessId: string,
@@ -1938,9 +1938,9 @@ async function dayBook(
   };
 }
 
-/* =========================================================
+/*         =
    PAYROLL
-========================================================= */
+        = */
 
 async function payrollSummary():
   Promise<ReportData> {
@@ -1963,9 +1963,9 @@ async function payrollSummary():
   };
 }
 
-/* =========================================================
+/*         =
    BUSINESS INCOME TAX
-========================================================= */
+        = */
 
 async function businessIncomeTax():
   Promise<ReportData> {
@@ -2033,9 +2033,9 @@ async function businessIncomeTax():
   };
 }
 
-/* =========================================================
+/*         =
    DOCUMENT INDEX
-========================================================= */
+        = */
 
 async function documentIndex(
   businessId: string,
@@ -2191,9 +2191,9 @@ async function documentIndex(
   };
 }
 
-/* =========================================================
+/*         =
    COUNTER / PRODUCT / BRANCH SALES
-========================================================= */
+        = */
 
 async function productSales(
   businessId: string,
@@ -2303,9 +2303,9 @@ async function productSales(
   };
 }
 
-/* =========================================================
+/*         =
    GET REPORT
-========================================================= */
+        = */
 
 export async function getReportById(
   reportId: ReportId,

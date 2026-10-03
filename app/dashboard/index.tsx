@@ -23,9 +23,9 @@ import {
   type RecentDocument,
 } from "../../src/services/dashboardService";
 
-/* =========================================================
+/*         =
    FORMATTERS
-========================================================= */
+        = */
 
 function formatCurrency(value: number): string {
   return `₹${value.toLocaleString("en-IN", {
@@ -48,9 +48,9 @@ function formatDate(value: string): string {
   return `${parts[2]}/${parts[1]}/${parts[0]}`;
 }
 
-/* =========================================================
+/*         =
    QUICK ACTION
-========================================================= */
+        = */
 
 type QuickActionProps = {
   icon: string;
@@ -87,9 +87,9 @@ function QuickAction({ icon, title, description, onPress }: QuickActionProps) {
   );
 }
 
-/* =========================================================
+/*         =
    QUICK ENTRY
-========================================================= */
+        = */
 
 type QuickEntryProps = {
   icon: string;
@@ -125,9 +125,9 @@ function QuickEntry({ icon, title, onPress }: QuickEntryProps) {
   );
 }
 
-/* =========================================================
+/*         =
    FLOW STEP
-========================================================= */
+        = */
 
 type FlowStepProps = {
   number: string;
@@ -156,9 +156,9 @@ function FlowStep({ number, title, description, onPress }: FlowStepProps) {
   );
 }
 
-/* =========================================================
+/*         =
    RECENT DOCUMENT
-========================================================= */
+        = */
 
 function RecentDocumentCard({ document }: { document: RecentDocument }) {
   const isSale = document.type === "SALE";
@@ -237,9 +237,9 @@ function RecentDocumentCard({ document }: { document: RecentDocument }) {
   );
 }
 
-/* =========================================================
+/*         =
    DASHBOARD
-========================================================= */
+        = */
 
 export default function DashboardScreen() {
   const { width } = useWindowDimensions();
@@ -250,9 +250,9 @@ export default function DashboardScreen() {
 
   const selectedRole = "Business Owner";
 
-  /* =======================================================
+  /*        ======
      DASHBOARD DATA
-  ======================================================= */
+         ====== */
 
   const [dashboardData, setDashboardData] = useState<DashboardData>({
     summary: {
@@ -270,9 +270,9 @@ export default function DashboardScreen() {
 
   const [loadingDashboard, setLoadingDashboard] = useState(false);
 
-  /* =======================================================
+  /*        ======
      REFRESH FROM SQLITE
-  ======================================================= */
+         ====== */
 
   const refreshDashboard = useCallback(async () => {
     try {
@@ -294,17 +294,17 @@ export default function DashboardScreen() {
     }, [refreshDashboard]),
   );
 
-  /* =======================================================
+  /*        ======
      UI
-  ======================================================= */
+         ====== */
 
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
 
-      {/* =====================================================
+      {/*        ====
           TOP HEADER
-      ===================================================== */}
+             ==== */}
 
       <View
         style={[
@@ -346,9 +346,9 @@ export default function DashboardScreen() {
         </View>
       </View>
 
-      {/* =====================================================
+      {/*        ====
           MAIN
-      ===================================================== */}
+             ==== */}
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -361,9 +361,9 @@ export default function DashboardScreen() {
         ]}
       >
         <View style={[styles.main, isLargeScreen && styles.mainLarge]}>
-          {/* =================================================
+          {/*        
               HERO
-          ================================================= */}
+                  */}
 
           <View style={styles.hero}>
             <View
@@ -469,9 +469,9 @@ export default function DashboardScreen() {
             </View>
           </View>
 
-          {/* =================================================
+          {/*        
               QUICK ENTRY
-          ================================================= */}
+                  */}
 
           <View style={styles.sectionHeader}>
             <View style={styles.sectionHeaderTextArea}>
@@ -516,7 +516,15 @@ export default function DashboardScreen() {
             <QuickEntry
               icon="📥"
               title="Purchase"
-              onPress={() => router.push("/purchases")}
+ 
+             // onPress={() => router.push("/purchases")}
+ 
+              onPress={() =>
+                router.push(
+                  "/purchases/add",
+                )
+              }
+  
             />
 
             <QuickEntry icon="💰" title="Money"
@@ -535,9 +543,9 @@ export default function DashboardScreen() {
             />
           </View>
 
-          {/* =================================================
+          {/*        
               RETAIL WORK SHOP
-          ================================================= */}
+                  */}
 
           <View style={styles.sectionHeader}>
             <View style={styles.sectionHeaderTextArea}>
@@ -568,7 +576,15 @@ export default function DashboardScreen() {
               icon="📥"
               title="Buy stock"
               description="Purchase bill and inward stock"
-              onPress={() => router.push("/purchases")}
+ 
+              //onPress={() => router.push("/purchases")}
+ 
+              onPress={() =>
+                router.push(
+                  "/purchases/add",
+                )
+              }
+  
             />
 
             <QuickAction
@@ -593,9 +609,9 @@ export default function DashboardScreen() {
             />
           </View>
 
-          {/* =================================================
+          {/*        
               BUSINESS FLOW
-          ================================================= */}
+                  */}
 
           <View style={styles.sectionHeader}>
             <View>
@@ -630,7 +646,15 @@ export default function DashboardScreen() {
               number="3"
               title="Purchase"
               description="Purchase and inward stock"
-              onPress={() => router.push("/purchases")}
+ 
+             // onPress={() => router.push("/purchases")}
+ 
+              onPress={() =>
+                router.push(
+                  "/purchases/add",
+                )
+              }
+  
             />
 
             <FlowStep
@@ -655,9 +679,9 @@ export default function DashboardScreen() {
             />
           </ScrollView>
 
-          {/* =================================================
+          {/*        
               RECENT DOCUMENTS
-          ================================================= */}
+                  */}
 
           <View style={styles.sectionHeader}>
             <View>
@@ -708,9 +732,9 @@ export default function DashboardScreen() {
         </View>
       </ScrollView>
 
-      {/* =====================================================
+      {/*        ====
           BOTTOM NAV
-      ===================================================== */}
+             ==== */}
 
       <View
         style={[
@@ -761,9 +785,9 @@ export default function DashboardScreen() {
   );
 }
 
-/* =========================================================
+/*         =
    STYLES
-========================================================= */
+        = */
 
 const styles = StyleSheet.create({
   container: {
@@ -1498,9 +1522,9 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
 
-  /* =====================================================
+  /*        ====
        RECENT DOCUMENTS
-    ===================================================== */
+           ==== */
 
   documentsList: {
     width: "100%",

@@ -8,9 +8,9 @@ import type {
   SavePaymentInput,
 } from "../types/payment";
 
-/* =========================================================
+/*         =
    DATABASE ROW TYPES
-========================================================= */
+        = */
 
 type OpenDocumentRow = {
   id: string;
@@ -60,9 +60,9 @@ type PaymentRow = {
   created_at: string;
 };
 
-/* =========================================================
+/*         =
    MAPPERS
-========================================================= */
+        = */
 
 function mapOpenDocument(row: OpenDocumentRow): OpenPaymentDocument {
   return {
@@ -120,7 +120,7 @@ function mapPayment(row: PaymentRow): PaymentRecord {
   };
 }
 
-/* =========================================================
+/*         =
    OPEN INVOICES / PURCHASE BILLS
 
    SALE:
@@ -128,7 +128,7 @@ function mapPayment(row: PaymentRow): PaymentRecord {
 
    PURCHASE:
    due amount = money we need to pay.
-========================================================= */
+        = */
 
 export async function getOpenPaymentDocuments(): Promise<
   OpenPaymentDocument[]
@@ -258,9 +258,9 @@ export async function getOpenPaymentDocuments(): Promise<
   return rows.map(mapOpenDocument);
 }
 
-/* =========================================================
+/*         =
    PAYMENT HISTORY
-========================================================= */
+        = */
 
 export async function getPayments(): Promise<PaymentRecord[]> {
   const business = await getBusiness();
@@ -319,9 +319,9 @@ export async function getPayments(): Promise<PaymentRecord[]> {
   return rows.map(mapPayment);
 }
 
-/* =========================================================
+/*         =
    SAVE PAYMENT
-========================================================= */
+        = */
 
 export async function insertPayment(
   input: SavePaymentInput,
@@ -340,17 +340,17 @@ export async function insertPayment(
 
   let result: PaymentRecord | null = null;
 
-  /* =======================================================
+  /*        ======
      TRANSACTION
 
      Saving the payment and updating the linked
      sale/purchase happen together.
-  ======================================================= */
+         ====== */
 
   await db.withTransactionAsync(async () => {
-    /* =====================================================
+    /*        ====
          SALE RECEIPT
-      ===================================================== */
+             ==== */
 
     if (input.documentType === "SALE") {
       const sale = await db.getFirstAsync<{
@@ -433,9 +433,9 @@ export async function insertPayment(
       const paymentStatus =
         newDue <= 0 ? "PAID" : newPaid > 0 ? "PARTIAL" : "UNPAID";
 
-      /* ===================================================
+      /*        ==
            CUSTOMER NAME
-        =================================================== */
+               == */
 
       let partyName = "Walk-in Customer";
 
@@ -464,9 +464,9 @@ export async function insertPayment(
 
       const documentNumber = sale.invoice_number?.trim() || "Invoice";
 
-      /* ===================================================
+      /*        ==
            UPDATE SALE
-        =================================================== */
+               == */
 
       await db.runAsync(
         `
@@ -490,9 +490,9 @@ export async function insertPayment(
         [newPaid, newDue, paymentStatus, createdAt, sale.id, business.id],
       );
 
-      /* ===================================================
+      /*        ==
            INSERT RECEIPT
-        =================================================== */
+               == */
 
       await db.runAsync(
         `
@@ -603,9 +603,9 @@ export async function insertPayment(
       return;
     }
 
-    /* =====================================================
+    /*        ====
          PURCHASE PAYMENT
-      ===================================================== */
+             ==== */
 
     const purchase = await db.getFirstAsync<{
       id: string;
@@ -691,9 +691,9 @@ export async function insertPayment(
     const paymentStatus =
       newDue <= 0 ? "PAID" : newPaid > 0 ? "PARTIAL" : "UNPAID";
 
-    /* =====================================================
+    /*        ====
          VENDOR NAME
-      ===================================================== */
+             ==== */
 
     let partyName = "Vendor";
 
@@ -720,21 +720,21 @@ export async function insertPayment(
       }
     }
 
-    /* =====================================================
+    /*        ====
          DOCUMENT NUMBER
 
          Prefer vendor invoice number.
          Otherwise use internal purchase number.
-      ===================================================== */
+             ==== */
 
     const documentNumber =
       purchase.invoice_number?.trim() ||
       purchase.purchase_number?.trim() ||
       "Purchase bill";
 
-    /* =====================================================
+    /*        ====
          UPDATE PURCHASE
-      ===================================================== */
+             ==== */
 
     await db.runAsync(
       `
@@ -758,9 +758,9 @@ export async function insertPayment(
       [newPaid, newDue, paymentStatus, createdAt, purchase.id, business.id],
     );
 
-    /* =====================================================
+    /*        ====
          INSERT VENDOR PAYMENT
-      ===================================================== */
+             ==== */
 
     await db.runAsync(
       `

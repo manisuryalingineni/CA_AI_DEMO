@@ -30,9 +30,9 @@ import type { CreateCustomerInput, Customer } from "../../src/types/customer";
 
 import { colors } from "../../src/theme/colors";
 
-/* =========================================================
+/*         =
    STATES
-========================================================= */
+        = */
 
 const STATES = [
   "Andhra Pradesh",
@@ -73,9 +73,9 @@ const STATES = [
   "Puducherry",
 ];
 
-/* =========================================================
+/*         =
    CUSTOMER FORM
-========================================================= */
+        = */
 
 interface CustomerFormProps {
   customer?: Customer | null;
@@ -92,9 +92,9 @@ function CustomerForm({ customer, onClose, onSaved }: CustomerFormProps) {
 
   const isLargeForm = width >= 700;
 
-  /* =======================================================
+  /*        ======
      FORM STATE
-  ======================================================= */
+         ====== */
 
   const [name, setName] = useState("");
 
@@ -114,9 +114,9 @@ function CustomerForm({ customer, onClose, onSaved }: CustomerFormProps) {
 
   const [saving, setSaving] = useState(false);
 
-  /* =======================================================
+  /*        ======
      TOAST
-  ======================================================= */
+         ====== */
 
   const [toastVisible, setToastVisible] = useState(false);
 
@@ -160,9 +160,9 @@ function CustomerForm({ customer, onClose, onSaved }: CustomerFormProps) {
     }, 1000);
   };
 
-  /* =======================================================
+  /*        ======
      LOAD / RESET FORM
-  ======================================================= */
+         ====== */
 
   useEffect(() => {
     if (customer) {
@@ -202,9 +202,9 @@ function CustomerForm({ customer, onClose, onSaved }: CustomerFormProps) {
     setAddress("");
   }, [customer]);
 
-  /* =======================================================
+  /*        ======
      CLOSE
-  ======================================================= */
+         ====== */
 
   const handleClose = () => {
     if (saving) {
@@ -214,9 +214,9 @@ function CustomerForm({ customer, onClose, onSaved }: CustomerFormProps) {
     onClose();
   };
 
-  /* =======================================================
+  /*        ======
      SAVE CUSTOMER
-  ======================================================= */
+         ====== */
 
   const handleSave = async () => {
     if (saving) {
@@ -227,9 +227,9 @@ function CustomerForm({ customer, onClose, onSaved }: CustomerFormProps) {
 
     const customerMobile = mobile.trim();
 
-    /* ===================================================
+    /*        ==
          NAME
-      =================================================== */
+             == */
 
     if (!customerName) {
       Alert.alert(
@@ -241,9 +241,9 @@ function CustomerForm({ customer, onClose, onSaved }: CustomerFormProps) {
       return;
     }
 
-    /* ===================================================
+    /*        ==
          MOBILE
-      =================================================== */
+             == */
 
     if (!customerMobile) {
       Alert.alert(
@@ -265,9 +265,9 @@ function CustomerForm({ customer, onClose, onSaved }: CustomerFormProps) {
       return;
     }
 
-    /* ===================================================
+    /*        ==
          GSTIN
-      =================================================== */
+             == */
 
     const cleanedGstin = gstin.trim().toUpperCase();
 
@@ -281,9 +281,9 @@ function CustomerForm({ customer, onClose, onSaved }: CustomerFormProps) {
       return;
     }
 
-    /* ===================================================
+    /*        ==
          NUMERIC VALUES
-      =================================================== */
+             == */
 
     const parsedCreditDays = Number(creditDays) || 0;
 
@@ -312,9 +312,9 @@ function CustomerForm({ customer, onClose, onSaved }: CustomerFormProps) {
     try {
       setSaving(true);
 
-      /* =================================================
+      /*        
            UPDATE CUSTOMER
-        ================================================= */
+                */
 
       if (customer) {
         await editCustomer({
@@ -344,9 +344,9 @@ function CustomerForm({ customer, onClose, onSaved }: CustomerFormProps) {
         );
       } else {
 
-      /* =================================================
+      /*        
            CREATE CUSTOMER
-        ================================================= */
+                */
         const input: CreateCustomerInput = {
           name: customerName,
 
@@ -393,9 +393,9 @@ function CustomerForm({ customer, onClose, onSaved }: CustomerFormProps) {
     }
   };
 
-  /* =======================================================
+  /*        ======
      SCREEN
-  ======================================================= */
+         ====== */
 
   return (
     <SafeAreaView style={styles.formSafeArea} edges={["top", "bottom"]}>
@@ -404,9 +404,9 @@ function CustomerForm({ customer, onClose, onSaved }: CustomerFormProps) {
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
         <View style={styles.formScreen}>
-          {/* =================================================
+          {/*        
               HEADER
-          ================================================= */}
+                  */}
 
           <View style={styles.formHeader}>
             <View style={styles.formHeaderLeft}>
@@ -451,9 +451,9 @@ function CustomerForm({ customer, onClose, onSaved }: CustomerFormProps) {
             </View>
           </View>
 
-          {/* =================================================
+          {/*        
               FORM
-          ================================================= */}
+                  */}
 
           <ScrollView
             showsVerticalScrollIndicator={false}
@@ -473,9 +473,9 @@ function CustomerForm({ customer, onClose, onSaved }: CustomerFormProps) {
                 Enter the customer&apos;s basic and account details.
               </Text>
 
-              {/* =================================================
+              {/*        
                   NAME / MOBILE
-              ================================================= */}
+                      */}
 
               <View style={[styles.formRow, !isLargeForm && styles.formColumn]}>
                 <View style={styles.formField}>
@@ -517,9 +517,9 @@ function CustomerForm({ customer, onClose, onSaved }: CustomerFormProps) {
                 </View>
               </View>
 
-              {/* =================================================
+              {/*        
                   GST / STATE
-              ================================================= */}
+                      */}
 
               <View style={[styles.formRow, !isLargeForm && styles.formColumn]}>
                 <View style={styles.formField}>
@@ -573,9 +573,9 @@ function CustomerForm({ customer, onClose, onSaved }: CustomerFormProps) {
                 </View>
               </View>
 
-              {/* =================================================
+              {/*        
                   CREDIT DAYS / OPENING BALANCE
-              ================================================= */}
+                      */}
 
               <View style={[styles.formRow, !isLargeForm && styles.formColumn]}>
                 <View style={styles.formField}>
@@ -625,9 +625,9 @@ function CustomerForm({ customer, onClose, onSaved }: CustomerFormProps) {
                 </View>
               </View>
 
-              {/* =================================================
+              {/*        
                   CUSTOMER CATEGORY
-              ================================================= */}
+                      */}
 
               <View style={styles.fullField}>
                 <Text style={styles.label}>Customer Category / Loyalty ID</Text>
@@ -642,9 +642,9 @@ function CustomerForm({ customer, onClose, onSaved }: CustomerFormProps) {
                 />
               </View>
 
-              {/* =================================================
+              {/*        
                   ADDRESS
-              ================================================= */}
+                      */}
 
               <View style={styles.fullField}>
                 <Text style={styles.label}>Address</Text>
@@ -663,9 +663,9 @@ function CustomerForm({ customer, onClose, onSaved }: CustomerFormProps) {
               </View>
             </View>
 
-            {/* =================================================
+            {/*        
                 ACTION BUTTONS
-            ================================================= */}
+                    */}
 
             <View
               style={[
@@ -708,9 +708,9 @@ function CustomerForm({ customer, onClose, onSaved }: CustomerFormProps) {
             </View>
           </ScrollView>
 
-          {/* =================================================
+          {/*        
               SUCCESS TOAST
-          ================================================= */}
+                  */}
 
           {toastVisible && (
             <Animated.View
@@ -752,10 +752,10 @@ function CustomerForm({ customer, onClose, onSaved }: CustomerFormProps) {
   );
 }
 
-/* =========================================================
+/*         =
    CUSTOMER ROUTE
    app/customers/index.tsx
-========================================================= */
+        = */
 
 export default function CustomersScreen() {
   const { customerId } = useLocalSearchParams<{
@@ -818,9 +818,9 @@ export default function CustomersScreen() {
     };
   }, [customerId]);
 
-  /* =======================================================
+  /*        ======
      LOADING
-  ======================================================= */
+         ====== */
 
   if (loading) {
     return (
@@ -832,9 +832,9 @@ export default function CustomersScreen() {
     );
   }
 
-  /* =======================================================
+  /*        ======
      NOT FOUND
-  ======================================================= */
+         ====== */
 
   if (customerId && !customer) {
     return (
@@ -870,14 +870,14 @@ export default function CustomersScreen() {
   );
 }
 
-/* =========================================================
+/*         =
    STYLES
-========================================================= */
+        = */
 
 const styles = StyleSheet.create({
-  /* =====================================================
+  /*        ====
        ROOT
-    ===================================================== */
+           ==== */
 
   formSafeArea: {
     flex: 1,
@@ -899,9 +899,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
 
-  /* =====================================================
+  /*        ====
        HEADER
-    ===================================================== */
+           ==== */
 
   formHeader: {
     minHeight: 76,
@@ -943,9 +943,9 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
 
-  /* =====================================================
+  /*        ====
        CONSISTENT BACK BUTTON
-    ===================================================== */
+           ==== */
 
   formBackButton: {
     width: 34,
@@ -1049,9 +1049,9 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
 
-  /* =====================================================
+  /*        ====
        SCROLL / FORM CARD
-    ===================================================== */
+           ==== */
 
   formScroll: {
     padding: 16,
@@ -1105,9 +1105,9 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
 
-  /* =====================================================
+  /*        ====
        FORM FIELDS
-    ===================================================== */
+           ==== */
 
   formRow: {
     flexDirection: "row",
@@ -1171,9 +1171,9 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
   },
 
-  /* =====================================================
+  /*        ====
        STATE PICKER
-    ===================================================== */
+           ==== */
 
   stateField: {
     height: 46,
@@ -1247,9 +1247,9 @@ const styles = StyleSheet.create({
     height: 46,
   },
 
-  /* =====================================================
+  /*        ====
        ACTIONS
-    ===================================================== */
+           ==== */
 
   formActions: {
     width: "100%",
@@ -1331,9 +1331,9 @@ const styles = StyleSheet.create({
     ],
   },
 
-  /* =====================================================
+  /*        ====
        SUCCESS TOAST
-    ===================================================== */
+           ==== */
 
   toastContainer: {
     position: "absolute",
@@ -1425,9 +1425,9 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
-  /* =====================================================
+  /*        ====
        LOADING
-    ===================================================== */
+           ==== */
 
   loadingScreen: {
     flex: 1,
@@ -1447,9 +1447,9 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 
-  /* =====================================================
+  /*        ====
        NOT FOUND
-    ===================================================== */
+           ==== */
 
   notFoundScreen: {
     flex: 1,

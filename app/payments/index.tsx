@@ -46,9 +46,9 @@ import type {
   PaymentRecord,
 } from "../../src/types/payment";
 
-/* =========================================================
+/*         =
    HELPERS
-========================================================= */
+        = */
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
@@ -97,9 +97,9 @@ function modeLabel(mode: PaymentMode): string {
   }
 }
 
-/* =========================================================
+/*         =
    SCREEN
-========================================================= */
+        = */
 
 export default function PaymentsScreen() {
   const { width } = useWindowDimensions();
@@ -110,9 +110,9 @@ export default function PaymentsScreen() {
 
   const isTablet = width >= 700;
 
-  /* =======================================================
+  /*        ======
      DATA
-  ======================================================= */
+         ====== */
 
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
 
@@ -124,9 +124,9 @@ export default function PaymentsScreen() {
 
   const [saving, setSaving] = useState(false);
 
-  /* =======================================================
+  /*        ======
      FORM
-  ======================================================= */
+         ====== */
 
   const [documentKey, setDocumentKey] = useState("");
 
@@ -144,9 +144,9 @@ export default function PaymentsScreen() {
 
   const [chequeDate, setChequeDate] = useState("");
 
-  /* =======================================================
+  /*        ======
      TOAST
-  ======================================================= */
+         ====== */
 
   const [toastVisible, setToastVisible] = useState(false);
 
@@ -182,9 +182,9 @@ export default function PaymentsScreen() {
     });
   }, [toastOpacity]);
 
-  /* =======================================================
+  /*        ======
      REFRESH
-  ======================================================= */
+         ====== */
 
   const refreshData = useCallback(async () => {
     try {
@@ -216,9 +216,9 @@ export default function PaymentsScreen() {
     }, [refreshData]),
   );
 
-  /* =======================================================
+  /*        ======
      SELECTED DOCUMENT
-  ======================================================= */
+         ====== */
 
   const selectedDocument = useMemo(() => {
     return openDocuments.find(
@@ -234,9 +234,9 @@ export default function PaymentsScreen() {
     setAmount(String(selectedDocument.dueAmount));
   }, [selectedDocument]);
 
-  /* =======================================================
+  /*        ======
      FORM ACTIONS
-  ======================================================= */
+         ====== */
 
   const resetForm = useCallback(() => {
     setDocumentKey("");
@@ -280,9 +280,9 @@ export default function PaymentsScreen() {
     resetForm();
   };
 
-  /* =======================================================
+  /*        ======
      SAVE PAYMENT
-  ======================================================= */
+         ====== */
 
   const handleSave = async () => {
     if (!selectedDocument) {
@@ -358,9 +358,9 @@ export default function PaymentsScreen() {
     }
   };
 
-  /* =======================================================
+  /*        ======
      FULL SCREEN PAYMENT FORM
-  ======================================================= */
+         ====== */
 
   const paymentForm = (
     <Modal
@@ -695,16 +695,16 @@ export default function PaymentsScreen() {
     </Modal>
   );
 
-  /* =======================================================
+  /*        ======
      MAIN PAGE
-  ======================================================= */
+         ====== */
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
       <View style={styles.container}>
-        {/* =================================================
+        {/*        
             MAIN HEADER
-        ================================================= */}
+                */}
 
         <View style={styles.topHeader}>
           {/* BACK BUTTON */}
@@ -754,9 +754,9 @@ export default function PaymentsScreen() {
           )}
         </View>
 
-        {/* =================================================
+        {/*        
             CONTENT
-        ================================================= */}
+                */}
 
         <ScrollView
           showsVerticalScrollIndicator={false}
@@ -799,9 +799,9 @@ export default function PaymentsScreen() {
             </Pressable>
           </View>
 
-          {/* =================================================
+          {/*        
               PAYMENT LIST
-          ================================================= */}
+                  */}
 
           {loading ? (
             <View style={styles.emptyCard}>
@@ -907,9 +907,9 @@ export default function PaymentsScreen() {
           )}
         </ScrollView>
 
-        {/* =================================================
+        {/*        
             BOTTOM NAVIGATION
-        ================================================= */}
+                */}
 
         <View
           style={[
@@ -961,9 +961,9 @@ export default function PaymentsScreen() {
 
         {paymentForm}
 
-        {/* =================================================
+        {/*        
             SUCCESS TOAST
-        ================================================= */}
+                */}
 
         {toastVisible && (
           <Animated.View
@@ -1004,14 +1004,14 @@ export default function PaymentsScreen() {
   );
 }
 
-/* =========================================================
+/*         =
    STYLES
-========================================================= */
+        = */
 
 const styles = StyleSheet.create({
-  /* =====================================================
+  /*        ====
        ROOT
-    ===================================================== */
+           ==== */
 
   safeArea: {
     flex: 1,
@@ -1025,9 +1025,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#F3F7F9",
   },
 
-  /* =====================================================
+  /*        ====
        MAIN HEADER
-    ===================================================== */
+           ==== */
 
   topHeader: {
     minHeight: 58,
@@ -1181,9 +1181,9 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
 
-  /* =====================================================
+  /*        ====
        MAIN CONTENT
-    ===================================================== */
+           ==== */
 
   content: {
     width: "100%",
@@ -1275,9 +1275,9 @@ const styles = StyleSheet.create({
     ],
   },
 
-  /* =====================================================
+  /*        ====
        EMPTY STATE
-    ===================================================== */
+           ==== */
 
   emptyCard: {
     minHeight: 235,
@@ -1359,9 +1359,9 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
 
-  /* =====================================================
+  /*        ====
        PAYMENT CARDS
-    ===================================================== */
+           ==== */
 
   paymentList: {
     gap: 7,
@@ -1498,9 +1498,9 @@ const styles = StyleSheet.create({
     color: "#667A88",
   },
 
-  /* =====================================================
+  /*        ====
        FULL SCREEN FORM
-    ===================================================== */
+           ==== */
 
   formScreen: {
     flex: 1,
@@ -1897,9 +1897,9 @@ const styles = StyleSheet.create({
     lineHeight: 11,
   },
 
-  /* =====================================================
+  /*        ====
        FORM BOTTOM BAR
-    ===================================================== */
+           ==== */
 
   formBottomBar: {
     minHeight: 60,
@@ -1988,9 +1988,9 @@ const styles = StyleSheet.create({
     opacity: 0.45,
   },
 
-  /* =====================================================
+  /*        ====
        BOTTOM NAVIGATION
-    ===================================================== */
+           ==== */
 
   bottomNavigation: {
     position: "absolute",
@@ -2056,9 +2056,9 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
 
-  /* =====================================================
+  /*        ====
        TOAST
-    ===================================================== */
+           ==== */
 
   toast: {
     position: "absolute",

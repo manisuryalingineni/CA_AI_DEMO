@@ -6,9 +6,9 @@ import * as FileSystem from "expo-file-system/legacy";
 
 import type { ReportData, ReportField } from "../types/report";
 
-/* =========================================================
+/*         =
    HELPERS
-========================================================= */
+        = */
 
 function escapeHtml(value: unknown): string {
   return String(value ?? "")
@@ -54,9 +54,9 @@ function safeFileName(value: string): string {
   return cleaned || "Business_Report";
 }
 
-/* =========================================================
+/*         =
    GENERIC REPORT HTML
-========================================================= */
+        = */
 
 function buildGenericReportHtml(report: ReportData): string {
   const records = report.rows
@@ -371,9 +371,9 @@ function buildGenericReportHtml(report: ReportData): string {
 `;
 }
 
-/* =========================================================
+/*         =
    PROFIT / LOSS HTML
-========================================================= */
+        = */
 
 function buildProfitLossHtml(report: ReportData): string {
   const first = report.rows[0];
@@ -682,9 +682,9 @@ function buildProfitLossHtml(report: ReportData): string {
 `;
 }
 
-/* =========================================================
+/*         =
    BUILD HTML
-========================================================= */
+        = */
 
 export function buildReportHtml(report: ReportData): string {
   if (report.id === "profit-loss") {
@@ -694,9 +694,9 @@ export function buildReportHtml(report: ReportData): string {
   return buildGenericReportHtml(report);
 }
 
-/* =========================================================
+/*         =
    RESULT
-========================================================= */
+        = */
 
 export type SavePdfResult = {
   saved: boolean;
@@ -708,23 +708,23 @@ export type SavePdfResult = {
   fileName?: string;
 };
 
-/* =========================================================
+/*         =
    SAVE REPORT PDF
-========================================================= */
+        = */
 
 export async function saveReportPdf(
   report: ReportData,
 ): Promise<SavePdfResult> {
   const html = buildReportHtml(report);
 
-  /* =======================================================
+  /*        ======
      CREATE PDF + BASE64
 
      This is important.
 
      We ask expo-print for base64 directly instead
      of creating the PDF and reading it again later.
-  ======================================================= */
+         ====== */
 
   const generated = await Print.printToFileAsync({
     html,
@@ -740,9 +740,9 @@ export async function saveReportPdf(
     throw new Error("PDF data could not be generated.");
   }
 
-  /* =======================================================
+  /*        ======
      FILE NAME
-  ======================================================= */
+         ====== */
 
   const now = new Date();
 
@@ -754,16 +754,16 @@ export async function saveReportPdf(
 
   const visibleFileName = `${fileBaseName}.pdf`;
 
-  /* =======================================================
+  /*        ======
      ANDROID
-  ======================================================= */
+         ====== */
 
   if (Platform.OS === "android") {
     const SAF = FileSystem.StorageAccessFramework;
 
-    /* =====================================================
+    /*        ====
        SELECT DESTINATION FOLDER
-    ===================================================== */
+           ==== */
 
     const permission = await SAF.requestDirectoryPermissionsAsync();
 
@@ -775,11 +775,11 @@ export async function saveReportPdf(
       };
     }
 
-    /* =====================================================
+    /*        ====
        CREATE EMPTY PDF FILE
 
        Expo expects filename WITHOUT extension.
-    ===================================================== */
+           ==== */
 
     let destinationUri: string;
 
@@ -803,7 +803,7 @@ export async function saveReportPdf(
       throw new Error("Android did not return a destination file.");
     }
 
-    /* =====================================================
+    /*        ====
        WRITE BASE64 PDF
 
        Important:
@@ -812,7 +812,7 @@ export async function saveReportPdf(
 
        Expo documents that writeAsStringAsync supports
        an existing SAF URI.
-    ===================================================== */
+           ==== */
 
     try {
       await FileSystem.writeAsStringAsync(
@@ -832,11 +832,11 @@ export async function saveReportPdf(
       );
     }
 
-    /* =====================================================
+    /*        ====
        VERIFY SAVED FILE
 
        getInfoAsync supports content:// / SAF URIs.
-    ===================================================== */
+           ==== */
 
     try {
       const info = await FileSystem.getInfoAsync(destinationUri);
@@ -870,9 +870,9 @@ export async function saveReportPdf(
     };
   }
 
-  /* =======================================================
+  /*        ======
      IOS
-  ======================================================= */
+         ====== */
 
   if (Platform.OS === "ios") {
     const documentDirectory = FileSystem.documentDirectory;
@@ -910,9 +910,9 @@ export async function saveReportPdf(
     };
   }
 
-  /* =======================================================
+  /*        ======
      WEB
-  ======================================================= */
+         ====== */
 
   await Print.printAsync({
     html,
@@ -927,9 +927,9 @@ export async function saveReportPdf(
   };
 }
 
-/* =========================================================
+/*         =
    PRINT REPORT
-========================================================= */
+        = */
 
 export async function printReport(report: ReportData): Promise<void> {
   await Print.printAsync({
