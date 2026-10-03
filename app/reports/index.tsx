@@ -398,11 +398,11 @@ export default function ReportsScreen() {
 
           <View style={styles.appHeaderText}>
             <Text style={styles.appTitle} numberOfLines={1}>
-              CA AI Business v4.2
+              CA AI Business
             </Text>
 
             <Text style={styles.appSubtitle} numberOfLines={1}>
-              Retail Shop Demo • Retail Shop
+            • Retail Shop
             </Text>
           </View>
 

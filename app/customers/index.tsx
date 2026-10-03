@@ -1,10 +1,7 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 
 import {
   Alert,
-  Animated,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,901 +11,492 @@ import {
   useWindowDimensions,
 } from "react-native";
 
-import { router, useLocalSearchParams } from "expo-router";
-
-import { Picker } from "@react-native-picker/picker";
-
-import { SafeAreaView } from "react-native-safe-area-context";
+import { router, useFocusEffect } from "expo-router";
 
 import { Ionicons } from "@expo/vector-icons";
 
-import { saveCustomer, editCustomer } from "../../src/services/customerService";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 
-import { getCustomerById } from "../../src/repositories/customerRepository";
+import { loadCustomers } from "../../src/services/customerService";
 
-import type { CreateCustomerInput, Customer } from "../../src/types/customer";
+import type { Customer } from "../../src/types/customer";
 
 import { colors } from "../../src/theme/colors";
 
-/*         =
-   STATES
-        = */
+/* =========================================================
+   HELPERS
+========================================================= */
 
-const STATES = [
-  "Andhra Pradesh",
-  "Arunachal Pradesh",
-  "Assam",
-  "Bihar",
-  "Chhattisgarh",
-  "Goa",
-  "Gujarat",
-  "Haryana",
-  "Himachal Pradesh",
-  "Jharkhand",
-  "Karnataka",
-  "Kerala",
-  "Madhya Pradesh",
-  "Maharashtra",
-  "Manipur",
-  "Meghalaya",
-  "Mizoram",
-  "Nagaland",
-  "Odisha",
-  "Punjab",
-  "Rajasthan",
-  "Sikkim",
-  "Tamil Nadu",
-  "Telangana",
-  "Tripura",
-  "Uttar Pradesh",
-  "Uttarakhand",
-  "West Bengal",
-  "Andaman and Nicobar Islands",
-  "Chandigarh",
-  "Dadra and Nagar Haveli and Daman and Diu",
-  "Delhi",
-  "Jammu and Kashmir",
-  "Ladakh",
-  "Lakshadweep",
-  "Puducherry",
-];
-
-/*         =
-   CUSTOMER FORM
-        = */
-
-interface CustomerFormProps {
-  customer?: Customer | null;
-
-  onClose: () => void;
-
-  onSaved: () => void;
+function money(value: number | undefined): string {
+  return `₹${Number(value || 0).toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
 }
 
-function CustomerForm({ customer, onClose, onSaved }: CustomerFormProps) {
+function customerInitial(name: string): string {
+  const value = name.trim();
+
+  return value ? value.charAt(0).toUpperCase() : "C";
+}
+
+function customerBalanceDue(customer: Customer): number {
+  /*
+   * Current Customer model exposes openingBalance.
+   * If customerService is later updated to return
+   * a calculated balanceDue field, this UI will
+   * automatically prefer that value.
+   */
+  const customerWithDue = customer as Customer & {
+    balanceDue?: number;
+  };
+
+  if (
+    typeof customerWithDue.balanceDue === "number" &&
+    Number.isFinite(customerWithDue.balanceDue)
+  ) {
+    return customerWithDue.balanceDue;
+  }
+
+  return Number(customer.openingBalance || 0);
+}
+
+/* =========================================================
+   CUSTOMER CARD
+========================================================= */
+
+function CustomerCard({ customer }: { customer: Customer }) {
+  const balanceDue = customerBalanceDue(customer);
+
+  return (
+    <View style={styles.customerCard}>
+      {/* AVATAR */}
+
+      <View style={styles.avatar}>
+        <Text style={styles.avatarText}>{customerInitial(customer.name)}</Text>
+      </View>
+
+      {/* CUSTOMER DETAILS */}
+
+      <View style={styles.customerContent}>
+        {/* NAME */}
+
+        <Text style={styles.customerName} numberOfLines={1}>
+          {customer.name}
+        </Text>
+
+        {/* MOBILE */}
+
+        <View style={styles.detailRow}>
+          <Ionicons name="call-outline" size={13} color={colors.mutedText} />
+
+          <Text style={styles.detailText} numberOfLines={1}>
+            {customer.mobile || "No mobile number"}
+          </Text>
+        </View>
+
+        {/* GSTIN */}
+
+        <View style={styles.detailRow}>
+          <Ionicons
+            name="document-text-outline"
+            size={13}
+            color={colors.mutedText}
+          />
+
+          <Text style={styles.detailText} numberOfLines={1}>
+            {customer.gstin
+              ? `GSTIN: ${customer.gstin}`
+              : "GSTIN: Not provided"}
+          </Text>
+        </View>
+
+        {/* ADDRESS */}
+
+        <View style={[styles.detailRow, styles.addressRow]}>
+          <Ionicons
+            name="location-outline"
+            size={13}
+            color={colors.mutedText}
+            style={styles.addressIcon}
+          />
+
+          <Text
+            style={[styles.detailText, styles.addressText]}
+            numberOfLines={2}
+          >
+            {customer.address || "Address not provided"}
+          </Text>
+        </View>
+      </View>
+
+      {/* BALANCE DUE */}
+
+      <View style={styles.balanceArea}>
+        <Text style={styles.balanceLabel}>BALANCE DUE</Text>
+
+        <Text
+          style={[
+            styles.balanceValue,
+
+            balanceDue > 0 && styles.balanceValueDue,
+          ]}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.72}
+        >
+          {money(balanceDue)}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+/* =========================================================
+   SCREEN
+========================================================= */
+
+export default function CustomersScreen() {
   const { width } = useWindowDimensions();
 
-  const isEditMode = Boolean(customer);
+  const insets = useSafeAreaInsets();
 
-  const isLargeForm = width >= 700;
+  const isLarge = width >= 700;
 
-  /*        ======
-     FORM STATE
-         ====== */
+  const [customers, setCustomers] = useState<Customer[]>([]);
 
-  const [name, setName] = useState("");
+  const [search, setSearch] = useState("");
 
-  const [mobile, setMobile] = useState("");
+  const [loading, setLoading] = useState(true);
 
-  const [gstin, setGstin] = useState("");
+  /* =======================================================
+     LOAD CUSTOMERS
+  ======================================================= */
 
-  const [state, setState] = useState("Andhra Pradesh");
-
-  const [creditDays, setCreditDays] = useState("0");
-
-  const [openingBalance, setOpeningBalance] = useState("0");
-
-  const [businessDetail, setBusinessDetail] = useState("");
-
-  const [address, setAddress] = useState("");
-
-  const [saving, setSaving] = useState(false);
-
-  /*        ======
-     TOAST
-         ====== */
-
-  const [toastVisible, setToastVisible] = useState(false);
-
-  const [toastTitle, setToastTitle] = useState("Customer saved");
-
-  const [toastMessage, setToastMessage] = useState(
-    "Customer saved successfully",
-  );
-
-  const toastOpacity = useRef(new Animated.Value(0)).current;
-
-  const showSuccessToast = (title: string, message: string) => {
-    setToastTitle(title);
-
-    setToastMessage(message);
-
-    toastOpacity.stopAnimation();
-
-    toastOpacity.setValue(0);
-
-    setToastVisible(true);
-
-    Animated.timing(toastOpacity, {
-      toValue: 1,
-
-      duration: 180,
-
-      useNativeDriver: true,
-    }).start();
-
-    setTimeout(() => {
-      Animated.timing(toastOpacity, {
-        toValue: 0,
-
-        duration: 180,
-
-        useNativeDriver: true,
-      }).start(() => {
-        setToastVisible(false);
-      });
-    }, 1000);
-  };
-
-  /*        ======
-     LOAD / RESET FORM
-         ====== */
-
-  useEffect(() => {
-    if (customer) {
-      setName(customer.name ?? "");
-
-      setMobile(customer.mobile ?? "");
-
-      setGstin(customer.gstin ?? "");
-
-      setState(customer.state || "Andhra Pradesh");
-
-      setCreditDays(String(customer.creditDays ?? 0));
-
-      setOpeningBalance(String(customer.openingBalance ?? 0));
-
-      setBusinessDetail(customer.businessDetail ?? "");
-
-      setAddress(customer.address ?? "");
-
-      return;
-    }
-
-    setName("");
-
-    setMobile("");
-
-    setGstin("");
-
-    setState("Andhra Pradesh");
-
-    setCreditDays("0");
-
-    setOpeningBalance("0");
-
-    setBusinessDetail("");
-
-    setAddress("");
-  }, [customer]);
-
-  /*        ======
-     CLOSE
-         ====== */
-
-  const handleClose = () => {
-    if (saving) {
-      return;
-    }
-
-    onClose();
-  };
-
-  /*        ======
-     SAVE CUSTOMER
-         ====== */
-
-  const handleSave = async () => {
-    if (saving) {
-      return;
-    }
-
-    const customerName = name.trim();
-
-    const customerMobile = mobile.trim();
-
-    /*        ==
-         NAME
-             == */
-
-    if (!customerName) {
-      Alert.alert(
-        "Required",
-
-        "Please enter customer name.",
-      );
-
-      return;
-    }
-
-    /*        ==
-         MOBILE
-             == */
-
-    if (!customerMobile) {
-      Alert.alert(
-        "Required",
-
-        "Please enter mobile number.",
-      );
-
-      return;
-    }
-
-    if (!/^\d{10}$/.test(customerMobile)) {
-      Alert.alert(
-        "Invalid mobile number",
-
-        "Please enter a valid 10-digit mobile number.",
-      );
-
-      return;
-    }
-
-    /*        ==
-         GSTIN
-             == */
-
-    const cleanedGstin = gstin.trim().toUpperCase();
-
-    if (cleanedGstin && cleanedGstin.length !== 15) {
-      Alert.alert(
-        "Invalid GSTIN",
-
-        "GSTIN must contain 15 characters.",
-      );
-
-      return;
-    }
-
-    /*        ==
-         NUMERIC VALUES
-             == */
-
-    const parsedCreditDays = Number(creditDays) || 0;
-
-    const parsedOpeningBalance = Number(openingBalance) || 0;
-
-    if (parsedCreditDays < 0) {
-      Alert.alert(
-        "Invalid credit days",
-
-        "Credit days cannot be negative.",
-      );
-
-      return;
-    }
-
-    if (parsedOpeningBalance < 0) {
-      Alert.alert(
-        "Invalid opening balance",
-
-        "Opening balance cannot be negative.",
-      );
-
-      return;
-    }
-
+  const loadData = useCallback(async () => {
     try {
-      setSaving(true);
+      setLoading(true);
 
-      /*        
-           UPDATE CUSTOMER
-                */
+      const result = await loadCustomers();
 
-      if (customer) {
-        await editCustomer({
-          ...customer,
-
-          name: customerName,
-
-          mobile: customerMobile,
-
-          gstin: cleanedGstin || undefined,
-
-          state,
-
-          creditDays: parsedCreditDays,
-
-          openingBalance: parsedOpeningBalance,
-
-          businessDetail: businessDetail.trim() || undefined,
-
-          address: address.trim() || undefined,
-        });
-
-        showSuccessToast(
-          "Customer updated",
-
-          "Customer updated successfully",
-        );
-      } else {
-
-      /*        
-           CREATE CUSTOMER
-                */
-        const input: CreateCustomerInput = {
-          name: customerName,
-
-          mobile: customerMobile,
-
-          gstin: cleanedGstin || undefined,
-
-          state,
-
-          creditDays: parsedCreditDays,
-
-          openingBalance: parsedOpeningBalance,
-
-          businessDetail: businessDetail.trim() || undefined,
-
-          address: address.trim() || undefined,
-        };
-
-        await saveCustomer(input);
-
-        showSuccessToast(
-          "Customer saved",
-
-          "Customer saved successfully",
-        );
-      }
-
-      /*
-       * Keep screen visible briefly so
-       * user can see success toast.
-       */
-
-      setTimeout(() => {
-        onSaved();
-      }, 1200);
+      setCustomers(result);
     } catch (error) {
       Alert.alert(
-        isEditMode ? "Unable to update" : "Unable to save",
+        "Unable to load customers",
 
         error instanceof Error ? error.message : "Something went wrong.",
       );
-
-      setSaving(false);
+    } finally {
+      setLoading(false);
     }
-  };
+  }, []);
 
-  /*        ======
-     SCREEN
-         ====== */
+  useFocusEffect(
+    useCallback(() => {
+      void loadData();
+    }, [loadData]),
+  );
+
+  /* =======================================================
+     FILTER
+  ======================================================= */
+
+  const filteredCustomers = useMemo(() => {
+    const query = search.trim().toLowerCase();
+
+    if (!query) {
+      return customers;
+    }
+
+    return customers.filter((customer) =>
+      [
+        customer.name,
+        customer.mobile,
+        customer.gstin,
+        customer.state,
+        customer.businessDetail,
+        customer.address,
+      ].some((value) =>
+        String(value || "")
+          .toLowerCase()
+          .includes(query),
+      ),
+    );
+  }, [customers, search]);
+
+  /* =======================================================
+     UI
+  ======================================================= */
 
   return (
-    <SafeAreaView style={styles.formSafeArea} edges={["top", "bottom"]}>
-      <KeyboardAvoidingView
-        style={styles.formKeyboard}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
-        <View style={styles.formScreen}>
-          {/*        
-              HEADER
-                  */}
+    <SafeAreaView style={styles.safeArea} edges={["top"]}>
+      <View style={styles.screen}>
+        {/* =================================================
+            HEADER
+        ================================================= */}
 
-          <View style={styles.formHeader}>
-            <View style={styles.formHeaderLeft}>
-              {/* BACK BUTTON */}
+        <View style={styles.header}>
+          <Pressable
+            onPress={() => router.back()}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+            style={({ pressed }) => [
+              styles.backButton,
 
-              <Pressable
-                onPress={handleClose}
-                disabled={saving}
-                hitSlop={10}
-                accessibilityRole="button"
-                accessibilityLabel="Go back"
-                style={({ pressed }) => [
-                  styles.formBackButton,
+              pressed && styles.backButtonPressed,
+            ]}
+          >
+            <Ionicons name="arrow-back" size={19} color={colors.primary} />
+          </Pressable>
 
-                  pressed && !saving && styles.formBackButtonPressed,
+          <View style={styles.headerText}>
+            <Text style={styles.headerTitle}>Customers</Text>
 
-                  saving && styles.formBackButtonDisabled,
-                ]}
-              >
-                <Ionicons name="arrow-back" size={19} color={colors.primary} />
-              </Pressable>
+            <Text style={styles.headerSubtitle} numberOfLines={1}>
+              Saved retail customers
+            </Text>
+          </View>
 
-              {/* TITLE */}
+          <View style={styles.logo}>
+            <Text style={styles.logoText}>CA</Text>
+          </View>
+        </View>
 
-              <View style={styles.formHeaderText}>
-                <Text style={styles.formHeaderTitle} numberOfLines={1}>
-                  {isEditMode ? "Edit Customer" : "Add Customer"}
-                </Text>
+        {/* =================================================
+            CONTENT
+        ================================================= */}
 
-                <Text style={styles.formHeaderSubtitle} numberOfLines={1}>
-                  {isEditMode
-                    ? "Update retail customer details"
-                    : "Create a new retail customer"}
-                </Text>
-              </View>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={[
+            styles.content,
+
+            isLarge && styles.contentLarge,
+
+            {
+              paddingBottom: 105 + insets.bottom,
+            },
+          ]}
+        >
+          {/* =================================================
+              TOP ROW
+          ================================================= */}
+
+          <View style={styles.topRow}>
+            <View style={styles.titleArea}>
+              <Text style={styles.pageTitle}>Customer master</Text>
+
+              <Text style={styles.pageSubtitle}>
+                View saved customers or create a new customer.
+              </Text>
             </View>
 
-            {/* LOGO */}
+            <Pressable
+              onPress={() => router.push("/customers/add")}
+              style={({ pressed }) => [
+                styles.addButton,
 
-            <View style={styles.formLogo}>
-              <Text style={styles.formLogoText}>CA</Text>
+                pressed && styles.buttonPressed,
+              ]}
+            >
+              <Ionicons name="add" size={17} color="#FFFFFF" />
+
+              <Text style={styles.addButtonText}>Add Customer</Text>
+            </Pressable>
+          </View>
+
+          {/* =================================================
+              SUMMARY
+          ================================================= */}
+
+          <View style={styles.summaryCard}>
+            <View style={styles.summaryIcon}>
+              <Ionicons name="people-outline" size={21} color={colors.teal} />
+            </View>
+
+            <View style={styles.summaryText}>
+              <Text style={styles.summaryLabel}>Total customers</Text>
+
+              <Text style={styles.summaryValue}>{customers.length}</Text>
             </View>
           </View>
 
-          {/*        
-              FORM
-                  */}
+          {/* =================================================
+              SEARCH
+          ================================================= */}
 
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            contentContainerStyle={[
-              styles.formScroll,
+          <View style={styles.searchBox}>
+            <Ionicons
+              name="search-outline"
+              size={17}
+              color={colors.mutedText}
+            />
 
-              isLargeForm && styles.formScrollLarge,
-            ]}
-          >
-            <View
-              style={[styles.formCard, isLargeForm && styles.formCardLarge]}
-            >
-              <Text style={styles.formTitle}>Customer Information</Text>
+            <TextInput
+              value={search}
+              onChangeText={setSearch}
+              placeholder="Search name, mobile, GSTIN or address"
+              placeholderTextColor={colors.mutedText}
+              style={styles.searchInput}
+              autoCapitalize="none"
+              returnKeyType="search"
+            />
 
-              <Text style={styles.formDescription}>
-                Enter the customer&apos;s basic and account details.
+            {!!search && (
+              <Pressable onPress={() => setSearch("")} hitSlop={8}>
+                <Ionicons
+                  name="close-circle"
+                  size={17}
+                  color={colors.mutedText}
+                />
+              </Pressable>
+            )}
+          </View>
+
+          {/* =================================================
+              CUSTOMER LIST
+          ================================================= */}
+
+          {loading ? (
+            <View style={styles.emptyCard}>
+              <View style={styles.emptyIconBox}>
+                <Ionicons
+                  name="hourglass-outline"
+                  size={24}
+                  color={colors.teal}
+                />
+              </View>
+
+              <Text style={styles.emptyTitle}>Loading customers</Text>
+            </View>
+          ) : filteredCustomers.length === 0 ? (
+            <View style={styles.emptyCard}>
+              <View style={styles.emptyIconBox}>
+                <Ionicons name="people-outline" size={25} color={colors.teal} />
+              </View>
+
+              <Text style={styles.emptyTitle}>
+                {search ? "No matching customers" : "No customers"}
               </Text>
 
-              {/*        
-                  NAME / MOBILE
-                      */}
+              <Text style={styles.emptyDescription}>
+                {search
+                  ? "Try a different search."
+                  : "Add your first customer to get started."}
+              </Text>
 
-              <View style={[styles.formRow, !isLargeForm && styles.formColumn]}>
-                <View style={styles.formField}>
-                  <Text style={styles.label}>
-                    Customer Name <Text style={styles.required}>*</Text>
-                  </Text>
-
-                  <TextInput
-                    value={name}
-                    onChangeText={setName}
-                    placeholder="Enter customer name"
-                    placeholderTextColor={colors.mutedText}
-                    style={styles.input}
-                    autoCapitalize="words"
-                    editable={!saving}
-                  />
-                </View>
-
-                <View style={styles.formField}>
-                  <Text style={styles.label}>
-                    Mobile Number <Text style={styles.required}>*</Text>
-                  </Text>
-
-                  <TextInput
-                    value={mobile}
-                    onChangeText={(value) =>
-                      setMobile(value.replace(/\D/g, "").slice(0, 10))
-                    }
-                    placeholder="10-digit mobile number"
-                    placeholderTextColor={colors.mutedText}
-                    keyboardType="phone-pad"
-                    maxLength={10}
-                    style={styles.input}
-                    textContentType="telephoneNumber"
-                    autoComplete="tel"
-                    importantForAutofill="yes"
-                    editable={!saving}
-                  />
-                </View>
-              </View>
-
-              {/*        
-                  GST / STATE
-                      */}
-
-              <View style={[styles.formRow, !isLargeForm && styles.formColumn]}>
-                <View style={styles.formField}>
-                  <Text style={styles.label}>GSTIN</Text>
-
-                  <TextInput
-                    value={gstin}
-                    onChangeText={(value) =>
-                      setGstin(
-                        value.toUpperCase().replace(/\s/g, "").slice(0, 15),
-                      )
-                    }
-                    placeholder="Optional GSTIN"
-                    placeholderTextColor={colors.mutedText}
-                    autoCapitalize="characters"
-                    style={styles.input}
-                    maxLength={15}
-                    editable={!saving}
-                  />
-                </View>
-
-                <View style={styles.formField}>
-                  <Text style={styles.label}>State</Text>
-
-                  <View style={styles.stateField}>
-                    <Text style={styles.stateValue} numberOfLines={1}>
-                      {state || "Select state"}
-                    </Text>
-
-                    <View style={styles.stateArrow} pointerEvents="none">
-                      <Ionicons
-                        name="chevron-down"
-                        size={15}
-                        color={colors.mutedText}
-                      />
-                    </View>
-
-                    <View style={styles.hiddenPickerContainer}>
-                      <Picker
-                        selectedValue={state}
-                        onValueChange={(value: string) => setState(value)}
-                        style={styles.hiddenPicker}
-                        enabled={!saving}
-                      >
-                        {STATES.map((item) => (
-                          <Picker.Item key={item} label={item} value={item} />
-                        ))}
-                      </Picker>
-                    </View>
-                  </View>
-                </View>
-              </View>
-
-              {/*        
-                  CREDIT DAYS / OPENING BALANCE
-                      */}
-
-              <View style={[styles.formRow, !isLargeForm && styles.formColumn]}>
-                <View style={styles.formField}>
-                  <Text style={styles.label}>Credit Days</Text>
-
-                  <TextInput
-                    value={creditDays}
-                    onChangeText={(value) =>
-                      setCreditDays(value.replace(/\D/g, ""))
-                    }
-                    placeholder="0"
-                    placeholderTextColor={colors.mutedText}
-                    keyboardType="numeric"
-                    style={styles.input}
-                    textContentType="none"
-                    autoComplete="off"
-                    importantForAutofill="no"
-                    editable={!saving}
-                  />
-                </View>
-
-                <View style={styles.formField}>
-                  <Text style={styles.label}>Opening Balance</Text>
-
-                  <TextInput
-                    value={openingBalance}
-                    onChangeText={(value) => {
-                      const cleaned = value.replace(/[^0-9.]/g, "");
-
-                      const parts = cleaned.split(".");
-
-                      if (parts.length > 2) {
-                        return;
-                      }
-
-                      setOpeningBalance(cleaned);
-                    }}
-                    placeholder="0"
-                    placeholderTextColor={colors.mutedText}
-                    keyboardType="decimal-pad"
-                    style={styles.input}
-                    textContentType="none"
-                    autoComplete="off"
-                    importantForAutofill="no"
-                    editable={!saving}
-                  />
-                </View>
-              </View>
-
-              {/*        
-                  CUSTOMER CATEGORY
-                      */}
-
-              <View style={styles.fullField}>
-                <Text style={styles.label}>Customer Category / Loyalty ID</Text>
-
-                <TextInput
-                  value={businessDetail}
-                  onChangeText={setBusinessDetail}
-                  placeholder="Example: Retail customer"
-                  placeholderTextColor={colors.mutedText}
-                  style={styles.input}
-                  editable={!saving}
-                />
-              </View>
-
-              {/*        
-                  ADDRESS
-                      */}
-
-              <View style={styles.fullField}>
-                <Text style={styles.label}>Address</Text>
-
-                <TextInput
-                  value={address}
-                  onChangeText={setAddress}
-                  placeholder="Customer address"
-                  placeholderTextColor={colors.mutedText}
-                  multiline
-                  numberOfLines={4}
-                  textAlignVertical="top"
-                  style={[styles.input, styles.addressInput]}
-                  editable={!saving}
-                />
-              </View>
+              {!search && (
+                <Pressable
+                  onPress={() => router.push("/customers/add")}
+                  style={styles.emptyAddButton}
+                >
+                  <Text style={styles.emptyAddText}>+ Add Customer</Text>
+                </Pressable>
+              )}
             </View>
-
-            {/*        
-                ACTION BUTTONS
-                    */}
-
-            <View
-              style={[
-                styles.formActions,
-
-                isLargeForm && styles.formActionsLarge,
-              ]}
-            >
-              <Pressable
-                onPress={handleClose}
-                style={({ pressed }) => [
-                  styles.cancelButton,
-
-                  pressed && !saving && styles.buttonPressed,
-                ]}
-                disabled={saving}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </Pressable>
-
-              <Pressable
-                onPress={handleSave}
-                style={({ pressed }) => [
-                  styles.saveButton,
-
-                  saving && styles.disabledButton,
-
-                  pressed && !saving && styles.buttonPressed,
-                ]}
-                disabled={saving}
-              >
-                <Text style={styles.saveButtonText}>
-                  {saving
-                    ? "Saving..."
-                    : isEditMode
-                      ? "Update Customer"
-                      : "Save Customer"}
-                </Text>
-              </Pressable>
+          ) : (
+            <View style={styles.list}>
+              {filteredCustomers.map((customer) => (
+                <CustomerCard key={customer.id} customer={customer} />
+              ))}
             </View>
-          </ScrollView>
-
-          {/*        
-              SUCCESS TOAST
-                  */}
-
-          {toastVisible && (
-            <Animated.View
-              pointerEvents="none"
-              style={[
-                styles.toastContainer,
-
-                {
-                  opacity: toastOpacity,
-
-                  transform: [
-                    {
-                      translateY: toastOpacity.interpolate({
-                        inputRange: [0, 1],
-
-                        outputRange: [10, 0],
-                      }),
-                    },
-                  ],
-                },
-              ]}
-            >
-              <View style={styles.toast}>
-                <View style={styles.toastIcon}>
-                  <Ionicons name="checkmark" size={15} color="#FFFFFF" />
-                </View>
-
-                <View style={styles.toastTextContainer}>
-                  <Text style={styles.toastTitle}>{toastTitle}</Text>
-
-                  <Text style={styles.toastMessage}>{toastMessage}</Text>
-                </View>
-              </View>
-            </Animated.View>
           )}
+        </ScrollView>
+
+        {/* =================================================
+            BOTTOM NAVIGATION
+        ================================================= */}
+
+        <View
+          style={[
+            styles.bottomNavigation,
+
+            {
+              bottom: Math.max(8, insets.bottom),
+            },
+          ]}
+        >
+          {/* HOME */}
+
+          <Pressable
+            onPress={() => router.replace("/dashboard")}
+            style={styles.navButton}
+          >
+            <Text style={styles.navIcon}>⌂</Text>
+
+            <Text style={styles.navText}>Home</Text>
+          </Pressable>
+
+          {/* SALES */}
+
+          <Pressable
+            onPress={() => router.push("/sales")}
+            style={styles.navButton}
+          >
+            <Text style={styles.navIcon}>🧾</Text>
+
+            <Text style={styles.navText}>Sales</Text>
+          </Pressable>
+
+          {/* PURCHASES */}
+
+          <Pressable
+            onPress={() => router.push("/purchases")}
+            style={styles.navButton}
+          >
+            <Text style={styles.navIcon}>📥</Text>
+
+            <Text style={styles.navText}>Purchases</Text>
+          </Pressable>
+
+          {/* MORE */}
+
+          <Pressable
+            onPress={() => router.push("/more")}
+            style={[styles.navButton, styles.navButtonActive]}
+          >
+            <Text style={styles.navIcon}>▦</Text>
+
+            <Text style={styles.navActiveText}>More</Text>
+          </Pressable>
         </View>
-      </KeyboardAvoidingView>
+      </View>
     </SafeAreaView>
   );
 }
 
-/*         =
-   CUSTOMER ROUTE
-   app/customers/index.tsx
-        = */
-
-export default function CustomersScreen() {
-  const { customerId } = useLocalSearchParams<{
-    customerId?: string;
-  }>();
-
-  const [customer, setCustomer] = useState<Customer | null>(null);
-
-  const [loading, setLoading] = useState(Boolean(customerId));
-
-  useEffect(() => {
-    let mounted = true;
-
-    const loadCustomer = async () => {
-      /*
-       * Normal new customer:
-       * /customers
-       */
-
-      if (!customerId) {
-        if (mounted) {
-          setCustomer(null);
-
-          setLoading(false);
-        }
-
-        return;
-      }
-
-      /*
-       * Edit existing customer:
-       * /customers?customerId=xxx
-       */
-
-      try {
-        const result = await getCustomerById(customerId);
-
-        if (mounted) {
-          setCustomer(result);
-        }
-      } catch (error) {
-        if (mounted) {
-          Alert.alert(
-            "Unable to load customer",
-
-            error instanceof Error ? error.message : "Something went wrong.",
-          );
-        }
-      } finally {
-        if (mounted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    loadCustomer();
-
-    return () => {
-      mounted = false;
-    };
-  }, [customerId]);
-
-  /*        ======
-     LOADING
-         ====== */
-
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.formSafeArea} edges={["top", "bottom"]}>
-        <View style={styles.loadingScreen}>
-          <Text style={styles.loadingText}>Loading customer...</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  /*        ======
-     NOT FOUND
-         ====== */
-
-  if (customerId && !customer) {
-    return (
-      <SafeAreaView style={styles.formSafeArea} edges={["top", "bottom"]}>
-        <View style={styles.notFoundScreen}>
-          <Text style={styles.formTitle}>Customer not found</Text>
-
-          <Text style={styles.formDescription}>
-            This customer could not be loaded.
-          </Text>
-
-          <Pressable
-            onPress={() => router.replace("/dashboard")}
-            style={[styles.saveButton, styles.notFoundButton]}
-          >
-            <Text style={styles.saveButtonText}>Back to Dashboard</Text>
-          </Pressable>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  return (
-    <CustomerForm
-      customer={customer}
-      onClose={() => {
-        router.replace("/dashboard");
-      }}
-      onSaved={() => {
-        router.replace("/dashboard");
-      }}
-    />
-  );
-}
-
-/*         =
+/* =========================================================
    STYLES
-        = */
+========================================================= */
 
 const styles = StyleSheet.create({
-  /*        ====
-       ROOT
-           ==== */
-
-  formSafeArea: {
+  safeArea: {
     flex: 1,
 
     backgroundColor: colors.background,
   },
 
-  formKeyboard: {
+  screen: {
     flex: 1,
-
-    width: "100%",
-  },
-
-  formScreen: {
-    flex: 1,
-
-    width: "100%",
 
     backgroundColor: colors.background,
   },
 
-  /*        ====
+  /* =====================================================
        HEADER
-           ==== */
+    ===================================================== */
 
-  formHeader: {
+  header: {
     minHeight: 76,
 
     backgroundColor: colors.primary,
 
-    paddingHorizontal: 18,
+    paddingHorizontal: 14,
 
     paddingVertical: 12,
 
@@ -916,7 +504,7 @@ const styles = StyleSheet.create({
 
     alignItems: "center",
 
-    justifyContent: "space-between",
+    gap: 10,
 
     elevation: 6,
 
@@ -924,7 +512,6 @@ const styles = StyleSheet.create({
 
     shadowOffset: {
       width: 0,
-
       height: 2,
     },
 
@@ -933,21 +520,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
 
-  formHeaderLeft: {
-    flex: 1,
-
-    flexDirection: "row",
-
-    alignItems: "center",
-
-    minWidth: 0,
-  },
-
-  /*        ====
-       CONSISTENT BACK BUTTON
-           ==== */
-
-  formBackButton: {
+  backButton: {
     width: 34,
 
     height: 34,
@@ -966,15 +539,12 @@ const styles = StyleSheet.create({
 
     borderColor: "#D9E3E7",
 
-    marginRight: 10,
-
     elevation: 4,
 
     shadowColor: "#000000",
 
     shadowOffset: {
       width: 0,
-
       height: 1,
     },
 
@@ -983,7 +553,7 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
   },
 
-  formBackButtonPressed: {
+  backButtonPressed: {
     opacity: 0.72,
 
     transform: [
@@ -993,17 +563,13 @@ const styles = StyleSheet.create({
     ],
   },
 
-  formBackButtonDisabled: {
-    opacity: 0.5,
-  },
-
-  formHeaderText: {
+  headerText: {
     flex: 1,
 
     minWidth: 0,
   },
 
-  formHeaderTitle: {
+  headerTitle: {
     color: "#FFFFFF",
 
     fontSize: 18,
@@ -1011,17 +577,15 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
 
-  formHeaderSubtitle: {
+  headerSubtitle: {
     color: "#D6E3EC",
 
     fontSize: 11,
 
     marginTop: 3,
-
-    marginBottom: 2,
   },
 
-  formLogo: {
+  logo: {
     width: 42,
 
     height: 40,
@@ -1035,13 +599,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
 
     justifyContent: "center",
-
-    marginLeft: 10,
-
-    marginTop: 3,
   },
 
-  formLogoText: {
+  logoText: {
     color: colors.primary,
 
     fontSize: 14,
@@ -1049,276 +609,82 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
 
-  /*        ====
-       SCROLL / FORM CARD
-           ==== */
+  /* =====================================================
+       CONTENT
+    ===================================================== */
 
-  formScroll: {
-    padding: 16,
-
-    paddingBottom: 40,
-
-    flexGrow: 1,
-  },
-
-  formScrollLarge: {
-    paddingHorizontal: 24,
-
-    paddingTop: 24,
-  },
-
-  formCard: {
+  content: {
     width: "100%",
 
-    backgroundColor: colors.card,
-
-    borderWidth: 1,
-
-    borderColor: colors.border,
-
-    borderRadius: 20,
-
-    padding: 20,
+    padding: 14,
   },
 
-  formCardLarge: {
-    maxWidth: 850,
+  contentLarge: {
+    maxWidth: 900,
 
     alignSelf: "center",
+
+    paddingTop: 22,
   },
 
-  formTitle: {
+  topRow: {
+    flexDirection: "row",
+
+    alignItems: "center",
+
+    gap: 10,
+
+    marginBottom: 12,
+  },
+
+  titleArea: {
+    flex: 1,
+
+    minWidth: 0,
+  },
+
+  pageTitle: {
     color: colors.text,
 
-    fontSize: 17,
+    fontSize: 18,
 
-    fontWeight: "800",
+    fontWeight: "900",
   },
 
-  formDescription: {
+  pageSubtitle: {
     color: colors.mutedText,
 
-    fontSize: 12,
+    fontSize: 10,
 
-    marginTop: 4,
+    lineHeight: 14,
 
-    lineHeight: 18,
+    marginTop: 3,
   },
 
-  /*        ====
-       FORM FIELDS
-           ==== */
+  addButton: {
+    minHeight: 42,
 
-  formRow: {
     flexDirection: "row",
 
-    gap: 12,
+    alignItems: "center",
 
-    marginTop: 16,
-  },
+    justifyContent: "center",
 
-  formColumn: {
-    flexDirection: "column",
-  },
-
-  formField: {
-    flex: 1,
-  },
-
-  fullField: {
-    width: "100%",
-
-    marginTop: 16,
-  },
-
-  label: {
-    color: colors.text,
-
-    fontSize: 12,
-
-    fontWeight: "700",
-
-    marginBottom: 6,
-  },
-
-  required: {
-    color: colors.error,
-  },
-
-  input: {
-    minHeight: 46,
-
-    backgroundColor: colors.card,
-
-    borderWidth: 1,
-
-    borderColor: colors.border,
-
-    borderRadius: 10,
+    gap: 4,
 
     paddingHorizontal: 12,
 
-    color: colors.text,
-
-    fontSize: 13,
-  },
-
-  addressInput: {
-    minHeight: 90,
-
-    paddingTop: 12,
-
-    paddingBottom: 12,
-  },
-
-  /*        ====
-       STATE PICKER
-           ==== */
-
-  stateField: {
-    height: 46,
-
-    backgroundColor: colors.card,
-
-    borderWidth: 1,
-
-    borderColor: colors.border,
-
-    borderRadius: 10,
-
-    paddingHorizontal: 12,
-
-    flexDirection: "row",
-
-    alignItems: "center",
-
-    justifyContent: "space-between",
-
-    position: "relative",
-
-    overflow: "hidden",
-  },
-
-  stateValue: {
-    flex: 1,
-
-    color: colors.text,
-
-    fontSize: 13,
-
-    fontWeight: "500",
-
-    paddingRight: 30,
-  },
-
-  stateArrow: {
-    position: "absolute",
-
-    right: 12,
-
-    top: 0,
-
-    bottom: 0,
-
-    width: 24,
-
-    alignItems: "center",
-
-    justifyContent: "center",
-  },
-
-  hiddenPickerContainer: {
-    position: "absolute",
-
-    left: 0,
-
-    right: 0,
-
-    top: 0,
-
-    bottom: 0,
-
-    opacity: 0.02,
-  },
-
-  hiddenPicker: {
-    width: "100%",
-
-    height: 46,
-  },
-
-  /*        ====
-       ACTIONS
-           ==== */
-
-  formActions: {
-    width: "100%",
-
-    flexDirection: "row",
-
-    gap: 12,
-
-    marginTop: 16,
-
-    marginBottom: 10,
-  },
-
-  formActionsLarge: {
-    maxWidth: 850,
-
-    alignSelf: "center",
-  },
-
-  cancelButton: {
-    flex: 1,
-
-    minHeight: 48,
-
     borderRadius: 11,
 
-    borderWidth: 1,
-
-    borderColor: colors.border,
-
-    backgroundColor: colors.card,
-
-    alignItems: "center",
-
-    justifyContent: "center",
+    backgroundColor: colors.teal,
   },
 
-  cancelButtonText: {
-    color: colors.text,
-
-    fontSize: 13,
-
-    fontWeight: "800",
-  },
-
-  saveButton: {
-    flex: 1.4,
-
-    minHeight: 48,
-
-    borderRadius: 11,
-
-    backgroundColor: colors.primary,
-
-    alignItems: "center",
-
-    justifyContent: "center",
-  },
-
-  disabledButton: {
-    opacity: 0.6,
-  },
-
-  saveButtonText: {
+  addButtonText: {
     color: "#FFFFFF",
 
-    fontSize: 13,
+    fontSize: 10,
 
-    fontWeight: "800",
+    fontWeight: "900",
   },
 
   buttonPressed: {
@@ -1326,133 +692,288 @@ const styles = StyleSheet.create({
 
     transform: [
       {
-        scale: 0.99,
+        scale: 0.98,
       },
     ],
   },
 
-  /*        ====
-       SUCCESS TOAST
-           ==== */
+  /* =====================================================
+       SUMMARY
+    ===================================================== */
 
-  toastContainer: {
-    position: "absolute",
-
-    left: 14,
-
-    right: 14,
-
-    bottom: 18,
-
-    alignItems: "center",
-
-    zIndex: 999,
-  },
-
-  toast: {
-    width: "100%",
-
-    maxWidth: 430,
-
-    minHeight: 56,
+  summaryCard: {
+    minHeight: 66,
 
     flexDirection: "row",
 
     alignItems: "center",
 
-    backgroundColor: "#FFFFFF",
+    gap: 10,
 
-    borderRadius: 14,
+    backgroundColor: "#EAF7F4",
 
     borderWidth: 1,
 
-    borderColor: "#D4E7E3",
+    borderColor: "#D3E8E3",
 
-    paddingHorizontal: 12,
+    borderRadius: 14,
 
-    paddingVertical: 9,
+    padding: 11,
 
-    elevation: 12,
-
-    shadowColor: "#143631",
-
-    shadowOffset: {
-      width: 0,
-
-      height: 4,
-    },
-
-    shadowOpacity: 0.16,
-
-    shadowRadius: 10,
+    marginBottom: 10,
   },
 
-  toastIcon: {
-    width: 32,
+  summaryIcon: {
+    width: 40,
 
-    height: 32,
+    height: 40,
 
-    borderRadius: 16,
+    borderRadius: 12,
+
+    backgroundColor: "#FFFFFF",
 
     alignItems: "center",
 
     justifyContent: "center",
-
-    backgroundColor: colors.teal,
-
-    marginRight: 10,
   },
 
-  toastTextContainer: {
+  summaryText: {
     flex: 1,
   },
 
-  toastTitle: {
-    color: colors.text,
-
-    fontSize: 11,
-
-    fontWeight: "900",
-  },
-
-  toastMessage: {
+  summaryLabel: {
     color: colors.mutedText,
 
     fontSize: 9,
+  },
 
-    fontWeight: "600",
+  summaryValue: {
+    color: colors.text,
+
+    fontSize: 17,
+
+    fontWeight: "900",
 
     marginTop: 2,
   },
 
-  /*        ====
-       LOADING
-           ==== */
+  /* =====================================================
+       SEARCH
+    ===================================================== */
 
-  loadingScreen: {
+  searchBox: {
+    minHeight: 45,
+
+    flexDirection: "row",
+
+    alignItems: "center",
+
+    gap: 7,
+
+    backgroundColor: "#FFFFFF",
+
+    borderWidth: 1,
+
+    borderColor: colors.border,
+
+    borderRadius: 12,
+
+    paddingHorizontal: 11,
+
+    marginBottom: 11,
+  },
+
+  searchInput: {
     flex: 1,
+
+    color: colors.text,
+
+    fontSize: 11,
+
+    paddingVertical: 10,
+  },
+
+  /* =====================================================
+       LIST
+    ===================================================== */
+
+  list: {
+    gap: 8,
+  },
+
+  customerCard: {
+    width: "100%",
+
+    minHeight: 118,
+
+    flexDirection: "row",
+
+    alignItems: "center",
+
+    gap: 10,
+
+    backgroundColor: "#FFFFFF",
+
+    borderWidth: 1,
+
+    borderColor: colors.border,
+
+    borderRadius: 16,
+
+    paddingHorizontal: 12,
+
+    paddingVertical: 12,
+
+    elevation: 1,
+
+    shadowColor: colors.primary,
+
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+
+    shadowOpacity: 0.04,
+
+    shadowRadius: 5,
+  },
+
+  avatar: {
+    width: 43,
+
+    height: 43,
+
+    flexShrink: 0,
+
+    borderRadius: 14,
 
     alignItems: "center",
 
     justifyContent: "center",
 
-    backgroundColor: colors.background,
+    backgroundColor: "#E8F6F3",
+
+    alignSelf: "flex-start",
+
+    marginTop: 2,
   },
 
-  loadingText: {
+  avatarText: {
+    color: colors.teal,
+
+    fontSize: 17,
+
+    fontWeight: "900",
+  },
+
+  customerContent: {
+    flex: 1,
+
+    minWidth: 0,
+
+    paddingRight: 4,
+  },
+
+  customerName: {
+    color: colors.text,
+
+    fontSize: 12.5,
+
+    fontWeight: "900",
+
+    marginBottom: 4,
+  },
+
+  detailRow: {
+    flexDirection: "row",
+
+    alignItems: "center",
+
+    gap: 5,
+
+    marginTop: 3,
+  },
+
+  detailText: {
+    flex: 1,
+
     color: colors.mutedText,
 
-    fontSize: 14,
+    fontSize: 8.5,
 
-    fontWeight: "600",
+    lineHeight: 12,
   },
 
-  /*        ====
-       NOT FOUND
-           ==== */
+  addressRow: {
+    alignItems: "flex-start",
+  },
 
-  notFoundScreen: {
-    flex: 1,
+  addressIcon: {
+    marginTop: 1,
+  },
+
+  addressText: {
+    lineHeight: 12,
+  },
+
+  /* =====================================================
+       BALANCE DUE
+    ===================================================== */
+
+  balanceArea: {
+    width: 105,
+
+    minHeight: 72,
+
+    flexShrink: 0,
+
+    alignItems: "flex-end",
+
+    justifyContent: "center",
+
+    paddingLeft: 10,
+
+    borderLeftWidth: 1,
+
+    borderLeftColor: "#E7EEF1",
+  },
+
+  balanceLabel: {
+    color: colors.mutedText,
+
+    fontSize: 6.8,
+
+    fontWeight: "900",
+
+    letterSpacing: 0.35,
+
+    textAlign: "right",
+  },
+
+  balanceValue: {
+    width: "100%",
+
+    color: colors.text,
+
+    fontSize: 12,
+
+    fontWeight: "900",
+
+    marginTop: 5,
+
+    textAlign: "right",
+  },
+
+  balanceValueDue: {
+    color: "#B35C34",
+  },
+
+  /* =====================================================
+       EMPTY
+    ===================================================== */
+
+  emptyCard: {
+    minHeight: 220,
 
     alignItems: "center",
 
@@ -1460,16 +981,151 @@ const styles = StyleSheet.create({
 
     padding: 20,
 
-    backgroundColor: colors.background,
+    backgroundColor: "#FFFFFF",
+
+    borderWidth: 1,
+
+    borderColor: colors.border,
+
+    borderRadius: 16,
   },
 
-  notFoundButton: {
-    width: "100%",
+  emptyIconBox: {
+    width: 50,
 
-    maxWidth: 400,
+    height: 50,
 
-    marginTop: 16,
+    borderRadius: 15,
 
-    flex: 0,
+    alignItems: "center",
+
+    justifyContent: "center",
+
+    backgroundColor: "#E8F6F3",
+
+    marginBottom: 9,
+  },
+
+  emptyTitle: {
+    color: colors.text,
+
+    fontSize: 14,
+
+    fontWeight: "900",
+
+    textAlign: "center",
+  },
+
+  emptyDescription: {
+    color: colors.mutedText,
+
+    fontSize: 9,
+
+    textAlign: "center",
+
+    marginTop: 4,
+  },
+
+  emptyAddButton: {
+    minHeight: 38,
+
+    marginTop: 12,
+
+    paddingHorizontal: 14,
+
+    borderRadius: 10,
+
+    backgroundColor: colors.teal,
+
+    alignItems: "center",
+
+    justifyContent: "center",
+  },
+
+  emptyAddText: {
+    color: "#FFFFFF",
+
+    fontSize: 9,
+
+    fontWeight: "900",
+  },
+
+  /* =====================================================
+       BOTTOM NAVIGATION
+    ===================================================== */
+
+  bottomNavigation: {
+    position: "absolute",
+
+    left: 9,
+
+    right: 9,
+
+    flexDirection: "row",
+
+    gap: 4,
+
+    padding: 6,
+
+    backgroundColor: "#FFFFFF",
+
+    borderWidth: 1,
+
+    borderColor: colors.border,
+
+    borderRadius: 20,
+
+    shadowColor: colors.primary,
+
+    shadowOffset: {
+      width: 0,
+      height: 12,
+    },
+
+    shadowOpacity: 0.2,
+
+    shadowRadius: 25,
+
+    elevation: 10,
+  },
+
+  navButton: {
+    flex: 1,
+
+    minHeight: 48,
+
+    borderRadius: 14,
+
+    alignItems: "center",
+
+    justifyContent: "center",
+  },
+
+  navButtonActive: {
+    backgroundColor: "#E5F5F2",
+  },
+
+  navIcon: {
+    color: colors.mutedText,
+
+    fontSize: 19,
+
+    marginBottom: 2,
+  },
+
+  navActiveText: {
+    color: colors.teal,
+
+    fontSize: 9,
+
+    fontWeight: "800",
+  },
+
+  navText: {
+    color: colors.mutedText,
+
+    fontSize: 9,
+
+    fontWeight: "800",
   },
 });
