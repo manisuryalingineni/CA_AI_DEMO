@@ -277,7 +277,7 @@ export default function AllOperationsScreen() {
               adjustsFontSizeToFit
               minimumFontScale={0.65}
             >
-              CA AI Business v4.2
+              CA AI Business 
             </Text>
 
             <Text
@@ -291,7 +291,7 @@ export default function AllOperationsScreen() {
               adjustsFontSizeToFit
               minimumFontScale={0.7}
             >
-              Retail Shop • Retail Shop
+              • Retail Shop
             </Text>
           </View>
 
@@ -925,11 +925,9 @@ const styles = StyleSheet.create({
 
     borderRadius: 11,
 
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "gold",
 
     borderWidth: 1.5,
-
-    borderColor: "#EFC64B",
 
     alignItems: "center",
 
@@ -1114,7 +1112,7 @@ const styles = StyleSheet.create({
   pageTitle: {
     color: "#102033",
 
-    fontSize: 19,
+    fontSize: 17,
 
     fontWeight: "800",
   },
@@ -1134,13 +1132,13 @@ const styles = StyleSheet.create({
 
     marginTop: 3,
 
-    lineHeight: 14,
+    lineHeight: 12,
   },
 
   pageSubtitleSmall: {
     fontSize: 8,
 
-    lineHeight: 11,
+    lineHeight: 10,
 
     marginTop: 2,
   },
@@ -1150,9 +1148,9 @@ const styles = StyleSheet.create({
   changeBusinessButton: {
     flexShrink: 0,
 
-    minWidth: 92,
+    minWidth: 94,
 
-    minHeight: 66,
+    minHeight: 50,
 
     backgroundColor: "#EAF7F6",
 
@@ -1178,13 +1176,13 @@ const styles = StyleSheet.create({
   changeBusinessText: {
     color: "#00877F",
 
-    fontSize: 14,
+    fontSize: 12,
 
-    fontWeight: "800",
+    fontWeight: "700",
 
     textAlign: "center",
 
-    lineHeight: 18,
+    lineHeight: 14,
   },
 
   changeBusinessTextSmall: {
@@ -1267,7 +1265,7 @@ const styles = StyleSheet.create({
   },
 
   expertIconText: {
-    fontSize: 22,
+    fontSize: 20,
   },
 
   expertIconTextSmall: {
@@ -1285,7 +1283,7 @@ const styles = StyleSheet.create({
   expertTitle: {
     color: "#19283A",
 
-    fontSize: 12,
+    fontSize: 11,
 
     fontWeight: "800",
 
@@ -1317,9 +1315,9 @@ const styles = StyleSheet.create({
   doNowButton: {
     flexShrink: 0,
 
-    minWidth: 65,
+    minWidth: 60,
 
-    minHeight: 49,
+    minHeight: 35,
 
     paddingHorizontal: 9,
 

@@ -1,6 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, {
+  useRef,
+  useState,
+} from "react";
+
 import {
   Alert,
+  Animated,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -10,379 +15,703 @@ import {
   TextInput,
   View,
   useWindowDimensions,
-} from 'react-native';
+} from "react-native";
 
-import { router, useLocalSearchParams } from 'expo-router';
+import {
+  router,
+} from "expo-router";
 
-import { Picker } from '@react-native-picker/picker';
+import {
+  Picker,
+} from "@react-native-picker/picker";
 
-import { SafeAreaView } from 'react-native-safe-area-context';
+import {
+  Ionicons,
+} from "@expo/vector-icons";
+
+import {
+  SafeAreaView,
+} from "react-native-safe-area-context";
 
 import {
   saveVendor,
-  editVendor,
-} from '../../src/services/vendorService';
-
-import {
-  getVendorById,
-} from '../../src/repositories/vendorRepository';
+} from "../../src/services/vendorService";
 
 import type {
   CreateVendorInput,
-  Vendor,
-} from '../../src/types/vendor';
+} from "../../src/types/vendor";
 
-import { colors } from '../../src/theme/colors';
+import {
+  colors,
+} from "../../src/theme/colors";
+
+/*         =
+   STATES
+        = */
 
 const STATES = [
-  'Andhra Pradesh',
-  'Arunachal Pradesh',
-  'Assam',
-  'Bihar',
-  'Chhattisgarh',
-  'Goa',
-  'Gujarat',
-  'Haryana',
-  'Himachal Pradesh',
-  'Jharkhand',
-  'Karnataka',
-  'Kerala',
-  'Madhya Pradesh',
-  'Maharashtra',
-  'Manipur',
-  'Meghalaya',
-  'Mizoram',
-  'Nagaland',
-  'Odisha',
-  'Punjab',
-  'Rajasthan',
-  'Sikkim',
-  'Tamil Nadu',
-  'Telangana',
-  'Tripura',
-  'Uttar Pradesh',
-  'Uttarakhand',
-  'West Bengal',
-  'Delhi',
-  'Jammu and Kashmir',
-  'Ladakh',
-  'Puducherry',
-  'Chandigarh',
-  'Andaman and Nicobar Islands',
-  'Dadra and Nagar Haveli and Daman and Diu',
-  'Lakshadweep',
+  "Andhra Pradesh",
+  "Arunachal Pradesh",
+  "Assam",
+  "Bihar",
+  "Chhattisgarh",
+  "Goa",
+  "Gujarat",
+  "Haryana",
+  "Himachal Pradesh",
+  "Jharkhand",
+  "Karnataka",
+  "Kerala",
+  "Madhya Pradesh",
+  "Maharashtra",
+  "Manipur",
+  "Meghalaya",
+  "Mizoram",
+  "Nagaland",
+  "Odisha",
+  "Punjab",
+  "Rajasthan",
+  "Sikkim",
+  "Tamil Nadu",
+  "Telangana",
+  "Tripura",
+  "Uttar Pradesh",
+  "Uttarakhand",
+  "West Bengal",
+  "Delhi",
+  "Jammu and Kashmir",
+  "Ladakh",
+  "Puducherry",
+  "Chandigarh",
+  "Andaman and Nicobar Islands",
+  "Dadra and Nagar Haveli and Daman and Diu",
+  "Lakshadweep",
 ];
 
-interface VendorFormProps {
-  vendor?: Vendor | null;
-}
+/*         =
+   ADD VENDOR
+        = */
 
-function VendorForm({ vendor }: VendorFormProps) {
-  const { width } = useWindowDimensions();
+export default function AddVendorScreen() {
+  const {
+    width,
+  } =
+    useWindowDimensions();
 
-  const isEditMode = Boolean(vendor);
-  const isLargeForm = width >= 700;
+  const isLargeForm =
+    width >= 700;
 
-  const [name, setName] = useState('');
-  const [mobile, setMobile] = useState('');
-  const [gstin, setGstin] = useState('');
-  const [state, setState] = useState('Andhra Pradesh');
-  const [creditDays, setCreditDays] = useState('0');
-  const [openingBalance, setOpeningBalance] = useState('0');
-  const [businessDetail, setBusinessDetail] = useState('');
-  const [address, setAddress] = useState('');
-  const [saving, setSaving] = useState(false);
+  const isSmall =
+    width < 370;
 
-  useEffect(() => {
-    if (vendor) {
-      setName(vendor.name);
-      setMobile(vendor.mobile);
-      setGstin(vendor.gstin ?? '');
-      setState(vendor.state || 'Andhra Pradesh');
-      setCreditDays(String(vendor.creditDays ?? 0));
-      setOpeningBalance(
-        String(vendor.openingBalance ?? 0),
+  /*        ======
+     FORM STATE
+         ====== */
+
+  const [
+    name,
+    setName,
+  ] =
+    useState("");
+
+  const [
+    mobile,
+    setMobile,
+  ] =
+    useState("");
+
+  const [
+    gstin,
+    setGstin,
+  ] =
+    useState("");
+
+  const [
+    state,
+    setState,
+  ] =
+    useState(
+      "Andhra Pradesh",
+    );
+
+  const [
+    creditDays,
+    setCreditDays,
+  ] =
+    useState("0");
+
+  const [
+    openingBalance,
+    setOpeningBalance,
+  ] =
+    useState("0");
+
+  const [
+    businessDetail,
+    setBusinessDetail,
+  ] =
+    useState("");
+
+  const [
+    address,
+    setAddress,
+  ] =
+    useState("");
+
+  const [
+    saving,
+    setSaving,
+  ] =
+    useState(false);
+
+  /*        ======
+     TOAST
+         ====== */
+
+  const [
+    toastVisible,
+    setToastVisible,
+  ] =
+    useState(false);
+
+  const toastOpacity =
+    useRef(
+      new Animated.Value(
+        0,
+      ),
+    ).current;
+
+  const showSuccessToast =
+    () => {
+      toastOpacity.stopAnimation();
+
+      toastOpacity.setValue(
+        0,
       );
-      setBusinessDetail(
-        vendor.businessDetail ?? '',
+
+      setToastVisible(
+        true,
       );
-      setAddress(vendor.address ?? '');
-      return;
-    }
 
-    setName('');
-    setMobile('');
-    setGstin('');
-    setState('Andhra Pradesh');
-    setCreditDays('0');
-    setOpeningBalance('0');
-    setBusinessDetail('');
-    setAddress('');
-  }, [vendor]);
+      Animated.timing(
+        toastOpacity,
+        {
+          toValue: 1,
 
-  const goToDashboard = () => {
-    if (saving) {
-      return;
-    }
+          duration: 180,
 
-    router.replace('/dashboard');
-  };
+          useNativeDriver:
+            true,
+        },
+      ).start();
 
-  const handleSave = async () => {
-    const vendorName = name.trim();
-    const vendorMobile = mobile.trim();
+      setTimeout(() => {
+        Animated.timing(
+          toastOpacity,
+          {
+            toValue: 0,
 
-    if (!vendorName) {
-      Alert.alert(
-        'Required',
-        'Please enter vendor name.',
-      );
-      return;
-    }
+            duration: 180,
 
-    if (!vendorMobile) {
-      Alert.alert(
-        'Required',
-        'Please enter mobile number.',
-      );
-      return;
-    }
-
-    if (!/^\d{10}$/.test(vendorMobile)) {
-      Alert.alert(
-        'Invalid mobile number',
-        'Please enter a valid 10-digit mobile number.',
-      );
-      return;
-    }
-
-    if (saving) {
-      return;
-    }
-
-    setSaving(true);
-
-    try {
-      if (vendor) {
-        await editVendor({
-          ...vendor,
-
-          name: vendorName,
-
-          mobile: vendorMobile,
-
-          gstin:
-            gstin.trim() || undefined,
-
-          state,
-
-          creditDays:
-            Number(creditDays) || 0,
-
-          openingBalance:
-            Number(openingBalance) || 0,
-
-          businessDetail:
-            businessDetail.trim() || undefined,
-
-          address:
-            address.trim() || undefined,
+            useNativeDriver:
+              true,
+          },
+        ).start(() => {
+          setToastVisible(
+            false,
+          );
         });
-      } else {
-        const input: CreateVendorInput = {
-          name: vendorName,
+      }, 1000);
+    };
 
-          mobile: vendorMobile,
+  /*        ======
+     BACK / CANCEL
+         ====== */
 
-          gstin:
-            gstin.trim() || undefined,
-
-          state,
-
-          creditDays:
-            Number(creditDays) || 0,
-
-          openingBalance:
-            Number(openingBalance) || 0,
-
-          businessDetail:
-            businessDetail.trim() || undefined,
-
-          address:
-            address.trim() || undefined,
-        };
-
-        await saveVendor(input);
+  const handleBack =
+    () => {
+      if (saving) {
+        return;
       }
 
-      router.replace('/dashboard');
-    } catch (error) {
-      Alert.alert(
-        isEditMode
-          ? 'Unable to update'
-          : 'Unable to save',
+      router.back();
+    };
 
-        error instanceof Error
-          ? error.message
-          : 'Something went wrong.',
+  const handleCancel =
+    () => {
+      if (saving) {
+        return;
+      }
+
+      router.replace(
+        "/dashboard",
       );
-    } finally {
-      setSaving(false);
-    }
-  };
+    };
+
+  /*        ======
+     SAVE
+         ====== */
+
+  const handleSave =
+    async () => {
+      if (saving) {
+        return;
+      }
+
+      const vendorName =
+        name.trim();
+
+      const vendorMobile =
+        mobile.trim();
+
+      /*        ==
+         NAME
+             == */
+
+      if (!vendorName) {
+        Alert.alert(
+          "Required",
+
+          "Please enter vendor name.",
+        );
+
+        return;
+      }
+
+      /*        ==
+         MOBILE
+             == */
+
+      if (!vendorMobile) {
+        Alert.alert(
+          "Required",
+
+          "Please enter mobile number.",
+        );
+
+        return;
+      }
+
+      if (
+        !/^\d{10}$/.test(
+          vendorMobile,
+        )
+      ) {
+        Alert.alert(
+          "Invalid mobile number",
+
+          "Please enter a valid 10-digit mobile number.",
+        );
+
+        return;
+      }
+
+      /*        ==
+         GSTIN
+             == */
+
+      const cleanedGstin =
+        gstin
+          .trim()
+          .toUpperCase();
+
+      if (
+        cleanedGstin &&
+        cleanedGstin.length !==
+          15
+      ) {
+        Alert.alert(
+          "Invalid GSTIN",
+
+          "GSTIN must contain 15 characters.",
+        );
+
+        return;
+      }
+
+      /*        ==
+         CREDIT DAYS
+             == */
+
+      const parsedCreditDays =
+        Number(
+          creditDays,
+        ) || 0;
+
+      if (
+        parsedCreditDays <
+        0
+      ) {
+        Alert.alert(
+          "Invalid credit days",
+
+          "Credit days cannot be negative.",
+        );
+
+        return;
+      }
+
+      /*        ==
+         OPENING BALANCE
+             == */
+
+      const parsedOpeningBalance =
+        Number(
+          openingBalance,
+        ) || 0;
+
+      if (
+        parsedOpeningBalance <
+        0
+      ) {
+        Alert.alert(
+          "Invalid opening balance",
+
+          "Opening balance cannot be negative.",
+        );
+
+        return;
+      }
+
+      const input:
+        CreateVendorInput =
+        {
+          name:
+            vendorName,
+
+          mobile:
+            vendorMobile,
+
+          gstin:
+            cleanedGstin ||
+            undefined,
+
+          state,
+
+          creditDays:
+            parsedCreditDays,
+
+          openingBalance:
+            parsedOpeningBalance,
+
+          businessDetail:
+            businessDetail
+              .trim() ||
+            undefined,
+
+          address:
+            address
+              .trim() ||
+            undefined,
+        };
+
+      try {
+        setSaving(
+          true,
+        );
+
+        await saveVendor(
+          input,
+        );
+
+        showSuccessToast();
+
+        /*
+         * Give the user enough time
+         * to see the success toast.
+         */
+
+        setTimeout(() => {
+          router.replace(
+            "/dashboard",
+          );
+        }, 1200);
+      } catch (error) {
+        Alert.alert(
+          "Unable to save vendor",
+
+          error instanceof Error
+            ? error.message
+            : "Something went wrong.",
+        );
+
+        setSaving(
+          false,
+        );
+      }
+    };
+
+  /*        ======
+     UI
+         ====== */
 
   return (
     <SafeAreaView
-      style={styles.formSafeArea}
-      edges={['top', 'bottom']}
+      style={
+        styles.safeArea
+      }
+      edges={[
+        "top",
+        "bottom",
+      ]}
     >
       <KeyboardAvoidingView
-        style={styles.formKeyboard}
+        style={
+          styles.keyboard
+        }
         behavior={
-          Platform.OS === 'ios'
-            ? 'padding'
+          Platform.OS ===
+          "ios"
+            ? "padding"
             : undefined
         }
       >
-        <View style={styles.formScreen}>
+        <View
+          style={
+            styles.container
+          }
+        >
+          {/*        
+              HEADER
+                  */}
 
-          {/* HEADER */}
-
-          <View style={styles.formHeader}>
-
-            <View style={styles.formHeaderLeft}>
+          <View
+            style={
+              styles.header
+            }
+          >
+            <View
+              style={
+                styles.headerLeft
+              }
+            >
+              {/* BACK */}
 
               <Pressable
-                onPress={goToDashboard}
-                style={styles.formBackButton}
-                disabled={saving}
+                onPress={
+                  handleBack
+                }
+                disabled={
+                  saving
+                }
+                hitSlop={
+                  10
+                }
+                accessibilityRole="button"
+                accessibilityLabel="Go back"
+                style={({
+                  pressed,
+                }) => [
+                  styles.backButton,
+
+                  pressed &&
+                    !saving &&
+                    styles.backButtonPressed,
+
+                  saving &&
+                    styles.backButtonDisabled,
+                ]}
               >
-                <Text style={styles.formBackIcon}>
-                  ‹
-                </Text>
+                <Ionicons
+                  name="arrow-back"
+                  size={
+                    19
+                  }
+                  color={
+                    colors.primary
+                  }
+                />
               </Pressable>
 
-              <View>
+              {/* TITLE */}
 
+              <View
+                style={
+                  styles.headerText
+                }
+              >
                 <Text
-                  style={styles.formHeaderTitle}
+                  style={[
+                    styles.headerTitle,
+
+                    isSmall &&
+                      styles.headerTitleSmall,
+                  ]}
+                  numberOfLines={
+                    1
+                  }
                 >
-                  {isEditMode
-                    ? 'Edit Vendor'
-                    : 'Add Vendor'}
+                  Add Vendor
                 </Text>
 
                 <Text
                   style={
-                    styles.formHeaderSubtitle
+                    styles.headerSubtitle
+                  }
+                  numberOfLines={
+                    1
                   }
                 >
-                  {isEditMode
-                    ? 'Update retail vendor details'
-                    : 'Create a new retail vendor'}
+                  Create a new retail vendor
                 </Text>
-
               </View>
-
             </View>
 
-            <View style={styles.formLogo}>
+            {/* LOGO */}
+
+            <View
+              style={
+                styles.logo
+              }
+            >
               <Text
-                style={styles.formLogoText}
+                style={
+                  styles.logoText
+                }
               >
                 CA
               </Text>
             </View>
-
           </View>
 
-
-          {/* FORM CONTENT */}
+          {/*        
+              FORM
+                  */}
 
           <ScrollView
-            showsVerticalScrollIndicator={false}
+            showsVerticalScrollIndicator={
+              false
+            }
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={[
-              styles.formScroll,
+              styles.scrollContent,
+
               isLargeForm &&
-                styles.formScrollLarge,
+                styles.scrollContentLarge,
             ]}
           >
-
             <View
               style={[
                 styles.formCard,
+
                 isLargeForm &&
                   styles.formCardLarge,
               ]}
             >
-
-              <Text style={styles.formTitle}>
+              <Text
+                style={
+                  styles.formTitle
+                }
+              >
                 Vendor Information
               </Text>
 
               <Text
-                style={styles.formDescription}
+                style={
+                  styles.formDescription
+                }
               >
-                Enter the vendor's basic and
-                account details.
+                Enter the vendor&apos;s basic and account details.
               </Text>
 
-
-              {/* NAME / MOBILE */}
+              {/*        
+                  NAME / MOBILE
+                      */}
 
               <View
                 style={[
                   styles.formRow,
+
                   !isLargeForm &&
                     styles.formColumn,
                 ]}
               >
+                {/* NAME */}
 
-                <View style={styles.formField}>
+                <View
+                  style={
+                    styles.formField
+                  }
+                >
+                  <Text
+                    style={
+                      styles.label
+                    }
+                  >
+                    Vendor Name{" "}
 
-                  <Text style={styles.label}>
-                    Vendor Name{' '}
                     <Text
-                      style={styles.required}
+                      style={
+                        styles.required
+                      }
                     >
                       *
                     </Text>
                   </Text>
 
                   <TextInput
-                    value={name}
-                    onChangeText={setName}
+                    value={
+                      name
+                    }
+                    onChangeText={
+                      setName
+                    }
                     placeholder="Enter vendor name"
                     placeholderTextColor={
                       colors.mutedText
                     }
+                    autoCapitalize="words"
                     autoComplete="off"
                     importantForAutofill="no"
-                    style={styles.input}
+                    editable={
+                      !saving
+                    }
+                    style={
+                      styles.input
+                    }
                   />
-
                 </View>
 
+                {/* MOBILE */}
 
-                <View style={styles.formField}>
+                <View
+                  style={
+                    styles.formField
+                  }
+                >
+                  <Text
+                    style={
+                      styles.label
+                    }
+                  >
+                    Mobile Number{" "}
 
-                  <Text style={styles.label}>
-                    Mobile Number{' '}
                     <Text
-                      style={styles.required}
+                      style={
+                        styles.required
+                      }
                     >
                       *
                     </Text>
                   </Text>
 
                   <TextInput
-                    value={mobile}
-                    onChangeText={(value) =>
+                    value={
+                      mobile
+                    }
+                    onChangeText={(
+                      value,
+                    ) =>
                       setMobile(
                         value
-                          .replace(/\D/g, '')
-                          .slice(0, 10),
+                          .replace(
+                            /\D/g,
+                            "",
+                          )
+                          .slice(
+                            0,
+                            10,
+                          ),
                       )
                     }
                     placeholder="10-digit mobile number"
@@ -393,34 +722,66 @@ function VendorForm({ vendor }: VendorFormProps) {
                     textContentType="telephoneNumber"
                     autoComplete="tel"
                     importantForAutofill="yes"
-                    maxLength={10}
-                    style={styles.input}
+                    maxLength={
+                      10
+                    }
+                    editable={
+                      !saving
+                    }
+                    style={
+                      styles.input
+                    }
                   />
-
                 </View>
-
               </View>
 
-
-              {/* GST / STATE */}
+              {/*        
+                  GST / STATE
+                      */}
 
               <View
                 style={[
                   styles.formRow,
+
                   !isLargeForm &&
                     styles.formColumn,
                 ]}
               >
+                {/* GSTIN */}
 
-                <View style={styles.formField}>
-
-                  <Text style={styles.label}>
+                <View
+                  style={
+                    styles.formField
+                  }
+                >
+                  <Text
+                    style={
+                      styles.label
+                    }
+                  >
                     GSTIN
                   </Text>
 
                   <TextInput
-                    value={gstin}
-                    onChangeText={setGstin}
+                    value={
+                      gstin
+                    }
+                    onChangeText={(
+                      value,
+                    ) =>
+                      setGstin(
+                        value
+                          .toUpperCase()
+                          .replace(
+                            /\s/g,
+                            "",
+                          )
+                          .slice(
+                            0,
+                            15,
+                          ),
+                      )
+                    }
                     placeholder="Optional GSTIN"
                     placeholderTextColor={
                       colors.mutedText
@@ -428,41 +789,65 @@ function VendorForm({ vendor }: VendorFormProps) {
                     autoCapitalize="characters"
                     autoComplete="off"
                     importantForAutofill="no"
-                    style={styles.input}
+                    editable={
+                      !saving
+                    }
+                    maxLength={
+                      15
+                    }
+                    style={
+                      styles.input
+                    }
                   />
-
                 </View>
 
+                {/* STATE */}
 
-                <View style={styles.formField}>
-
-                  <Text style={styles.label}>
+                <View
+                  style={
+                    styles.formField
+                  }
+                >
+                  <Text
+                    style={
+                      styles.label
+                    }
+                  >
                     State
                   </Text>
 
                   <View
-                    style={styles.stateField}
+                    style={
+                      styles.stateField
+                    }
                   >
-
                     <Text
-                      style={styles.stateValue}
-                      numberOfLines={1}
+                      style={
+                        styles.stateValue
+                      }
+                      numberOfLines={
+                        1
+                      }
                     >
                       {state ||
-                        'Select state'}
+                        "Select state"}
                     </Text>
 
                     <View
-                      style={styles.stateArrow}
+                      style={
+                        styles.stateArrow
+                      }
                       pointerEvents="none"
                     >
-                      <Text
-                        style={
-                          styles.stateArrowText
+                      <Ionicons
+                        name="chevron-down"
+                        size={
+                          15
                         }
-                      >
-                        ▼
-                      </Text>
+                        color={
+                          colors.mutedText
+                        }
+                      />
                     </View>
 
                     <View
@@ -471,56 +856,85 @@ function VendorForm({ vendor }: VendorFormProps) {
                       }
                     >
                       <Picker
-                        selectedValue={state}
+                        selectedValue={
+                          state
+                        }
                         onValueChange={(
-                          value: string,
-                        ) => setState(value)}
+                          value:
+                            string,
+                        ) =>
+                          setState(
+                            value,
+                          )
+                        }
+                        enabled={
+                          !saving
+                        }
                         style={
                           styles.hiddenPicker
                         }
                       >
                         {STATES.map(
-                          (item) => (
+                          (
+                            item,
+                          ) => (
                             <Picker.Item
-                              key={item}
-                              label={item}
-                              value={item}
+                              key={
+                                item
+                              }
+                              label={
+                                item
+                              }
+                              value={
+                                item
+                              }
                             />
                           ),
                         )}
                       </Picker>
                     </View>
-
                   </View>
-
                 </View>
-
               </View>
 
-
-              {/* CREDIT / BALANCE */}
+              {/*        
+                  CREDIT / OPENING BALANCE
+                      */}
 
               <View
                 style={[
                   styles.formRow,
+
                   !isLargeForm &&
                     styles.formColumn,
                 ]}
               >
+                {/* CREDIT DAYS */}
 
-                <View style={styles.formField}>
-
-                  <Text style={styles.label}>
+                <View
+                  style={
+                    styles.formField
+                  }
+                >
+                  <Text
+                    style={
+                      styles.label
+                    }
+                  >
                     Credit Days
                   </Text>
 
                   <TextInput
-                    value={creditDays}
-                    onChangeText={(value) =>
+                    value={
+                      creditDays
+                    }
+                    onChangeText={(
+                      value,
+                    ) =>
                       setCreditDays(
                         value.replace(
                           /\D/g,
-                          '',
+                          "",
                         ),
                       )
                     }
@@ -529,73 +943,101 @@ function VendorForm({ vendor }: VendorFormProps) {
                       colors.mutedText
                     }
                     keyboardType="number-pad"
-
-                    /*
-                     * IMPORTANT:
-                     * Prevent Android from treating
-                     * this field as an autofill field.
-                     */
                     autoComplete="off"
                     textContentType="none"
                     importantForAutofill="no"
-
-                    style={styles.input}
+                    editable={
+                      !saving
+                    }
+                    style={
+                      styles.input
+                    }
                   />
-
                 </View>
 
+                {/* OPENING BALANCE */}
 
-                <View style={styles.formField}>
-
-                  <Text style={styles.label}>
+                <View
+                  style={
+                    styles.formField
+                  }
+                >
+                  <Text
+                    style={
+                      styles.label
+                    }
+                  >
                     Opening Balance
                   </Text>
 
                   <TextInput
-                    value={openingBalance}
-                    onChangeText={(value) =>
-                      setOpeningBalance(
+                    value={
+                      openingBalance
+                    }
+                    onChangeText={(
+                      value,
+                    ) => {
+                      const cleaned =
                         value.replace(
                           /[^0-9.]/g,
-                          '',
-                        ),
-                      )
-                    }
+                          "",
+                        );
+
+                      const parts =
+                        cleaned.split(
+                          ".",
+                        );
+
+                      if (
+                        parts.length >
+                        2
+                      ) {
+                        return;
+                      }
+
+                      setOpeningBalance(
+                        cleaned,
+                      );
+                    }}
                     placeholder="0"
                     placeholderTextColor={
                       colors.mutedText
                     }
                     keyboardType="decimal-pad"
-
-                    /*
-                     * IMPORTANT:
-                     * Prevent Android from copying
-                     * phone/autofill values here.
-                     */
                     autoComplete="off"
                     textContentType="none"
                     importantForAutofill="no"
-
-                    style={styles.input}
+                    editable={
+                      !saving
+                    }
+                    style={
+                      styles.input
+                    }
                   />
-
                 </View>
-
               </View>
 
-
-              {/* VENDOR DETAILS */}
+              {/*        
+                  VENDOR DETAILS
+                      */}
 
               <View
-                style={styles.fullField}
+                style={
+                  styles.fullField
+                }
               >
-
-                <Text style={styles.label}>
-                  Vendor details
+                <Text
+                  style={
+                    styles.label
+                  }
+                >
+                  Vendor Details
                 </Text>
 
                 <TextInput
-                  value={businessDetail}
+                  value={
+                    businessDetail
+                  }
                   onChangeText={
                     setBusinessDetail
                   }
@@ -605,25 +1047,39 @@ function VendorForm({ vendor }: VendorFormProps) {
                   }
                   autoComplete="off"
                   importantForAutofill="no"
-                  style={styles.input}
+                  editable={
+                    !saving
+                  }
+                  style={
+                    styles.input
+                  }
                 />
-
               </View>
 
-
-              {/* ADDRESS */}
+              {/*        
+                  ADDRESS
+                      */}
 
               <View
-                style={styles.fullField}
+                style={
+                  styles.fullField
+                }
               >
-
-                <Text style={styles.label}>
+                <Text
+                  style={
+                    styles.label
+                  }
+                >
                   Address
                 </Text>
 
                 <TextInput
-                  value={address}
-                  onChangeText={setAddress}
+                  value={
+                    address
+                  }
+                  onChangeText={
+                    setAddress
+                  }
                   placeholder="Vendor address"
                   placeholderTextColor={
                     colors.mutedText
@@ -631,33 +1087,50 @@ function VendorForm({ vendor }: VendorFormProps) {
                   autoComplete="street-address"
                   importantForAutofill="no"
                   multiline
-                  numberOfLines={4}
+                  numberOfLines={
+                    4
+                  }
                   textAlignVertical="top"
+                  editable={
+                    !saving
+                  }
                   style={[
                     styles.input,
+
                     styles.addressInput,
                   ]}
                 />
-
               </View>
-
             </View>
 
-
-            {/* BUTTONS */}
+            {/*        
+                ACTIONS
+                    */}
 
             <View
               style={[
-                styles.formActions,
+                styles.actions,
+
                 isLargeForm &&
-                  styles.formActionsLarge,
+                  styles.actionsLarge,
               ]}
             >
-
               <Pressable
-                onPress={goToDashboard}
-                style={styles.cancelButton}
-                disabled={saving}
+                onPress={
+                  handleCancel
+                }
+                disabled={
+                  saving
+                }
+                style={({
+                  pressed,
+                }) => [
+                  styles.cancelButton,
+
+                  pressed &&
+                    !saving &&
+                    styles.buttonPressed,
+                ]}
               >
                 <Text
                   style={
@@ -668,520 +1141,714 @@ function VendorForm({ vendor }: VendorFormProps) {
                 </Text>
               </Pressable>
 
-
               <Pressable
-                onPress={handleSave}
-                style={[
+                onPress={
+                  handleSave
+                }
+                disabled={
+                  saving
+                }
+                style={({
+                  pressed,
+                }) => [
                   styles.saveButton,
+
                   saving &&
                     styles.disabledButton,
-                ]}
-                disabled={saving}
-              >
 
+                  pressed &&
+                    !saving &&
+                    styles.buttonPressed,
+                ]}
+              >
                 <Text
                   style={
                     styles.saveButtonText
                   }
                 >
                   {saving
-                    ? 'Saving...'
-                    : isEditMode
-                      ? 'Update Vendor'
-                      : 'Save Vendor'}
+                    ? "Saving..."
+                    : "Save Vendor"}
                 </Text>
-
               </Pressable>
-
             </View>
-
           </ScrollView>
 
+          {/*        
+              SUCCESS TOAST
+                  */}
+
+          {toastVisible && (
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.toastContainer,
+
+                {
+                  opacity:
+                    toastOpacity,
+
+                  transform: [
+                    {
+                      translateY:
+                        toastOpacity.interpolate({
+                          inputRange: [
+                            0,
+                            1,
+                          ],
+
+                          outputRange: [
+                            10,
+                            0,
+                          ],
+                        }),
+                    },
+                  ],
+                },
+              ]}
+            >
+              <View
+                style={
+                  styles.toast
+                }
+              >
+                <View
+                  style={
+                    styles.toastIcon
+                  }
+                >
+                  <Ionicons
+                    name="checkmark"
+                    size={
+                      15
+                    }
+                    color="#FFFFFF"
+                  />
+                </View>
+
+                <View
+                  style={
+                    styles.toastTextContainer
+                  }
+                >
+                  <Text
+                    style={
+                      styles.toastTitle
+                    }
+                  >
+                    Vendor saved
+                  </Text>
+
+                  <Text
+                    style={
+                      styles.toastMessage
+                    }
+                  >
+                    Vendor saved successfully
+                  </Text>
+                </View>
+              </View>
+            </Animated.View>
+          )}
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
+/*         =
+   STYLES
+        = */
 
-export default function AddVendorScreen() {
+const styles =
+  StyleSheet.create({
+    /*        ====
+       ROOT
+           ==== */
 
-  const {
-    vendorId,
-  } =
-    useLocalSearchParams<{
-      vendorId?: string;
-    }>();
+    safeArea: {
+      flex: 1,
 
-  const [vendor, setVendor] =
-    useState<Vendor | null>(null);
+      backgroundColor:
+        colors.background,
+    },
 
-  const [loading, setLoading] =
-    useState(Boolean(vendorId));
+    keyboard: {
+      flex: 1,
 
+      width: "100%",
+    },
 
-  useEffect(() => {
+    container: {
+      flex: 1,
 
-    let mounted = true;
+      width: "100%",
 
-    const loadVendor =
-      async () => {
+      backgroundColor:
+        colors.background,
+    },
 
-        if (!vendorId) {
+    /*        ====
+       HEADER
+           ==== */
 
-          if (mounted) {
+    header: {
+      minHeight: 76,
 
-            setVendor(null);
-            setLoading(false);
+      backgroundColor:
+        colors.primary,
 
-          }
+      paddingHorizontal: 18,
 
-          return;
-        }
+      paddingVertical: 12,
 
+      flexDirection: "row",
 
-        try {
+      alignItems: "center",
 
-          const result =
-            await getVendorById(
-              vendorId,
-            );
+      justifyContent:
+        "space-between",
 
-          if (mounted) {
-            setVendor(result);
-          }
+      elevation: 6,
 
-        } catch (error) {
+      shadowColor:
+        "#000000",
 
-          if (mounted) {
+      shadowOffset: {
+        width: 0,
+        height: 2,
+      },
 
-            Alert.alert(
-              'Unable to load vendor',
+      shadowOpacity: 0.15,
 
-              error instanceof Error
-                ? error.message
-                : 'Something went wrong.',
-            );
+      shadowRadius: 4,
+    },
 
-          }
+    headerLeft: {
+      flex: 1,
 
-        } finally {
+      flexDirection: "row",
 
-          if (mounted) {
-            setLoading(false);
-          }
+      alignItems: "center",
 
-        }
+      minWidth: 0,
+    },
 
-      };
+    /*        ====
+       BACK BUTTON
+           ==== */
 
+    backButton: {
+      width: 34,
 
-    loadVendor();
+      height: 34,
 
+      flexShrink: 0,
 
-    return () => {
-      mounted = false;
-    };
+      borderRadius: 10,
 
-  }, [vendorId]);
+      alignItems: "center",
 
+      justifyContent:
+        "center",
 
-  if (loading) {
+      backgroundColor:
+        "#FFFFFF",
 
-    return (
-      <SafeAreaView
-        style={styles.formSafeArea}
-        edges={['top', 'bottom']}
-      >
+      borderWidth: 1,
 
-        <View
-          style={[
-            styles.formScreen,
-            {
-              alignItems: 'center',
-              justifyContent:
-                'center',
-            },
-          ]}
-        >
-
-          <Text
-            style={
-              styles.formDescription
-            }
-          >
-            Loading vendor...
-          </Text>
-
-        </View>
-
-      </SafeAreaView>
-    );
-  }
-
-
-  if (vendorId && !vendor) {
-
-    return (
-      <SafeAreaView
-        style={styles.formSafeArea}
-        edges={['top', 'bottom']}
-      >
-
-        <View
-          style={[
-            styles.formScreen,
-            {
-              alignItems: 'center',
-              justifyContent:
-                'center',
-              padding: 20,
-            },
-          ]}
-        >
-
-          <Text
-            style={styles.formTitle}
-          >
-            Vendor not found
-          </Text>
-
-          <Pressable
-            onPress={() =>
-              router.replace(
-                '/dashboard',
-              )
-            }
-            style={[
-              styles.saveButton,
-              {
-                width: '100%',
-                marginTop: 16,
-              },
-            ]}
-          >
-
-            <Text
-              style={
-                styles.saveButtonText
-              }
-            >
-              Back to Dashboard
-            </Text>
-
-          </Pressable>
-
-        </View>
-
-      </SafeAreaView>
-    );
-  }
-
-
-  return (
-    <VendorForm
-      vendor={vendor}
-    />
-  );
-}
-
-
-const styles = StyleSheet.create({
-
-  formSafeArea: {
-    flex: 1,
-    backgroundColor:
-      colors.background,
-  },
-
-  formKeyboard: {
-    flex: 1,
-    width: '100%',
-  },
-
-  formScreen: {
-    flex: 1,
-    width: '100%',
-    backgroundColor:
-      colors.background,
-  },
-
-
-  /* HEADER */
-
-  formHeader: {
-    minHeight: 76,
-    backgroundColor:
-      colors.primary,
-    paddingHorizontal: 18,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent:
-      'space-between',
-    elevation: 6,
-  },
-
-  formHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-
-  formBackButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    backgroundColor:
-      '#FFFFFF',
-    alignItems: 'center',
-    justifyContent:
-      'center',
-    marginRight: 10,
-  },
-
-  formBackIcon: {
-    color: colors.primary,
-    fontSize: 30,
-    lineHeight: 32,
-    fontWeight: '500',
-    marginTop: -2,
-  },
-
-  formHeaderTitle: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '800',
-  },
-
-  formHeaderSubtitle: {
-    color: '#D6E3EC',
-    fontSize: 11,
-    marginTop: 3,
-  },
-
-  formLogo: {
-    width: 42,
-    height: 42,
-    borderRadius: 13,
-    backgroundColor:
-      colors.gold,
-    alignItems: 'center',
-    justifyContent:
-      'center',
-    marginLeft: 10,
-  },
-
-  formLogoText: {
-    color: colors.primary,
-    fontSize: 14,
-    fontWeight: '900',
-  },
-
-
-  /* FORM */
-
-  formScroll: {
-    padding: 16,
-    paddingBottom: 30,
-    flexGrow: 1,
-  },
-
-  formScrollLarge: {
-    paddingHorizontal: 24,
-    paddingTop: 24,
-  },
-
-  formCard: {
-    width: '100%',
-    backgroundColor:
-      colors.card,
-    borderWidth: 1,
-    borderColor:
-      colors.border,
-    borderRadius: 20,
-    padding: 20,
-  },
-
-  formCardLarge: {
-    maxWidth: 850,
-    alignSelf: 'center',
-  },
-
-  formTitle: {
-    color: colors.text,
-    fontSize: 17,
-    fontWeight: '800',
-  },
-
-  formDescription: {
-    color: colors.mutedText,
-    fontSize: 12,
-    marginTop: 4,
-    lineHeight: 18,
-  },
-
-  formRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 16,
-  },
-
-  formColumn: {
-    flexDirection: 'column',
-  },
-
-  formField: {
-    flex: 1,
-  },
-
-  fullField: {
-    width: '100%',
-    marginTop: 16,
-  },
-
-  label: {
-    color: colors.text,
-    fontSize: 12,
-    fontWeight: '700',
-    marginBottom: 6,
-  },
-
-  required: {
-    color: colors.error,
-  },
-
-  input: {
-    minHeight: 46,
-    backgroundColor:
-      colors.card,
-    borderWidth: 1,
-    borderColor:
-      colors.border,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    color: colors.text,
-    fontSize: 13,
-  },
-
-  addressInput: {
-    minHeight: 90,
-    paddingTop: 12,
-  },
-
-
-  /* STATE */
-
-  stateField: {
-    height: 46,
-    backgroundColor:
-      colors.card,
-    borderWidth: 1,
-    borderColor:
-      colors.border,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent:
-      'space-between',
-    position: 'relative',
-    overflow: 'hidden',
-  },
-
-  stateValue: {
-    flex: 1,
-    color: colors.text,
-    fontSize: 13,
-    fontWeight: '500',
-    paddingRight: 30,
-  },
-
-  stateArrow: {
-    position: 'absolute',
-    right: 12,
-    top: 0,
-    bottom: 0,
-    width: 24,
-    alignItems: 'center',
-    justifyContent:
-      'center',
-  },
-
-  stateArrowText: {
-    color:
-      colors.mutedText,
-    fontSize: 10,
-  },
-
-  hiddenPickerContainer: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 0,
-    bottom: 0,
-    opacity: 0.02,
-  },
-
-  hiddenPicker: {
-    width: '100%',
-    height: 46,
-  },
-
-
-  /* ACTIONS */
-
-  formActions: {
-    width: '100%',
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 16,
-  },
-
-  formActionsLarge: {
-    maxWidth: 850,
-    alignSelf: 'center',
-  },
-
-  cancelButton: {
-    flex: 1,
-    minHeight: 48,
-    borderRadius: 11,
-    borderWidth: 1,
-    borderColor:
-      colors.border,
-    backgroundColor:
-      colors.card,
-    alignItems: 'center',
-    justifyContent:
-      'center',
-  },
-
-  cancelButtonText: {
-    color: colors.text,
-    fontSize: 13,
-    fontWeight: '800',
-  },
-
-  saveButton: {
-    flex: 1.4,
-    minHeight: 48,
-    borderRadius: 11,
-    backgroundColor:
-      colors.primary,
-    alignItems: 'center',
-    justifyContent:
-      'center',
-  },
-
-  disabledButton: {
-    opacity: 0.6,
-  },
-
-  saveButtonText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '800',
-  },
-
-});
+      borderColor:
+        "#D9E3E7",
+
+      marginRight: 10,
+
+      elevation: 4,
+
+      shadowColor:
+        "#000000",
+
+      shadowOffset: {
+        width: 0,
+        height: 1,
+      },
+
+      shadowOpacity: 0.15,
+
+      shadowRadius: 3,
+    },
+
+    backButtonPressed: {
+      opacity: 0.72,
+
+      transform: [
+        {
+          scale: 0.94,
+        },
+      ],
+    },
+
+    backButtonDisabled: {
+      opacity: 0.5,
+    },
+
+    headerText: {
+      flex: 1,
+
+      minWidth: 0,
+    },
+
+    headerTitle: {
+      color: "#FFFFFF",
+
+      fontSize: 18,
+
+      fontWeight: "800",
+    },
+
+    headerTitleSmall: {
+      fontSize: 16,
+    },
+
+    headerSubtitle: {
+      color: "#D6E3EC",
+
+      fontSize: 11,
+
+      marginTop: 3,
+    },
+
+    logo: {
+      width: 42,
+
+      height: 42,
+
+      flexShrink: 0,
+
+      borderRadius: 13,
+
+      backgroundColor:
+        colors.gold,
+
+      alignItems: "center",
+
+      justifyContent:
+        "center",
+
+      marginLeft: 10,
+    },
+
+    logoText: {
+      color:
+        colors.primary,
+
+      fontSize: 14,
+
+      fontWeight: "900",
+    },
+
+    /*        ====
+       SCROLL
+           ==== */
+
+    scrollContent: {
+      padding: 16,
+
+      paddingBottom: 30,
+
+      flexGrow: 1,
+    },
+
+    scrollContentLarge: {
+      paddingHorizontal: 24,
+
+      paddingTop: 24,
+    },
+
+    /*        ====
+       FORM CARD
+           ==== */
+
+    formCard: {
+      width: "100%",
+
+      backgroundColor:
+        colors.card,
+
+      borderWidth: 1,
+
+      borderColor:
+        colors.border,
+
+      borderRadius: 20,
+
+      padding: 20,
+    },
+
+    formCardLarge: {
+      maxWidth: 850,
+
+      alignSelf: "center",
+    },
+
+    formTitle: {
+      color:
+        colors.text,
+
+      fontSize: 17,
+
+      fontWeight: "800",
+    },
+
+    formDescription: {
+      color:
+        colors.mutedText,
+
+      fontSize: 12,
+
+      marginTop: 4,
+
+      lineHeight: 18,
+    },
+
+    /*        ====
+       FORM FIELDS
+           ==== */
+
+    formRow: {
+      flexDirection: "row",
+
+      gap: 12,
+
+      marginTop: 16,
+    },
+
+    formColumn: {
+      flexDirection:
+        "column",
+    },
+
+    formField: {
+      flex: 1,
+    },
+
+    fullField: {
+      width: "100%",
+
+      marginTop: 16,
+    },
+
+    label: {
+      color:
+        colors.text,
+
+      fontSize: 12,
+
+      fontWeight: "700",
+
+      marginBottom: 6,
+    },
+
+    required: {
+      color:
+        colors.error,
+    },
+
+    input: {
+      minHeight: 46,
+
+      backgroundColor:
+        colors.card,
+
+      borderWidth: 1,
+
+      borderColor:
+        colors.border,
+
+      borderRadius: 10,
+
+      paddingHorizontal: 12,
+
+      color:
+        colors.text,
+
+      fontSize: 13,
+    },
+
+    addressInput: {
+      minHeight: 90,
+
+      paddingTop: 12,
+
+      paddingBottom: 12,
+    },
+
+    /*        ====
+       STATE
+           ==== */
+
+    stateField: {
+      height: 46,
+
+      backgroundColor:
+        colors.card,
+
+      borderWidth: 1,
+
+      borderColor:
+        colors.border,
+
+      borderRadius: 10,
+
+      paddingHorizontal: 12,
+
+      flexDirection: "row",
+
+      alignItems: "center",
+
+      justifyContent:
+        "space-between",
+
+      position: "relative",
+
+      overflow: "hidden",
+    },
+
+    stateValue: {
+      flex: 1,
+
+      color:
+        colors.text,
+
+      fontSize: 13,
+
+      fontWeight: "500",
+
+      paddingRight: 30,
+    },
+
+    stateArrow: {
+      position: "absolute",
+
+      right: 12,
+
+      top: 0,
+
+      bottom: 0,
+
+      width: 24,
+
+      alignItems: "center",
+
+      justifyContent:
+        "center",
+    },
+
+    hiddenPickerContainer: {
+      position: "absolute",
+
+      left: 0,
+
+      right: 0,
+
+      top: 0,
+
+      bottom: 0,
+
+      opacity: 0.02,
+    },
+
+    hiddenPicker: {
+      width: "100%",
+
+      height: 46,
+    },
+
+    /*        ====
+       ACTIONS
+           ==== */
+
+    actions: {
+      width: "100%",
+
+      flexDirection: "row",
+
+      gap: 12,
+
+      marginTop: 16,
+
+      marginBottom: 10,
+    },
+
+    actionsLarge: {
+      maxWidth: 850,
+
+      alignSelf: "center",
+    },
+
+    cancelButton: {
+      flex: 1,
+
+      minHeight: 48,
+
+      borderRadius: 11,
+
+      borderWidth: 1,
+
+      borderColor:
+        colors.border,
+
+      backgroundColor:
+        colors.card,
+
+      alignItems: "center",
+
+      justifyContent:
+        "center",
+    },
+
+    cancelButtonText: {
+      color:
+        colors.text,
+
+      fontSize: 13,
+
+      fontWeight: "800",
+    },
+
+    saveButton: {
+      flex: 1.4,
+
+      minHeight: 48,
+
+      borderRadius: 11,
+
+      backgroundColor:
+        colors.primary,
+
+      alignItems: "center",
+
+      justifyContent:
+        "center",
+    },
+
+    saveButtonText: {
+      color: "#FFFFFF",
+
+      fontSize: 13,
+
+      fontWeight: "800",
+    },
+
+    disabledButton: {
+      opacity: 0.6,
+    },
+
+    buttonPressed: {
+      opacity: 0.75,
+
+      transform: [
+        {
+          scale: 0.99,
+        },
+      ],
+    },
+
+    /*        ====
+       TOAST
+           ==== */
+
+    toastContainer: {
+      position: "absolute",
+
+      left: 14,
+      right: 14,
+
+      bottom: 18,
+
+      alignItems: "center",
+
+      zIndex: 999,
+    },
+
+    toast: {
+      width: "100%",
+
+      maxWidth: 430,
+
+      minHeight: 56,
+
+      flexDirection: "row",
+
+      alignItems: "center",
+
+      backgroundColor:
+        "#FFFFFF",
+
+      borderRadius: 14,
+
+      borderWidth: 1,
+
+      borderColor:
+        "#D4E7E3",
+
+      paddingHorizontal: 12,
+
+      paddingVertical: 9,
+
+      elevation: 12,
+
+      shadowColor:
+        "#143631",
+
+      shadowOffset: {
+        width: 0,
+        height: 4,
+      },
+
+      shadowOpacity: 0.16,
+
+      shadowRadius: 10,
+    },
+
+    toastIcon: {
+      width: 32,
+
+      height: 32,
+
+      borderRadius: 16,
+
+      alignItems: "center",
+
+      justifyContent:
+        "center",
+
+      backgroundColor:
+        colors.teal,
+
+      marginRight: 10,
+    },
+
+    toastTextContainer: {
+      flex: 1,
+    },
+
+    toastTitle: {
+      color:
+        colors.text,
+
+      fontSize: 11,
+
+      fontWeight: "900",
+    },
+
+    toastMessage: {
+      color:
+        colors.mutedText,
+
+      fontSize: 9,
+
+      fontWeight: "600",
+
+      marginTop: 2,
+    },
+  });

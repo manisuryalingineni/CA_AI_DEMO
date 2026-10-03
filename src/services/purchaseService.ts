@@ -107,9 +107,9 @@ export interface CreatePurchaseInput {
   items: CreatePurchaseItemInput[];
 }
 
-/* =========================================
+/*      ======
    RFQ INPUT TYPE
-========================================= */
+     ====== */
 
 export interface CreatePurchaseRfqInput {
   vendorId: string;
@@ -1011,9 +1011,9 @@ export async function removePurchase(
 }
 
 
-/* =========================================
+/*      ======
    SAVE PURCHASE RFQ
-========================================= */
+     ====== */
 
 export async function savePurchaseRfq(
   input: CreatePurchaseRfqInput,
@@ -1313,9 +1313,9 @@ export async function savePurchaseRfq(
 }
 
 
-/* =========================================
+/*      ======
    LOAD PURCHASE RFQS
-========================================= */
+     ====== */
 
 export async function loadPurchaseRfqs():
   Promise<PurchaseRfqListRow[]> {
@@ -1335,9 +1335,9 @@ export async function loadPurchaseRfqs():
 }
 
 
-/* =========================================
+/*      ======
    LOAD ONE PURCHASE RFQ
-========================================= */
+     ====== */
 
 export async function loadPurchaseRfq(
   rfqId: string,
@@ -1380,9 +1380,9 @@ export async function loadPurchaseRfq(
 }
 
 
-/* =========================================
+/*      ======
    LOAD PURCHASE RFQ ITEMS
-========================================= */
+     ====== */
 
 export async function loadPurchaseRfqItems(
   rfqId: string,
@@ -1405,9 +1405,9 @@ export async function loadPurchaseRfqItems(
 }
 
 
-/* =========================================
+/*      ======
    PURCHASE RFQ + ITEMS
-========================================= */
+     ====== */
 
 export interface PurchaseRfqWithItems {
   rfq: PurchaseRfqRow;
@@ -1444,9 +1444,9 @@ export async function loadPurchaseRfqWithItems(
 }
 
 
-/* =========================================
+/*      ======
    DELETE PURCHASE RFQ
-========================================= */
+     ====== */
 
 export async function removePurchaseRfq(
   rfqId: string,
@@ -1491,9 +1491,9 @@ export async function removePurchaseRfq(
   );
 }
 
-/* =========================================
+/*      ======
    PURCHASE WORKFLOW
-========================================= */
+     ====== */
 
 export interface SavePurchaseWorkflowInput
   extends Omit<
@@ -1505,9 +1505,9 @@ export interface SavePurchaseWorkflowInput
 }
 
 
-/* =========================================
+/*      ======
    SAVE WORKFLOW DOCUMENT
-========================================= */
+     ====== */
 
 export async function savePurchaseWorkflow(
   input: SavePurchaseWorkflowInput,
@@ -1544,9 +1544,9 @@ export async function savePurchaseWorkflow(
 }
 
 
-/* =========================================
+/*      ======
    LOAD COMPLETE WORKFLOW
-========================================= */
+     ====== */
 
 export async function loadPurchaseWorkflow():
   Promise<WorkflowDocument[]> {
@@ -1567,9 +1567,9 @@ export async function loadPurchaseWorkflow():
 }
 
 
-/* =========================================
+/*      ======
    LOAD ONE WORKFLOW DOCUMENT
-========================================= */
+     ====== */
 
 export async function loadPurchaseWorkflowDocument(
   documentType:
