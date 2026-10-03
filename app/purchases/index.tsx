@@ -26,7 +26,10 @@ import {
 
 import { Picker } from '@react-native-picker/picker';
 
-import { SafeAreaView } from 'react-native-safe-area-context';
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
 
 import { colors } from '../../src/theme/colors';
 
@@ -2381,6 +2384,9 @@ export default function PurchasesScreen() {
   const { width } =
     useWindowDimensions();
 
+  const insets =
+    useSafeAreaInsets();
+
 
   const [purchases, setPurchases] =
     useState<PurchaseListRow[]>([]);
@@ -3335,6 +3341,153 @@ export default function PurchasesScreen() {
           }
         />
 
+        {/* =====================================================
+            BOTTOM NAVIGATION
+        ===================================================== */}
+
+        <View
+          style={[
+            styles.bottomNavigation,
+
+            {
+              bottom: Math.max(
+                8,
+                insets.bottom,
+              ),
+            },
+          ]}
+        >
+          {/* HOME */}
+
+          <Pressable
+            onPress={() =>
+              router.replace(
+                '/dashboard',
+              )
+            }
+            style={({ pressed }) => [
+              styles.navButton,
+
+              pressed &&
+                styles.navPressed,
+            ]}
+          >
+            <Text
+              style={
+                styles.navIcon
+              }
+            >
+              ⌂
+            </Text>
+
+            <Text
+              style={
+                styles.navText
+              }
+            >
+              Home
+            </Text>
+          </Pressable>
+
+          {/* SALES */}
+
+          <Pressable
+            onPress={() =>
+              router.push(
+                '/sales',
+              )
+            }
+            style={({ pressed }) => [
+              styles.navButton,
+
+              pressed &&
+                styles.navPressed,
+            ]}
+          >
+            <Text
+              style={
+                styles.navIcon
+              }
+            >
+              🧾
+            </Text>
+
+            <Text
+              style={
+                styles.navText
+              }
+            >
+              Sales
+            </Text>
+          </Pressable>
+
+          {/* PURCHASES - ACTIVE */}
+
+          <Pressable
+            onPress={() =>
+              router.replace(
+                '/purchases',
+              )
+            }
+            style={({ pressed }) => [
+              styles.navButton,
+              styles.navButtonActive,
+
+              pressed &&
+                styles.navPressed,
+            ]}
+          >
+            <Text
+              style={[
+                styles.navIcon,
+                styles.navIconActive,
+              ]}
+            >
+              📥
+            </Text>
+
+            <Text
+              style={
+                styles.navActiveText
+              }
+            >
+              Purchases
+            </Text>
+          </Pressable>
+
+          {/* MORE */}
+
+          <Pressable
+            onPress={() =>
+              router.push(
+                '/more',
+              )
+            }
+            style={({ pressed }) => [
+              styles.navButton,
+
+              pressed &&
+                styles.navPressed,
+            ]}
+          >
+            <Text
+              style={
+                styles.navIcon
+              }
+            >
+              ▦
+            </Text>
+
+            <Text
+              style={
+                styles.navText
+              }
+            >
+              More
+            </Text>
+          </Pressable>
+        </View>
+
       </View>
 
     </SafeAreaView>
@@ -3508,7 +3661,7 @@ const styles =
     content: {
       padding: 16,
 
-      paddingBottom: 40,
+      paddingBottom: 120,
     },
 
 
@@ -4585,6 +4738,100 @@ const styles =
 
     disabledButton: {
       opacity: 0.6,
+    },
+
+
+    /* =========================================================
+       BOTTOM NAVIGATION
+    ========================================================= */
+
+    bottomNavigation: {
+      position: 'absolute',
+
+      left: 9,
+      right: 9,
+
+      flexDirection: 'row',
+
+      gap: 4,
+
+      padding: 6,
+
+      backgroundColor: '#FFFFFF',
+
+      borderWidth: 1,
+
+      borderColor: colors.border,
+
+      borderRadius: 20,
+
+      shadowColor: colors.primary,
+
+      shadowOffset: {
+        width: 0,
+        height: 12,
+      },
+
+      shadowOpacity: 0.2,
+
+      shadowRadius: 25,
+
+      elevation: 10,
+    },
+
+
+    navButton: {
+      flex: 1,
+
+      minHeight: 48,
+
+      borderRadius: 14,
+
+      alignItems: 'center',
+
+      justifyContent: 'center',
+    },
+
+
+    navButtonActive: {
+      backgroundColor: '#E5F5F2',
+    },
+
+
+    navPressed: {
+      opacity: 0.75,
+    },
+
+
+    navIcon: {
+      color: colors.mutedText,
+
+      fontSize: 19,
+
+      marginBottom: 2,
+    },
+
+
+    navIconActive: {
+      color: colors.teal,
+    },
+
+
+    navActiveText: {
+      color: colors.teal,
+
+      fontSize: 9,
+
+      fontWeight: '800',
+    },
+
+
+    navText: {
+      color: colors.mutedText,
+
+      fontSize: 9,
+
+      fontWeight: '800',
     },
 
   });
