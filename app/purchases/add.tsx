@@ -1,2665 +1,4292 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, {
+    useCallback,
+    useEffect,
+    useMemo,
+    useState,
+} from 'react';
+
 import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  useWindowDimensions,
-  View,
+    Alert,
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
+    useWindowDimensions,
 } from 'react-native';
-import { router } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+
+import {
+    router,
+    useLocalSearchParams,
+} from 'expo-router';
+
+import { Picker } from '@react-native-picker/picker';
+
+import {
+    SafeAreaView,
+} from 'react-native-safe-area-context';
 
 import { colors } from '../../src/theme/colors';
-import { loadProducts } from '../../src/services/productService';
-import { loadVendors } from '../../src/services/vendorService';
-import type { Product } from '../../src/types/product';
-import type { Vendor } from '../../src/types/vendor';
+
+import {
+    loadPurchaseWorkflow,
+    loadPurchaseWorkflowDocument,
+    savePurchaseWorkflow,
+} from '../../src/services/purchaseService';
+
+import {
+    loadVendors,
+} from '../../src/services/vendorService';
+
+import {
+    loadProducts,
+} from '../../src/services/productService';
+
+import type {
+    DocumentType,
+    PurchaseStatus,
+    SupplyType,
+    WorkflowDetail,
+    WorkflowDocument,
+} from '../../src/repositories/purchaseRepository';
+
+
+/* =========================================================
+   LOCAL TYPES
+========================================================= */
+
+
+type VendorOption = {
+    id: string;
+    name: string;
+    state: string;
+    gstin?: string;
+};
+
 
 type ProductOption = {
-  id: string;
-  name: string;
-  hsn: string;
-  unit: string;
-  purchasePrice: number;
-  gstRate: number;
-  availableStock: number;
+    id: string;
+    name: string;
+    hsn?: string;
+    unit: string;
+    purchasePrice: number;
+    gstRate: number;
 };
+
 
 type PurchaseItem = {
-  id: string;
-  productId: string;
-  productName: string;
-  quantity: string;
-  unitPrice: string;
-  gstRate: string;
-  discount: string;
-  unit: string;
-  hsn: string;
-  availableStock: number;
+    id: string;
+    productId: string;
+    productName: string;
+    hsn: string;
+    unit: string;
+    quantity: string;
+    unitPrice: string;
+    gstRate: string;
+    discount: string;
+    sourceItemId?: string;
 };
 
-const formatCurrency = (value: number) =>
-  `₹${value.toLocaleString('en-IN', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
 
-export default function AddPurchaseScreen() {
-  const { width } = useWindowDimensions();
-  const isWide = width >= 900;
+interface FormDataProps {
+    vendors: VendorOption[];
 
-  const [vendors, setVendors] = useState<Vendor[]>([]);
-  const [products, setProducts] = useState<ProductOption[]>([]);
+    products: ProductOption[];
 
-  const [vendor, setVendor] = useState('');
-  const [vendorSearch, setVendorSearch] = useState('');
-  const [vendorDropdownOpen, setVendorDropdownOpen] = useState(false);
+    documentType:
+    DocumentType;
 
-  const [invoiceNumber, setInvoiceNumber] = useState('');
+    sourceType?:
+    DocumentType;
 
-  const [purchaseDate, setPurchaseDate] = useState(
-    new Date().toISOString().slice(0, 10),
-  );
+    sourceId?:
+    string;
 
-  const [items, setItems] = useState<PurchaseItem[]>([]);
-  const [productSearch, setProductSearch] = useState('');
+    sourceDocument?:
+    WorkflowDetail | null;
 
-  const [paidAmount, setPaidAmount] = useState('0');
-  const [notes, setNotes] = useState('');
+    returnPurchases:
+    WorkflowDocument[];
+}
 
-  const [loadingData, setLoadingData] = useState(true);
-  const [saving, setSaving] = useState(false);
+type PurchaseDocumentConfig = {
+    title: string;
+    subtitle: string;
+    saveLabel: string;
+    successTitle: string;
+    successMessage: string;
+    showInvoice: boolean;
+    showPayment: boolean;
+    showRefund: boolean;
+};
 
-  /*
-   * Load real vendors and products from SQLite.
-   *
-   * The service layer is responsible for
-   * resolving the current business.
-   */
-  useEffect(() => {
-    let mounted = true;
 
-    const loadPurchaseData = async () => {
-      try {
-        setLoadingData(true);
+const DOCUMENT_CONFIG:
+    Record<
+        DocumentType,
+        PurchaseDocumentConfig
+    > = {
 
-        const [vendorData, productData] = await Promise.all([
-          loadVendors(),
-          loadProducts(),
-        ]);
+    REQUEST: {
+        title:
+            'Purchase request',
 
-        if (!mounted) {
-          return;
-        }
+        subtitle:
+            'Vendor and inward stock flow',
 
-        setVendors(vendorData);
+        saveLabel:
+            'Save Purchase request',
 
-        const mappedProducts: ProductOption[] = productData.map(
-          product => ({
-            id: product.id,
-            name: product.name,
-            hsn: product.hsn ?? '',
-            unit: product.unit,
-            purchasePrice: Number(product.purchasePrice) || 0,
-            gstRate: Number(product.gstRate) || 0,
-            availableStock: Number(product.openingStock) || 0,
-          }),
-        );
+        successTitle:
+            'Purchase request saved',
 
-        setProducts(mappedProducts);
-      } catch (error) {
-        console.error(
-          'Failed to load purchase data:',
-          error,
-        );
+        successMessage:
+            'Purchase request has been saved successfully.',
 
-        if (mounted) {
-          Alert.alert(
-            'Unable to load data',
-            'Products or vendors could not be loaded.',
-          );
-        }
-      } finally {
-        if (mounted) {
-          setLoadingData(false);
-        }
-      }
-    };
+        showInvoice: false,
 
-    loadPurchaseData();
+        showPayment: false,
 
-    return () => {
-      mounted = false;
-    };
-  }, []);
+        showRefund: false,
+    },
 
-  const calculations = useMemo(() => {
-    let subtotal = 0;
-    let gstAmount = 0;
-    let discount = 0;
 
-    items.forEach(item => {
-      const quantity =
-        Number(item.quantity) || 0;
+    RFQ: {
+        title:
+            'Request for quotation',
 
-      const unitPrice =
-        Number(item.unitPrice) || 0;
+        subtitle:
+            'Vendor and inward stock flow',
 
-      const gstRate =
-        Number(item.gstRate) || 0;
+        saveLabel:
+            'Save Request for quotation',
 
-      const itemDiscount =
-        Number(item.discount) || 0;
+        successTitle:
+            'RFQ saved',
 
-      const gross =
-        quantity * unitPrice;
+        successMessage:
+            'Request for quotation has been saved successfully.',
 
-      const taxableAmount =
-        Math.max(
-          gross - itemDiscount,
-          0,
-        );
+        showInvoice: false,
 
-      subtotal += taxableAmount;
-      discount += itemDiscount;
+        showPayment: false,
 
-      gstAmount +=
-        (taxableAmount * gstRate) / 100;
-    });
+        showRefund: false,
+    },
 
-    const totalAmount =
-      subtotal + gstAmount;
 
-    const paid = Math.max(
-      Number(paidAmount) || 0,
-      0,
-    );
+    PO: {
+        title:
+            'Purchase order',
 
-    const due = Math.max(
-      totalAmount - paid,
-      0,
-    );
+        subtitle:
+            'Vendor and inward stock flow',
 
-    let paymentStatus:
-      | 'UNPAID'
-      | 'PARTIAL'
-      | 'PAID' = 'UNPAID';
+        saveLabel:
+            'Save Purchase order',
 
-    if (
-      paid > 0 &&
-      paid < totalAmount
-    ) {
-      paymentStatus = 'PARTIAL';
-    }
+        successTitle:
+            'Purchase order saved',
 
-    if (
-      totalAmount > 0 &&
-      paid >= totalAmount
-    ) {
-      paymentStatus = 'PAID';
-    }
+        successMessage:
+            'Purchase order has been saved successfully.',
 
-    return {
-      subtotal,
-      gstAmount,
-      discount,
-      totalAmount,
-      paid,
-      due,
-      paymentStatus,
-    };
-  }, [items, paidAmount]);
+        showInvoice: false,
 
-  const updateItem = (
-    id: string,
-    field: keyof PurchaseItem,
-    value: string,
-  ) => {
-    setItems(current =>
-      current.map(item =>
-        item.id === id
-          ? {
-              ...item,
-              [field]: value,
-            }
-          : item,
-      ),
-    );
-  };
+        showPayment: false,
 
-  /*
-   * Current inventory is NOT a purchase limit.
-   *
-   * Example:
-   * Current stock = 24
-   * Purchase quantity = 10
-   * Resulting stock = 34
-   *
-   * The availableStock value is kept only
-   * for display/reference purposes.
-   */
-  const addProductToPurchase = (
-    product: ProductOption,
-  ) => {
-    if (!vendor) {
-      Alert.alert(
-        'Select Vendor',
-        'Please select a vendor before selecting a product.',
-      );
-      return;
-    }
+        showRefund: false,
+    },
 
-    const existingItem = items.find(
-      item =>
-        item.productId === product.id,
-    );
 
-    const currentQuantity =
-      Number(existingItem?.quantity) || 0;
+    GRN: {
+        title:
+            'Goods receipt note',
 
-    if (existingItem) {
-      updateItem(
-        existingItem.id,
-        'quantity',
-        String(currentQuantity + 1),
-      );
-    } else {
-      setItems(current => [
-        ...current,
+        subtitle:
+            'Vendor and inward stock flow',
+
+        saveLabel:
+            'Save Goods receipt note',
+
+        successTitle:
+            'Goods receipt note saved',
+
+        successMessage:
+            'Goods receipt note has been saved successfully.',
+
+        showInvoice: false,
+
+        showPayment: false,
+
+        showRefund: false,
+    },
+
+
+    PURCHASE: {
+        title:
+            'Purchase bill',
+
+        subtitle:
+            'Vendor and inward stock flow',
+
+        saveLabel:
+            'Save Purchase bill',
+
+        successTitle:
+            'Purchase saved',
+
+        successMessage:
+            'Purchase bill has been saved successfully.',
+
+        showInvoice: true,
+
+        showPayment: true,
+
+        showRefund: false,
+    },
+
+
+    RETURN: {
+        title:
+            'Purchase return',
+
+        subtitle:
+            'Vendor and inward stock flow',
+
+        saveLabel:
+            'Save Purchase return',
+
+        successTitle:
+            'Purchase return saved',
+
+        successMessage:
+            'Purchase return has been saved successfully.',
+
+        showInvoice: false,
+
+        showPayment: false,
+
+        showRefund: true,
+    },
+};
+
+/* =========================================================
+   HELPERS
+========================================================= */
+
+const todayIso = () =>
+    new Date()
+        .toISOString()
+        .slice(0, 10);
+
+
+const formatCurrency = (
+    value: number,
+) =>
+    `₹${Number(value || 0).toLocaleString(
+        'en-IN',
         {
-          id: `item_${Date.now()}_${Math.random()}`,
-          productId: product.id,
-          productName: product.name,
-          quantity: '1',
-          unitPrice: String(
-            product.purchasePrice,
-          ),
-          gstRate: String(
-            product.gstRate,
-          ),
-          discount: '0',
-          unit: product.unit,
-          hsn: product.hsn,
-          availableStock:
-            product.availableStock,
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
         },
-      ]);
-    }
+    )}`;
 
-    setProductSearch('');
-  };
 
-  const removeItem = (id: string) => {
-    setItems(current =>
-      current.filter(
-        item => item.id !== id,
-      ),
-    );
-  };
+/* =========================================================
+   PURCHASE WORKFLOW FORM
+========================================================= */
 
-  const getSelectedQuantity = (
-    productId: string,
-  ) => {
-    const item = items.find(
-      current =>
-        current.productId ===
-        productId,
-    );
-
-    return (
-      Number(item?.quantity) || 0
-    );
-  };
-
-  const filteredProducts = useMemo(() => {
-    const search =
-      productSearch
-        .trim()
-        .toLowerCase();
-
-    if (!vendor || !search) {
-      return [];
-    }
-
-    return products.filter(
-      product =>
-        product.name
-          .toLowerCase()
-          .includes(search) ||
-        product.hsn
-          .toLowerCase()
-          .includes(search),
-    );
-  }, [
-    products,
-    productSearch,
-    vendor,
-  ]);
-
-  const filteredVendors = useMemo(() => {
-    const search =
-      vendorSearch
-        .trim()
-        .toLowerCase();
-
-    if (!search) {
-      return vendors.slice(0, 8);
-    }
-
-    return vendors
-      .filter(item => {
-        const nameMatch =
-          item.name
-            .toLowerCase()
-            .includes(search);
-
-        const mobileMatch =
-          item.mobile
-            ?.toLowerCase()
-            .includes(search);
-
-        const gstinMatch =
-          item.gstin
-            ?.toLowerCase()
-            .includes(search);
-
-        return (
-          nameMatch ||
-          mobileMatch ||
-          gstinMatch
-        );
-      })
-      .slice(0, 8);
-  }, [
+function WorkflowForm({
     vendors,
-    vendorSearch,
-  ]);
+    products,
+    documentType,
+    sourceType,
+    sourceId,
+    sourceDocument,
+    returnPurchases,
+}: FormDataProps) {
 
-  const selectedVendor = useMemo(
-    () =>
-      vendors.find(
-        item =>
-          item.id === vendor,
-      ) ?? null,
-    [vendors, vendor],
-  );
+    const config =
+        DOCUMENT_CONFIG[
+        documentType
+        ];
 
-  const selectVendor = (
-    selected: Vendor,
-  ) => {
-    setVendor(selected.id);
-    setVendorSearch(selected.name);
-    setVendorDropdownOpen(false);
-    setProductSearch('');
-    setItems([]);
-  };
+    const { width } =
+        useWindowDimensions();
 
-  const handleSave = async () => {
-    if (!vendor.trim()) {
-      Alert.alert(
-        'Required',
-        'Please select a vendor.',
-      );
-      return;
-    }
+    const isSmall =
+        width < 380;
 
-    if (!invoiceNumber.trim()) {
-      Alert.alert(
-        'Required',
-        'Please enter the invoice number.',
-      );
-      return;
-    }
+    const isWide =
+        width >= 760;
 
-    if (!purchaseDate.trim()) {
-      Alert.alert(
-        'Required',
-        'Please enter the purchase date.',
-      );
-      return;
-    }
 
-    if (items.length === 0) {
-      Alert.alert(
-        'Required',
-        'Please add at least one product.',
-      );
-      return;
-    }
+    /* =======================================================
+       HEADER
+    ======================================================= */
 
-    if (
-      calculations.totalAmount <= 0
-    ) {
-      Alert.alert(
-        'Invalid purchase',
-        'Purchase total must be greater than zero.',
-      );
-      return;
-    }
+    const [vendorId, setVendorId] =
+        useState('');
 
-    if (
-      calculations.paid >
-      calculations.totalAmount
-    ) {
-      Alert.alert(
-        'Invalid payment',
-        'Paid amount cannot be greater than the purchase total.',
-      );
-      return;
-    }
+    const [
+        invoiceNumber,
+        setInvoiceNumber,
+    ] = useState('');
 
-    if (saving) {
-      return;
-    }
+    const [
+        purchaseDate,
+        setPurchaseDate,
+    ] = useState(
+        todayIso(),
+    );
 
-    setSaving(true);
+    const [
+        dueDate,
+        setDueDate,
+    ] = useState(
+        todayIso(),
+    );
 
-    try {
-      /*
-       * UI-only for this step.
-       *
-       * The next step will connect this form
-       * to purchaseService.savePurchase().
-       *
-       * Expected final flow:
-       *
-       * Vendor
-       *   ↓
-       * Purchase Bill
-       *   ↓
-       * Purchase Items
-       *   ↓
-       * Save Purchase
-       *   ↓
-       * Increase Inventory
-       *   ↓
-       * Create Inventory Movement
-       */
+    const [
+        supplyType,
+        setSupplyType,
+    ] =
+        useState<SupplyType>(
+            'WITHIN_STATE',
+        );
 
-      Alert.alert(
-        'Purchase',
-        'Purchase form is ready to connect.',
-      );
+    const [
+        counterBranch,
+        setCounterBranch,
+    ] = useState('');
 
-      router.back();
-    } catch (error) {
-      console.error(
-        'Failed to save purchase:',
-        error,
-      );
+    const [
+        salesperson,
+        setSalesperson,
+    ] = useState('');
 
-      Alert.alert(
-        'Unable to save purchase',
-        'Something went wrong while saving the purchase.',
-      );
-    } finally {
-      setSaving(false);
-    }
-  };
+    const [
+        deliveryMethod,
+        setDeliveryMethod,
+    ] = useState('');
 
-  return (
-    <SafeAreaView
-      style={styles.safeArea}
-    >
-      <View style={styles.page}>
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            <Pressable
-              style={styles.backButton}
-              onPress={() =>
-                router.back()
-              }
-            >
-              <Text
-                style={styles.backIcon}
-              >
-                ‹
-              </Text>
-            </Pressable>
+    const [
+        paidAmount,
+        setPaidAmount,
+    ] = useState('0');
 
-            <View>
-              <Text
-                style={styles.headerTitle}
-              >
-                Add Purchase
-              </Text>
+    const [
+        refundAmount,
+        setRefundAmount,
+    ] = useState('0');
 
-              <Text
-                style={styles.headerSubtitle}
-              >
-                Purchase bill and stock inward
-              </Text>
-            </View>
-          </View>
+    const [
+        notes,
+        setNotes,
+    ] = useState('');
 
-          <View
-            style={styles.logoCircle}
-          >
-            <Text
-              style={styles.logoText}
-            >
-              CA
-            </Text>
-          </View>
-        </View>
+    const [
+        saving,
+        setSaving,
+    ] = useState(false);
 
-        <ScrollView
-          contentContainerStyle={[
-            styles.content,
-            isWide &&
-              styles.contentWide,
-          ]}
-          showsVerticalScrollIndicator={
-            false
-          }
-        >
-          {/* Purchase Details */}
-          <View style={styles.card}>
-            <Text
-              style={styles.sectionTitle}
-            >
-              Purchase Details
-            </Text>
 
-            <Text
-              style={
-                styles.sectionSubtitle
-              }
-            >
-              Enter the basic purchase information.
-            </Text>
+    /* =======================================================
+       NEW LINE
+    ======================================================= */
 
-            <View
-              style={
-                isWide
-                  ? styles.row
-                  : undefined
-              }
-            >
-              {/* Vendor */}
-              <View
-                style={[
-                  styles.field,
-                  isWide &&
-                    styles.halfField,
-                ]}
-              >
-                <Text
-                  style={styles.label}
-                >
-                  Vendor{' '}
-                  <Text
-                    style={
-                      styles.required
-                    }
-                  >
-                    *
-                  </Text>
-                </Text>
+    const [
+        selectedProductId,
+        setSelectedProductId,
+    ] = useState('');
 
-                <View
-                  style={
-                    styles.vendorContainer
-                  }
-                >
-                  <TextInput
-                    value={
-                      vendorSearch
-                    }
-                    onChangeText={value => {
-                      setVendorSearch(
-                        value,
-                      );
-                      setVendor('');
-                      setVendorDropdownOpen(
-                        true,
-                      );
-                    }}
-                    onFocus={() =>
-                      setVendorDropdownOpen(
-                        true,
-                      )
-                    }
-                    placeholder="Search vendor..."
-                    placeholderTextColor={
-                      colors.mutedText
-                    }
-                    style={
-                      styles.input
-                    }
-                    editable={
-                      !loadingData
-                    }
-                  />
+    const [
+        lineQuantity,
+        setLineQuantity,
+    ] = useState('1');
 
-                  {vendorDropdownOpen &&
-                    !loadingData && (
-                      <View
-                        style={
-                          styles.vendorSuggestions
-                        }
-                      >
-                        {filteredVendors.length >
-                        0 ? (
-                          filteredVendors.map(
-                            item => (
-                              <Pressable
-                                key={
-                                  item.id
-                                }
-                                style={
-                                  styles.vendorSuggestion
-                                }
-                                onPress={() =>
-                                  selectVendor(
-                                    item,
-                                  )
-                                }
-                              >
-                                <View
-                                  style={
-                                    styles.vendorSuggestionAvatar
-                                  }
-                                >
-                                  <Text
-                                    style={
-                                      styles.vendorSuggestionAvatarText
-                                    }
-                                  >
-                                    {item.name
-                                      .charAt(
-                                        0,
-                                      )
-                                      .toUpperCase()}
-                                  </Text>
-                                </View>
+    const [
+        lineRate,
+        setLineRate,
+    ] = useState('');
 
-                                <View
-                                  style={
-                                    styles.vendorSuggestionMain
-                                  }
-                                >
-                                  <Text
-                                    style={
-                                      styles.vendorSuggestionName
-                                    }
-                                  >
-                                    {
-                                      item.name
-                                    }
-                                  </Text>
+    const [
+        lineGstRate,
+        setLineGstRate,
+    ] = useState('');
 
-                                  <Text
-                                    style={
-                                      styles.vendorSuggestionMeta
-                                    }
-                                  >
-                                    {item.mobile ||
-                                      'No mobile'}
-                                    {item.gstin
-                                      ? ` • ${item.gstin}`
-                                      : ''}
-                                  </Text>
-                                </View>
-                              </Pressable>
-                            ),
-                          )
-                        ) : (
-                          <View
-                            style={
-                              styles.noVendorResult
-                            }
-                          >
-                            <Text
-                              style={
-                                styles.noVendorResultText
-                              }
-                            >
-                              No vendors found
-                            </Text>
-                          </View>
-                        )}
-                      </View>
-                    )}
-                </View>
+    const [
+        lineDiscount,
+        setLineDiscount,
+    ] = useState('0');
 
-                {selectedVendor && (
-                  <View
-                    style={
-                      styles.selectedVendorInfo
-                    }
-                  >
-                    <Text
-                      style={
-                        styles.selectedVendorText
-                      }
-                    >
-                      Selected:{' '}
-                      {
-                        selectedVendor.name
-                      }
-                    </Text>
+    const [
+        items,
+        setItems,
+    ] =
+        useState<PurchaseItem[]>(
+            [],
+        );
 
-                    {selectedVendor.mobile ? (
-                      <Text
-                        style={
-                          styles.selectedVendorMeta
-                        }
-                      >
-                        {
-                          selectedVendor.mobile
-                        }
-                      </Text>
-                    ) : null}
-                  </View>
-                )}
-              </View>
 
-              {/* Invoice Number */}
-              <View
-                style={[
-                  styles.field,
-                  isWide &&
-                    styles.halfField,
-                ]}
-              >
-                <Text
-                  style={styles.label}
-                >
-                  Invoice Number{' '}
-                  <Text
-                    style={
-                      styles.required
-                    }
-                  >
-                    *
-                  </Text>
-                </Text>
+    const selectedVendor =
+        vendors.find(
+            vendor =>
+                vendor.id ===
+                vendorId,
+        );
 
-                <TextInput
-                  value={
-                    invoiceNumber
-                  }
-                  onChangeText={
-                    setInvoiceNumber
-                  }
-                  placeholder="Enter invoice number"
-                  placeholderTextColor={
-                    colors.mutedText
-                  }
-                  style={
-                    styles.input
-                  }
-                />
-              </View>
-            </View>
 
-            {/* Purchase Date */}
-            <View style={styles.field}>
-              <Text
-                style={styles.label}
-              >
-                Purchase Date
-              </Text>
+    const selectedProduct =
+        products.find(
+            product =>
+                product.id ===
+                selectedProductId,
+        );
 
-              <TextInput
-                value={
-                  purchaseDate
-                }
-                onChangeText={
-                  setPurchaseDate
-                }
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor={
-                  colors.mutedText
-                }
-                style={
-                  styles.input
-                }
-              />
-            </View>
-          </View>
 
-          {/* Purchase Items */}
-          <View style={styles.card}>
-            <View
-              style={
-                styles.sectionHeaderRow
-              }
-            >
-              <View
-                style={{ flex: 1 }}
-              >
-                <Text
-                  style={
-                    styles.sectionTitle
-                  }
-                >
-                  Purchase Items
-                </Text>
+    /* =======================================================
+       AUTO PRODUCT VALUES
+    ======================================================= */
 
-                <Text
-                  style={
-                    styles.sectionSubtitle
-                  }
-                >
-                  Search and add products to this
-                  purchase.
-                </Text>
-              </View>
-            </View>
+    useEffect(() => {
 
-            {/* Loading */}
-            {loadingData ? (
-              <View
-                style={
-                  styles.loadingContainer
-                }
-              >
-                <ActivityIndicator
-                  size="small"
-                  color={colors.teal}
-                />
+        if (!selectedProduct) {
 
-                <Text
-                  style={
-                    styles.loadingText
-                  }
-                >
-                  Loading products and vendors...
-                </Text>
-              </View>
-            ) : null}
+            setLineRate('');
 
-            {/* Product Search */}
-            {!loadingData && (
-              <>
-                <View
-                  style={
-                    styles.searchContainer
-                  }
-                >
-                  <Text
-                    style={
-                      styles.searchIcon
-                    }
-                  >
-                    ⌕
-                  </Text>
+            setLineGstRate('');
 
-                  <TextInput
-                    value={
-                      productSearch
-                    }
-                    onChangeText={
-                      setProductSearch
-                    }
-                    placeholder={
-                      vendor
-                        ? 'Search products...'
-                        : 'Select a vendor first...'
-                    }
-                    placeholderTextColor={
-                      colors.mutedText
-                    }
-                    style={
-                      styles.searchInput
-                    }
-                    editable={
-                      Boolean(vendor)
-                    }
-                  />
+            return;
+        }
 
-                  {productSearch.length >
-                    0 && (
-                    <Pressable
-                      onPress={() =>
-                        setProductSearch(
-                          '',
-                        )
-                      }
-                      style={
-                        styles.clearSearchButton
-                      }
-                    >
-                      <Text
-                        style={
-                          styles.clearSearchText
-                        }
-                      >
-                        ×
-                      </Text>
-                    </Pressable>
-                  )}
-                </View>
+        setLineRate(
+            String(
+                selectedProduct
+                    .purchasePrice,
+            ),
+        );
 
-                {/* Product Suggestions */}
-                {productSearch.trim()
-                    .length > 0 &&
-                  filteredProducts.length >
-                    0 && (
-                    <View
-                      style={
-                        styles.productSuggestions
-                      }
-                    >
-                      {filteredProducts.map(
-                        product => (
-                          <Pressable
-                            key={
-                              product.id
-                            }
-                            style={
-                              styles.productSuggestion
-                            }
-                            onPress={() =>
-                              addProductToPurchase(
-                                product,
-                              )
-                            }
-                          >
-                            <View
-                              style={
-                                styles.productSuggestionMain
-                              }
-                            >
-                              <Text
-                                style={
-                                  styles.productSuggestionName
-                                }
-                              >
-                                {
-                                  product.name
-                                }
-                              </Text>
+        setLineGstRate(
+            String(
+                selectedProduct
+                    .gstRate,
+            ),
+        );
 
-                              <Text
-                                style={
-                                  styles.productSuggestionMeta
-                                }
-                              >
-                                HSN{' '}
-                                {product.hsn ||
-                                  'N/A'}{' '}
-                                • GST{' '}
-                                {
-                                  product.gstRate
-                                }
-                                % •{' '}
-                                {
-                                  product.unit
-                                }
-                              </Text>
+    }, [
+        selectedProduct,
+    ]);
 
-                              <Text
-                                style={
-                                  styles.productSuggestionStock
-                                }
-                              >
-                                Current stock:{' '}
-                                {
-                                  product.availableStock
-                                }{' '}
-                                {
-                                  product.unit
-                                }
+    useEffect(() => {
 
-                                {getSelectedQuantity(
-                                  product.id,
-                                ) > 0
-                                  ? ` • Selected: ${getSelectedQuantity(
-                                      product.id,
-                                    )}`
-                                  : ''}
-                              </Text>
-                            </View>
+        if (!sourceDocument) {
+            return;
+        }
 
-                            <View
-                              style={
-                                styles.productSuggestionRight
-                              }
-                            >
-                              <Text
-                                style={
-                                  styles.productSuggestionPrice
-                                }
-                              >
-                                ₹
-                                {
-                                  product.purchasePrice
-                                }
-                              </Text>
 
-                              <Text
-                                style={
-                                  styles.productSuggestionAction
-                                }
-                              >
-                                + Add
-                              </Text>
-                            </View>
-                          </Pressable>
-                        ),
-                      )}
-                    </View>
-                  )}
+        const source =
+            sourceDocument.document;
 
-                {!vendor ? (
-                  <View
-                    style={
-                      styles.vendorRequiredBox
-                    }
-                  >
-                    <Text
-                      style={
-                        styles.vendorRequiredTitle
-                      }
-                    >
-                      Select a vendor to add products
-                    </Text>
 
-                    <Text
-                      style={
-                        styles.vendorRequiredText
-                      }
-                    >
-                      Once a vendor is selected,
-                      search here to select products
-                      for the purchase bill.
-                    </Text>
-                  </View>
-                ) : null}
+        /* =====================================
+           HEADER PREFILL
+        ===================================== */
 
-                {vendor &&
-                  productSearch.trim()
-                    .length > 0 &&
-                  filteredProducts.length ===
-                    0 && (
-                    <View
-                      style={
-                        styles.noProductResult
-                      }
-                    >
-                      <Text
-                        style={
-                          styles.noProductResultText
-                        }
-                      >
-                        No products found for this search
-                      </Text>
-                    </View>
-                  )}
-              </>
-            )}
+        setVendorId(
+            source.vendor_id || '',
+        );
 
-            {/* Selected Items */}
-            {items.length === 0 ? (
-              <View
-                style={
-                  styles.emptyItems
-                }
-              >
-                <View
-                  style={
-                    styles.emptyItemsIcon
-                  }
-                >
-                  <Text
-                    style={
-                      styles.emptyItemsIconText
-                    }
-                  >
-                    +
-                  </Text>
-                </View>
 
-                <Text
-                  style={
-                    styles.emptyItemsTitle
-                  }
-                >
-                  No items added
-                </Text>
+        setSupplyType(
+            source.supply_type,
+        );
 
-                <Text
-                  style={
-                    styles.emptyItemsText
-                  }
-                >
-                  Search for a product above to add it
-                  to this purchase.
-                </Text>
-              </View>
-            ) : (
-              <View
-                style={
-                  styles.itemsList
-                }
-              >
-                {items.map(
-                  (item, index) => {
+
+        setCounterBranch(
+            source.counter_branch || '',
+        );
+
+
+        setSalesperson(
+            source.salesperson || '',
+        );
+
+
+        setDeliveryMethod(
+            source.delivery_method || '',
+        );
+
+
+        /*
+         * A converted document should never be dated
+         * before its source document.
+         */
+        const today =
+            todayIso();
+
+
+        const nextDate =
+            today <
+                source.document_date
+                ? source.document_date
+                : today;
+
+
+        setPurchaseDate(
+            nextDate,
+        );
+
+
+        const nextDueDate =
+            source.due_date &&
+                source.due_date >=
+                nextDate
+                ? source.due_date
+                : nextDate;
+
+
+        setDueDate(
+            nextDueDate,
+        );
+
+
+        /* =====================================
+           ITEM PREFILL
+        ===================================== */
+
+        const sourceItems =
+            sourceDocument.items
+                .map(
+                    item => {
+
+                        const remainingQuantity =
+                            Math.max(
+                                item.quantity -
+                                (
+                                    item.returned_quantity ||
+                                    0
+                                ),
+                                0,
+                            );
+
+
+                        const quantity =
+                            documentType ===
+                                'RETURN'
+                                ? remainingQuantity
+                                : item.quantity;
+
+
+                        return {
+
+                            id:
+                                `source_${item.id}`,
+
+                            sourceItemId:
+                                item.id,
+
+                            productId:
+                                item.product_id,
+
+                            productName:
+                                item.product_name,
+
+                            hsn:
+                                item.hsn ||
+                                '',
+
+                            unit:
+                                item.unit ||
+                                '',
+
+                            quantity:
+                                String(
+                                    quantity,
+                                ),
+
+                            unitPrice:
+                                String(
+                                    item.unit_price,
+                                ),
+
+                            gstRate:
+                                String(
+                                    item.gst_rate,
+                                ),
+
+                            discount:
+                                String(
+                                    item.discount || 0,
+                                ),
+                        };
+                    },
+                )
+                .filter(
+                    item =>
+                        Number(
+                            item.quantity,
+                        ) > 0,
+                );
+
+
+        setItems(
+            sourceItems,
+        );
+
+    }, [
+        sourceDocument,
+        documentType,
+    ]);
+
+    /* =======================================================
+       CALCULATIONS
+    ======================================================= */
+
+    const calculations =
+        useMemo(() => {
+
+            let taxableValue = 0;
+            let gstAmount = 0;
+            let discount = 0;
+
+            items.forEach(
+                item => {
+
                     const quantity =
-                      Number(
-                        item.quantity,
-                      ) || 0;
+                        Number(
+                            item.quantity,
+                        ) || 0;
 
-                    const unitPrice =
-                      Number(
-                        item.unitPrice,
-                      ) || 0;
+                    const rate =
+                        Number(
+                            item.unitPrice,
+                        ) || 0;
 
                     const gstRate =
-                      Number(
-                        item.gstRate,
-                      ) || 0;
+                        Number(
+                            item.gstRate,
+                        ) || 0;
 
-                    const discount =
-                      Number(
-                        item.discount,
-                      ) || 0;
+                    const itemDiscount =
+                        Number(
+                            item.discount,
+                        ) || 0;
 
-                    const taxableAmount =
-                      Math.max(
+                    const gross =
                         quantity *
-                          unitPrice -
-                          discount,
-                        0,
-                      );
+                        rate;
 
-                    const gstAmount =
-                      (taxableAmount *
-                        gstRate) /
-                      100;
+                    const taxable =
+                        Math.max(
+                            gross -
+                            itemDiscount,
+                            0,
+                        );
 
-                    const itemTotal =
-                      taxableAmount +
-                      gstAmount;
+                    const gst =
+                        taxable *
+                        gstRate /
+                        100;
 
-                    return (
-                      <View
-                        key={
-                          item.id
+                    taxableValue +=
+                        taxable;
+
+                    gstAmount +=
+                        gst;
+
+                    discount +=
+                        itemDiscount;
+                },
+            );
+
+
+            const totalAmount =
+                taxableValue +
+                gstAmount;
+
+
+            const paid =
+                Math.max(
+                    Number(
+                        paidAmount,
+                    ) || 0,
+                    0,
+                );
+
+
+            const due =
+                Math.max(
+                    totalAmount -
+                    paid,
+                    0,
+                );
+
+
+            let paymentStatus:
+                PurchaseStatus =
+                'UNPAID';
+
+
+            if (
+                paid > 0 &&
+                paid < totalAmount
+            ) {
+                paymentStatus =
+                    'PARTIAL';
+            }
+
+
+            if (
+                totalAmount > 0 &&
+                paid >= totalAmount
+            ) {
+                paymentStatus =
+                    'PAID';
+            }
+
+
+            let cgstAmount = 0;
+            let sgstAmount = 0;
+            let igstAmount = 0;
+
+
+            if (
+                supplyType ===
+                'WITHIN_STATE'
+            ) {
+
+                cgstAmount =
+                    gstAmount / 2;
+
+                sgstAmount =
+                    gstAmount / 2;
+
+            } else {
+
+                igstAmount =
+                    gstAmount;
+            }
+
+
+            return {
+                taxableValue,
+                gstAmount,
+                cgstAmount,
+                sgstAmount,
+                igstAmount,
+                discount,
+                totalAmount,
+                paid,
+                due,
+                paymentStatus,
+            };
+
+        }, [
+            items,
+            paidAmount,
+            supplyType,
+        ]);
+
+
+    /* =======================================================
+       ITEM HELPERS
+    ======================================================= */
+
+    const updateItem = (
+        id: string,
+        field:
+            keyof PurchaseItem,
+        value: string,
+    ) => {
+
+        setItems(
+            current =>
+                current.map(
+                    item =>
+                        item.id === id
+                            ? {
+                                ...item,
+                                [field]:
+                                    value,
+                            }
+                            : item,
+                ),
+        );
+    };
+
+
+    const changeQuantity = (
+        id: string,
+        amount: number,
+    ) => {
+
+        setItems(
+            current =>
+                current.map(
+                    item => {
+
+                        if (
+                            item.id !== id
+                        ) {
+                            return item;
                         }
-                        style={
-                          styles.cartItem
-                        }
-                      >
-                        {/* Item Header */}
-                        <View
-                          style={
-                            styles.cartItemHeader
-                          }
-                        >
-                          <View
-                            style={
-                              styles.cartItemNumber
-                            }
-                          >
-                            <Text
-                              style={
-                                styles.cartItemNumberText
-                              }
-                            >
-                              {index +
-                                1}
-                            </Text>
-                          </View>
 
-                          <View
-                            style={
-                              styles.cartItemInfo
-                            }
-                          >
-                            <Text
-                              style={
-                                styles.cartItemName
-                              }
-                            >
-                              {
-                                item.productName
-                              }
-                            </Text>
+                        const currentQuantity =
+                            Number(
+                                item.quantity,
+                            ) || 1;
 
-                            <Text
-                              style={
-                                styles.cartItemMeta
-                              }
-                            >
-                              HSN{' '}
-                              {item.hsn ||
-                                'N/A'}{' '}
-                              • GST{' '}
-                              {
-                                item.gstRate
-                              }
-                              % •{' '}
-                              {
-                                item.unit
-                              }
-                            </Text>
+                        const nextQuantity =
+                            Math.max(
+                                currentQuantity +
+                                amount,
+                                1,
+                            );
 
-                            <Text
-                              style={
-                                styles.cartStockText
-                              }
-                            >
-                              Current stock:{' '}
-                              {
-                                item.availableStock
-                              }{' '}
-                              {
-                                item.unit
-                              }
-                            </Text>
-                          </View>
+                        return {
+                            ...item,
 
-                          <Pressable
-                            style={
-                              styles.cartRemoveButton
-                            }
-                            onPress={() =>
-                              removeItem(
-                                item.id,
-                              )
-                            }
-                          >
-                            <Text
-                              style={
-                                styles.cartRemoveText
-                              }
-                            >
-                              ×
-                            </Text>
-                          </Pressable>
-                        </View>
+                            quantity:
+                                String(
+                                    nextQuantity,
+                                ),
+                        };
+                    },
+                ),
+        );
+    };
 
-                        {/* Item Controls */}
-                        <View
-                          style={[
-                            styles.cartControls,
-                            !isWide &&
-                              styles.cartControlsMobile,
-                          ]}
-                        >
-                          {/* Quantity */}
-                          <View
-                            style={
-                              styles.cartControl
-                            }
-                          >
-                            <Text
-                              style={
-                                styles.cartControlLabel
-                              }
-                            >
-                              Quantity
-                            </Text>
 
-                            <View
-                              style={
-                                styles.quantityControl
-                              }
-                            >
-                              <Pressable
-                                style={
-                                  styles.quantityButton
-                                }
-                                onPress={() => {
-                                  const nextQuantity =
-                                    Math.max(
-                                      quantity -
-                                        1,
-                                      1,
-                                    );
+    const removeItem = (
+        id: string,
+    ) => {
 
-                                  updateItem(
-                                    item.id,
-                                    'quantity',
-                                    String(
-                                      nextQuantity,
-                                    ),
-                                  );
-                                }}
-                              >
-                                <Text
-                                  style={
-                                    styles.quantityButtonText
-                                  }
-                                >
-                                  −
-                                </Text>
-                              </Pressable>
+        setItems(
+            current =>
+                current.filter(
+                    item =>
+                        item.id !== id,
+                ),
+        );
+    };
 
-                              <TextInput
-                                value={
-                                  item.quantity
-                                }
-                                onChangeText={value => {
-                                  const cleaned =
-                                    value.replace(
-                                      /[^0-9.]/g,
-                                      '',
-                                    );
 
-                                  updateItem(
-                                    item.id,
-                                    'quantity',
-                                    cleaned,
-                                  );
-                                }}
-                                keyboardType="numeric"
-                                style={
-                                  styles.quantityInput
-                                }
-                              />
+    /* =======================================================
+       ADD LINE
+    ======================================================= */
 
-                              <Pressable
-                                style={
-                                  styles.quantityButton
-                                }
-                                onPress={() => {
-                                  const nextQuantity =
-                                    quantity +
-                                    1;
+    const handleAddLine = () => {
 
-                                  updateItem(
-                                    item.id,
-                                    'quantity',
-                                    String(
-                                      nextQuantity,
-                                    ),
-                                  );
-                                }}
-                              >
-                                <Text
-                                  style={
-                                    styles.quantityButtonText
-                                  }
-                                >
-                                  +
-                                </Text>
-                              </Pressable>
-                            </View>
-                          </View>
+        if (!selectedProduct) {
 
-                          {/* Purchase Price */}
-                          <View
-                            style={
-                              styles.cartControl
-                            }
-                          >
-                            <Text
-                              style={
-                                styles.cartControlLabel
-                              }
-                            >
-                              Purchase Price
-                            </Text>
+            Alert.alert(
+                'Product required',
+                'Please select a product.',
+            );
 
-                            <TextInput
-                              value={
-                                item.unitPrice
-                              }
-                              onChangeText={value =>
-                                updateItem(
-                                  item.id,
-                                  'unitPrice',
-                                  value.replace(
-                                    /[^0-9.]/g,
-                                    '',
-                                  ),
-                                )
-                              }
-                              keyboardType="numeric"
-                              style={
-                                styles.cartPriceInput
-                              }
-                            />
-                          </View>
+            return;
+        }
 
-                          {/* GST */}
-                          <View
-                            style={
-                              styles.cartControlSmall
-                            }
-                          >
-                            <Text
-                              style={
-                                styles.cartControlLabel
-                              }
-                            >
-                              GST
-                            </Text>
 
-                            <View
-                              style={
-                                styles.gstDisplay
-                              }
-                            >
-                              <Text
-                                style={
-                                  styles.gstDisplayText
-                                }
-                              >
-                                {
-                                  item.gstRate
-                                }
-                                %
-                              </Text>
-                            </View>
-                          </View>
+        const quantity =
+            Number(
+                lineQuantity,
+            ) || 0;
 
-                          {/* Amount */}
-                          <View
-                            style={[
-                              styles.cartAmount,
-                              !isWide &&
-                                styles.cartAmountMobile,
-                            ]}
-                          >
-                            <Text
-                              style={
-                                styles.cartControlLabel
-                              }
-                            >
-                              Amount
-                            </Text>
+        const rate =
+            Number(
+                lineRate,
+            ) || 0;
 
-                            <Text
-                              style={
-                                styles.cartAmountValue
-                              }
-                            >
-                              {formatCurrency(
-                                itemTotal,
-                              )}
-                            </Text>
-                          </View>
-                        </View>
-                      </View>
-                    );
-                  },
-                )}
-              </View>
-            )}
+        const gstRate =
+            Number(
+                lineGstRate,
+            ) || 0;
 
-            {/* Add More Items */}
-            <Pressable
-              style={
-                styles.addMoreItemsButton
-              }
-              onPress={() =>
-                setProductSearch('')
-              }
-            >
-              <Text
-                style={
-                  styles.addMoreItemsIcon
-                }
-              >
-                +
-              </Text>
+        const discount =
+            Number(
+                lineDiscount,
+            ) || 0;
 
-              <Text
-                style={
-                  styles.addMoreItemsText
-                }
-              >
-                Add More Items
-              </Text>
-            </Pressable>
-          </View>
 
-          {/* Payment */}
-          <View style={styles.card}>
-            <Text
-              style={styles.sectionTitle}
-            >
-              Payment
-            </Text>
+        if (
+            quantity <= 0
+        ) {
 
-            <Text
-              style={
-                styles.sectionSubtitle
-              }
-            >
-              Record the amount paid against this
-              purchase.
-            </Text>
+            Alert.alert(
+                'Invalid quantity',
+                'Quantity must be greater than zero.',
+            );
+
+            return;
+        }
+
+
+        if (
+            rate < 0
+        ) {
+
+            Alert.alert(
+                'Invalid rate',
+                'Purchase rate cannot be negative.',
+            );
+
+            return;
+        }
+
+
+        if (
+            gstRate < 0 ||
+            gstRate > 100
+        ) {
+
+            Alert.alert(
+                'Invalid GST',
+                'GST rate must be between 0 and 100.',
+            );
+
+            return;
+        }
+
+
+        if (
+            discount < 0
+        ) {
+
+            Alert.alert(
+                'Invalid discount',
+                'Discount cannot be negative.',
+            );
+
+            return;
+        }
+
+
+        const existing =
+            items.find(
+                item =>
+                    item.productId ===
+                    selectedProduct.id,
+            );
+
+
+        if (existing) {
+
+            updateItem(
+                existing.id,
+                'quantity',
+                String(
+                    (
+                        Number(
+                            existing.quantity,
+                        ) || 0
+                    ) +
+                    quantity,
+                ),
+            );
+
+        } else {
+
+            setItems(
+                current => [
+                    ...current,
+
+                    {
+                        id:
+                            `purchase_line_${Date.now()}_${Math.random()}`,
+
+                        productId:
+                            selectedProduct.id,
+
+                        productName:
+                            selectedProduct.name,
+
+                        hsn:
+                            selectedProduct.hsn ??
+                            '',
+
+                        unit:
+                            selectedProduct.unit,
+
+                        quantity:
+                            String(
+                                quantity,
+                            ),
+
+                        unitPrice:
+                            String(
+                                rate,
+                            ),
+
+                        gstRate:
+                            String(
+                                gstRate,
+                            ),
+
+                        discount:
+                            String(
+                                discount,
+                            ),
+                    },
+                ],
+            );
+        }
+
+
+        setSelectedProductId('');
+
+        setLineQuantity('1');
+
+        setLineRate('');
+
+        setLineGstRate('');
+
+        setLineDiscount('0');
+    };
+
+
+    /* =======================================================
+       SAVE
+    ======================================================= */
+
+    const handleSave =
+        async () => {
+            if (
+                documentType ===
+                'RETURN' &&
+                (
+                    sourceType !==
+                    'PURCHASE' ||
+                    !sourceId ||
+                    !sourceDocument
+                )
+            ) {
+
+                Alert.alert(
+                    'Original purchase required',
+                    'Select an original Purchase Bill before creating a Purchase Return.',
+                );
+
+                return;
+            }
+            if (!vendorId) {
+
+                Alert.alert(
+                    'Vendor required',
+                    'Please select a vendor.',
+                );
+
+                return;
+            }
+
+
+            if (!purchaseDate) {
+
+                Alert.alert(
+                    'Date required',
+                    'Please enter the document date.',
+                );
+
+                return;
+            }
+
+
+            if (!dueDate) {
+
+                Alert.alert(
+                    'Due date required',
+                    'Please enter the due date.',
+                );
+
+                return;
+            }
+
+
+            if (
+                dueDate <
+                purchaseDate
+            ) {
+
+                Alert.alert(
+                    'Invalid due date',
+                    'Due date cannot be before the purchase date.',
+                );
+
+                return;
+            }
+
+
+            if (
+                items.length === 0
+            ) {
+
+                Alert.alert(
+                    'Items required',
+                    'Please add at least one item.',
+                );
+
+                return;
+            }
+
+
+            if (
+                (
+                    documentType ===
+                    'PURCHASE' ||
+                    documentType ===
+                    'RETURN'
+                ) &&
+                calculations
+                    .totalAmount <= 0
+            ) {
+
+                Alert.alert(
+                    'Invalid total',
+                    'Document total must be greater than zero.',
+                );
+
+                return;
+            }
+
+
+            if (
+                documentType ===
+                'PURCHASE' &&
+                calculations.paid >
+                calculations.totalAmount
+            ) {
+
+                Alert.alert(
+                    'Invalid payment',
+                    'Paid amount cannot exceed purchase total.',
+                );
+
+                return;
+            }
+
+
+            if (saving) {
+                return;
+            }
+
+
+            setSaving(true);
+
+
+            try {
+                await savePurchaseWorkflow({
+
+                    documentType,
+
+                    vendorId,
+
+                    documentDate:
+                        purchaseDate,
+
+                    dueDate,
+
+                    supplyType,
+
+                    invoiceNumber:
+                        documentType ===
+                            'PURCHASE'
+                            ? (
+                                invoiceNumber
+                                    .trim() ||
+                                undefined
+                            )
+                            : undefined,
+
+                    counterBranch:
+                        counterBranch
+                            .trim() ||
+                        undefined,
+
+                    salesperson:
+                        salesperson
+                            .trim() ||
+                        undefined,
+
+                    deliveryMethod:
+                        deliveryMethod
+                            .trim() ||
+                        undefined,
+
+                    notes:
+                        notes.trim() ||
+                        undefined,
+
+                    paidAmount:
+                        documentType ===
+                            'PURCHASE'
+                            ? calculations.paid
+                            : 0,
+
+
+                    refundAmount:
+                        documentType ===
+                            'RETURN'
+                            ? Math.max(
+                                Number(
+                                    refundAmount,
+                                ) || 0,
+                                0,
+                            )
+                            : 0,
+
+                    sourceType,
+
+                    sourceId,
+
+                    items:
+                        items.map(
+                            item => ({
+
+                                productId:
+                                    item.productId,
+
+                                productName:
+                                    item.productName,
+
+                                hsn:
+                                    item.hsn ||
+                                    undefined,
+
+                                unit:
+                                    item.unit ||
+                                    undefined,
+
+                                quantity:
+                                    Number(
+                                        item.quantity,
+                                    ) || 0,
+
+                                unitPrice:
+                                    Number(
+                                        item.unitPrice,
+                                    ) || 0,
+
+                                gstRate:
+                                    Number(
+                                        item.gstRate,
+                                    ) || 0,
+
+                                discount:
+                                    Number(
+                                        item.discount,
+                                    ) || 0,
+
+                                sourceItemId:
+                                    item.sourceItemId,
+                            }),
+                        ),
+                });
+
+
+                Alert.alert(
+                    config.successTitle,
+                    config.successMessage,
+                    [
+                        {
+                            text: 'OK',
+
+                            onPress: () =>
+                                router.back(),
+                        },
+                    ],
+                );
+
+            } catch (error) {
+
+                console.error(
+                    'savePurchaseWorkflow error:',
+                    error,
+                );
+
+
+                Alert.alert(
+                    `Unable to save ${config.title}`,
+
+                    error instanceof Error
+                        ? error.message
+                        : 'Something went wrong while saving the document.',
+                );
+
+            } finally {
+
+                setSaving(false);
+            }
+        };
+
+
+    /* =======================================================
+       UI
+    ======================================================= */
+
+    return (
+        <FormScreen
+            title={
+                config.title
+            }
+            subtitle={
+                config.subtitle
+            }
+            saving={
+                saving
+            }
+        >
 
             <View
-              style={
-                isWide
-                  ? styles.row
-                  : undefined
-              }
+                style={
+                    styles.infoBanner
+                }
             >
-              <View
-                style={[
-                  styles.field,
-                  isWide &&
-                    styles.halfField,
-                ]}
-              >
                 <Text
-                  style={styles.label}
+                    style={
+                        styles.infoBannerText
+                    }
                 >
-                  Paid Amount
+                    {documentType ===
+                        'PURCHASE'
+                        ? 'Only the Purchase Bill posts stock inward and records the vendor payable.'
+                        : documentType ===
+                            'RETURN'
+                            ? 'Purchase Return reverses stock from an existing Purchase Bill.'
+                            : 'This is a workflow document and does not post stock or vendor payable.'}
                 </Text>
+            </View>
 
-                <TextInput
-                  value={
-                    paidAmount
-                  }
-                  onChangeText={
-                    value =>
-                      setPaidAmount(
-                        value.replace(
-                          /[^0-9.]/g,
-                          '',
-                        ),
-                      )
-                  }
-                  keyboardType="numeric"
-                  placeholder="0.00"
-                  placeholderTextColor={
-                    colors.mutedText
-                  }
-                  style={
-                    styles.input
-                  }
-                />
-              </View>
 
-              <View
-                style={[
-                  styles.field,
-                  isWide &&
-                    styles.halfField,
-                ]}
-              >
-                <Text
-                  style={styles.label}
+            {sourceDocument && (
+
+                <View
+                    style={
+                        styles.infoBanner
+                    }
                 >
-                  Payment Status
+
+                    <Text
+                        style={
+                            styles.infoBannerText
+                        }
+                    >
+                        Converted from{' '}
+                        {
+                            sourceDocument
+                                .document
+                                .document_number
+                        }
+                        {' • '}
+                        {
+                            sourceDocument
+                                .document
+                                .vendor_name
+                        }
+                        . Vendor and item details have been carried forward automatically.
+                    </Text>
+
+                </View>
+
+            )}
+
+            {documentType ===
+                'RETURN' && (
+
+                    <View
+                        style={
+                            styles.formField
+                        }
+                    >
+
+                        <Text
+                            style={
+                                styles.label
+                            }
+                        >
+                            ORIGINAL PURCHASE BILL *
+                        </Text>
+
+
+                        <View
+                            style={
+                                styles.pickerField
+                            }
+                        >
+
+                            <Picker
+                                selectedValue={
+                                    sourceDocument
+                                        ?.document
+                                        .id ||
+                                    sourceId ||
+                                    ''
+                                }
+
+                                onValueChange={(
+                                    value: string,
+                                ) => {
+
+                                    if (!value) {
+                                        return;
+                                    }
+
+
+                                    router.replace({
+                                        pathname:
+                                            '/purchases/add',
+
+                                        params: {
+                                            type:
+                                                'RETURN',
+
+                                            sourceType:
+                                                'PURCHASE',
+
+                                            sourceId:
+                                                value,
+                                        },
+                                    });
+                                }}
+
+                                enabled={
+                                    !saving
+                                }
+                            >
+
+                                <Picker.Item
+                                    label="Select original Purchase Bill"
+                                    value=""
+                                />
+
+
+                                {returnPurchases.map(
+                                    purchase => {
+
+                                        const available =
+                                            Math.max(
+                                                purchase.total_amount -
+                                                purchase.return_amount,
+                                                0,
+                                            );
+
+
+                                        return (
+
+                                            <Picker.Item
+                                                key={
+                                                    purchase.id
+                                                }
+
+                                                value={
+                                                    purchase.id
+                                                }
+
+                                                label={
+                                                    `${purchase.document_number} • ${purchase.vendor_name || 'Vendor'} • ${formatCurrency(available)} available`
+                                                }
+                                            />
+
+                                        );
+                                    },
+                                )}
+
+                            </Picker>
+
+                        </View>
+
+
+                        {returnPurchases.length ===
+                            0 && (
+
+                                <Text
+                                    style={
+                                        styles.helperText
+                                    }
+                                >
+                                    No Purchase Bills with a remaining return value were found.
+                                </Text>
+
+                            )}
+
+                    </View>
+
+                )}
+
+            {/* VENDOR */}
+
+            <View
+                style={
+                    styles.formField
+                }
+            >
+
+                <Text
+                    style={
+                        styles.label
+                    }
+                >
+                    VENDOR *
                 </Text>
 
                 <View
-                  style={
-                    styles.statusInput
-                  }
-                >
-                  <Text
-                    style={[
-                      styles.statusText,
-                      calculations.paymentStatus ===
-                        'PAID' &&
-                        styles.paidText,
-                      calculations.paymentStatus ===
-                        'PARTIAL' &&
-                        styles.partialText,
-                      calculations.paymentStatus ===
-                        'UNPAID' &&
-                        styles.unpaidText,
-                    ]}
-                  >
-                    {
-                      calculations.paymentStatus
+                    style={
+                        styles.pickerField
                     }
-                  </Text>
-                </View>
-              </View>
-            </View>
-          </View>
+                >
 
-          {/* Notes */}
-          <View style={styles.card}>
-            <Text
-              style={styles.sectionTitle}
+                    <Picker
+                        selectedValue={
+                            vendorId
+                        }
+                        onValueChange={(
+                            value: string,
+                        ) =>
+                            setVendorId(
+                                value,
+                            )
+                        }
+                        enabled={
+                            !saving &&
+                            !sourceDocument &&
+                            documentType !==
+                            'RETURN'
+                        }
+                    >
+
+                        <Picker.Item
+                            label="Select vendor"
+                            value=""
+                        />
+
+                        {vendors.map(
+                            vendor => (
+
+                                <Picker.Item
+                                    key={
+                                        vendor.id
+                                    }
+                                    label={
+                                        vendor.name
+                                    }
+                                    value={
+                                        vendor.id
+                                    }
+                                />
+
+                            ),
+                        )}
+
+                    </Picker>
+
+                </View>
+
+
+                {selectedVendor
+                    ? (
+
+                        <Text
+                            style={
+                                styles.helperText
+                            }
+                        >
+                            {selectedVendor.gstin
+                                ? `GSTIN ${selectedVendor.gstin} • `
+                                : ''
+                            }
+
+                            {selectedVendor.state}
+                        </Text>
+
+                    )
+                    : null}
+
+            </View>
+
+
+            {/* INVOICE */}
+
+            {config.showInvoice && (
+
+                <View
+                    style={
+                        styles.formField
+                    }
+                >
+
+                    <Text
+                        style={
+                            styles.label
+                        }
+                    >
+                        VENDOR INVOICE / REFERENCE
+                    </Text>
+
+                    <TextInput
+                        value={
+                            invoiceNumber
+                        }
+                        onChangeText={
+                            setInvoiceNumber
+                        }
+                        placeholder="Optional vendor invoice number"
+                        placeholderTextColor={
+                            colors.mutedText
+                        }
+                        style={
+                            styles.input
+                        }
+                        editable={
+                            !saving
+                        }
+                    />
+
+                </View>
+
+            )}
+
+
+            {/* DATES */}
+
+            <View
+                style={[
+                    styles.formRow,
+
+                    !isWide &&
+                    styles.formColumn,
+                ]}
             >
-              Notes
+
+                <View
+                    style={
+                        styles.formRowField
+                    }
+                >
+
+                    <Text
+                        style={
+                            styles.label
+                        }
+                    >
+                        DOCUMENT DATE
+                    </Text>
+
+                    <TextInput
+                        value={
+                            purchaseDate
+                        }
+                        onChangeText={
+                            setPurchaseDate
+                        }
+                        placeholder="YYYY-MM-DD"
+                        placeholderTextColor={
+                            colors.mutedText
+                        }
+                        style={
+                            styles.input
+                        }
+                        editable={
+                            !saving
+                        }
+                    />
+
+                </View>
+
+
+                <View
+                    style={
+                        styles.formRowField
+                    }
+                >
+
+                    <Text
+                        style={
+                            styles.label
+                        }
+                    >
+                        {documentType ===
+                            'RFQ'
+                            ? 'VALID / DUE DATE'
+                            : 'DUE DATE'}
+                    </Text>
+
+                    <TextInput
+                        value={
+                            dueDate
+                        }
+                        onChangeText={
+                            setDueDate
+                        }
+                        placeholder="YYYY-MM-DD"
+                        placeholderTextColor={
+                            colors.mutedText
+                        }
+                        style={
+                            styles.input
+                        }
+                        editable={
+                            !saving
+                        }
+                    />
+
+                </View>
+
+            </View>
+
+
+            <SupplyPicker
+                value={
+                    supplyType
+                }
+                onChange={
+                    setSupplyType
+                }
+                enabled={
+                    !saving &&
+                    documentType !==
+                    'RETURN'
+                }
+            />
+
+
+            <OptionalFields
+                counterBranch={
+                    counterBranch
+                }
+                setCounterBranch={
+                    setCounterBranch
+                }
+                salesperson={
+                    salesperson
+                }
+                setSalesperson={
+                    setSalesperson
+                }
+                deliveryMethod={
+                    deliveryMethod
+                }
+                setDeliveryMethod={
+                    setDeliveryMethod
+                }
+                saving={
+                    saving
+                }
+            />
+
+
+            {/* ADD ITEM */}
+
+            <View
+                style={[
+                    styles.lineCard,
+
+                    isSmall &&
+                    styles.lineCardSmall,
+                ]}
+            >
+
+                <Text
+                    style={
+                        styles.lineCardTitle
+                    }
+                >
+                    {documentType ===
+                        'RETURN'
+                        ? 'Items being returned'
+                        : 'Add item or service'}
+                </Text>
+
+                {documentType !==
+                    'RETURN' && (
+
+                        <>
+
+                            <ProductPicker
+                                products={
+                                    products
+                                }
+                                selectedProductId={
+                                    selectedProductId
+                                }
+                                setSelectedProductId={
+                                    setSelectedProductId
+                                }
+                                enabled={
+                                    !saving
+                                }
+                            />
+
+
+                            <View
+                                style={[
+                                    styles.formRow,
+                                    styles.lineRow,
+
+                                    !isWide &&
+                                    styles.formColumn,
+                                ]}
+                            >
+
+                                <NumberField
+                                    label="QTY"
+                                    value={
+                                        lineQuantity
+                                    }
+                                    onChange={
+                                        setLineQuantity
+                                    }
+                                />
+
+                                <NumberField
+                                    label="RATE"
+                                    value={
+                                        lineRate
+                                    }
+                                    onChange={
+                                        setLineRate
+                                    }
+                                />
+
+                                <NumberField
+                                    label="GST %"
+                                    value={
+                                        lineGstRate
+                                    }
+                                    onChange={
+                                        setLineGstRate
+                                    }
+                                />
+
+                                <NumberField
+                                    label="DISCOUNT"
+                                    value={
+                                        lineDiscount
+                                    }
+                                    onChange={
+                                        setLineDiscount
+                                    }
+                                />
+
+                            </View>
+
+
+                            <Pressable
+                                style={
+                                    styles.addLineButton
+                                }
+                                onPress={
+                                    handleAddLine
+                                }
+                                disabled={
+                                    saving
+                                }
+                            >
+
+                                <Text
+                                    style={
+                                        styles.addLineButtonText
+                                    }
+                                >
+                                    Add line
+                                </Text>
+
+                            </Pressable>
+
+                        </>
+
+                    )}
+
+
+                {items.length === 0
+                    ? (
+
+                        <Text
+                            style={
+                                styles.noLinesText
+                            }
+                        >
+                            No lines added.
+                        </Text>
+
+                    )
+                    : (
+
+                        <View
+                            style={
+                                styles.selectedItems
+                            }
+                        >
+
+                            {items.map(
+                                (
+                                    item,
+                                    index,
+                                ) => {
+
+                                    const quantity =
+                                        Number(
+                                            item.quantity,
+                                        ) || 0;
+
+                                    const rate =
+                                        Number(
+                                            item.unitPrice,
+                                        ) || 0;
+
+                                    const gstRate =
+                                        Number(
+                                            item.gstRate,
+                                        ) || 0;
+
+                                    const discount =
+                                        Number(
+                                            item.discount,
+                                        ) || 0;
+
+                                    const taxable =
+                                        Math.max(
+                                            quantity *
+                                            rate -
+                                            discount,
+                                            0,
+                                        );
+
+                                    const gst =
+                                        taxable *
+                                        gstRate /
+                                        100;
+
+                                    const total =
+                                        taxable +
+                                        gst;
+
+
+                                    return (
+
+                                        <View
+                                            key={
+                                                item.id
+                                            }
+                                            style={
+                                                styles.itemCard
+                                            }
+                                        >
+
+                                            <View
+                                                style={
+                                                    styles.itemTop
+                                                }
+                                            >
+
+                                                <View
+                                                    style={{
+                                                        flex: 1,
+                                                    }}
+                                                >
+
+                                                    <Text
+                                                        style={
+                                                            styles.itemName
+                                                        }
+                                                    >
+                                                        {index + 1}.{' '}
+                                                        {item.productName}
+                                                    </Text>
+
+                                                    <Text
+                                                        style={
+                                                            styles.itemMeta
+                                                        }
+                                                    >
+                                                        HSN{' '}
+                                                        {item.hsn ||
+                                                            '—'}
+                                                        {' • '}
+                                                        {item.unit ||
+                                                            'Unit'}
+                                                        {' • GST '}
+                                                        {item.gstRate}%
+                                                    </Text>
+
+                                                </View>
+
+
+                                                <Pressable
+                                                    style={
+                                                        styles.removeButton
+                                                    }
+                                                    onPress={() =>
+                                                        removeItem(
+                                                            item.id,
+                                                        )
+                                                    }
+                                                    disabled={
+                                                        saving
+                                                    }
+                                                >
+
+                                                    <Text
+                                                        style={
+                                                            styles.removeButtonText
+                                                        }
+                                                    >
+                                                        ×
+                                                    </Text>
+
+                                                </Pressable>
+
+                                            </View>
+
+
+                                            <View
+                                                style={
+                                                    styles.itemBottom
+                                                }
+                                            >
+
+                                                <View
+                                                    style={
+                                                        styles.quantityEditor
+                                                    }
+                                                >
+
+                                                    <Pressable
+                                                        style={
+                                                            styles.quantityButton
+                                                        }
+                                                        onPress={() =>
+                                                            changeQuantity(
+                                                                item.id,
+                                                                -1,
+                                                            )
+                                                        }
+                                                    >
+                                                        <Text
+                                                            style={
+                                                                styles.quantityButtonText
+                                                            }
+                                                        >
+                                                            −
+                                                        </Text>
+                                                    </Pressable>
+
+
+                                                    <TextInput
+                                                        value={
+                                                            item.quantity
+                                                        }
+                                                        onChangeText={
+                                                            value =>
+                                                                updateItem(
+                                                                    item.id,
+                                                                    'quantity',
+                                                                    value.replace(
+                                                                        /[^0-9.]/g,
+                                                                        '',
+                                                                    ),
+                                                                )
+                                                        }
+                                                        keyboardType="decimal-pad"
+                                                        style={
+                                                            styles.quantityInput
+                                                        }
+                                                    />
+
+
+                                                    <Pressable
+                                                        style={
+                                                            styles.quantityButton
+                                                        }
+                                                        onPress={() =>
+                                                            changeQuantity(
+                                                                item.id,
+                                                                1,
+                                                            )
+                                                        }
+                                                    >
+                                                        <Text
+                                                            style={
+                                                                styles.quantityButtonText
+                                                            }
+                                                        >
+                                                            +
+                                                        </Text>
+                                                    </Pressable>
+
+                                                </View>
+
+
+                                                <Text
+                                                    style={
+                                                        styles.itemTotal
+                                                    }
+                                                >
+                                                    {formatCurrency(
+                                                        total,
+                                                    )}
+                                                </Text>
+
+                                            </View>
+
+                                        </View>
+                                    );
+                                },
+                            )}
+
+                        </View>
+                    )}
+
+            </View>
+
+
+            <TotalsCard
+                supplyType={
+                    supplyType
+                }
+                taxableValue={
+                    calculations
+                        .taxableValue
+                }
+                cgstAmount={
+                    calculations
+                        .cgstAmount
+                }
+                sgstAmount={
+                    calculations
+                        .sgstAmount
+                }
+                igstAmount={
+                    calculations
+                        .igstAmount
+                }
+                totalAmount={
+                    calculations
+                        .totalAmount
+                }
+                totalLabel="Total"
+            />
+
+
+            {/* PAYMENT */}
+            {config.showPayment && (
+                <View
+                    style={
+                        styles.formField
+                    }
+                >
+
+                    <Text
+                        style={
+                            styles.label
+                        }
+                    >
+                        PAID AMOUNT
+                    </Text>
+
+                    <TextInput
+                        value={
+                            paidAmount
+                        }
+                        onChangeText={
+                            value =>
+                                setPaidAmount(
+                                    value.replace(
+                                        /[^0-9.]/g,
+                                        '',
+                                    ),
+                                )
+                        }
+                        keyboardType="decimal-pad"
+                        placeholder="0"
+                        placeholderTextColor={
+                            colors.mutedText
+                        }
+                        style={
+                            styles.input
+                        }
+                        editable={
+                            !saving
+                        }
+                    />
+
+
+                    <Text
+                        style={
+                            styles.helperText
+                        }
+                    >
+                        Status:{' '}
+                        {calculations
+                            .paymentStatus}
+                        {' • Due '}
+                        {formatCurrency(
+                            calculations.due,
+                        )}
+                    </Text>
+
+                </View>
+            )}
+
+            <NotesField
+                value={
+                    notes
+                }
+                onChange={
+                    setNotes
+                }
+                placeholder={
+                    documentType ===
+                        'RFQ'
+                        ? 'Quotation instructions or terms'
+                        : documentType ===
+                            'PO'
+                            ? 'Purchase order instructions or terms'
+                            : documentType ===
+                                'GRN'
+                                ? 'Goods receipt notes'
+                                : documentType ===
+                                    'RETURN'
+                                    ? 'Return reason or notes'
+                                    : 'Optional reference or terms'
+                }
+                enabled={
+                    !saving
+                }
+            />
+            {config.showRefund && (
+
+                <View
+                    style={
+                        styles.formField
+                    }
+                >
+
+                    <Text
+                        style={
+                            styles.label
+                        }
+                    >
+                        REFUND AMOUNT
+                    </Text>
+
+                    <TextInput
+                        value={
+                            refundAmount
+                        }
+                        onChangeText={
+                            value =>
+                                setRefundAmount(
+                                    value.replace(
+                                        /[^0-9.]/g,
+                                        '',
+                                    ),
+                                )
+                        }
+                        keyboardType="decimal-pad"
+                        placeholder="0"
+                        placeholderTextColor={
+                            colors.mutedText
+                        }
+                        style={
+                            styles.input
+                        }
+                        editable={
+                            !saving
+                        }
+                    />
+
+                    <Text
+                        style={
+                            styles.helperText
+                        }
+                    >
+                        Enter the amount actually refunded to the vendor payment source. Leave 0 when the return should only reduce the vendor payable.
+                    </Text>
+
+                </View>
+
+            )}
+
+
+            <FormActions
+                saving={
+                    saving
+                }
+                disabled={
+                    items.length === 0
+                }
+                saveLabel={
+                    config.saveLabel
+                }
+                onSave={
+                    handleSave
+                }
+            />
+
+        </FormScreen>
+    );
+}
+
+
+
+/* =========================================================
+   SHARED FORM SCREEN
+========================================================= */
+
+function FormScreen({
+    title,
+    subtitle,
+    saving,
+    children,
+}: {
+    title: string;
+    subtitle: string;
+    saving: boolean;
+    children:
+    React.ReactNode;
+}) {
+
+    const { width } =
+        useWindowDimensions();
+
+    const isSmall =
+        width < 380;
+
+    const isWide =
+        width >= 760;
+
+
+    return (
+
+        <SafeAreaView
+            style={
+                styles.safeArea
+            }
+            edges={[
+                'top',
+                'bottom',
+            ]}
+        >
+
+            <KeyboardAvoidingView
+                style={
+                    styles.keyboard
+                }
+                behavior={
+                    Platform.OS ===
+                        'ios'
+                        ? 'padding'
+                        : undefined
+                }
+            >
+
+                <View
+                    style={
+                        styles.screen
+                    }
+                >
+
+                    <View
+                        style={[
+                            styles.header,
+
+                            isSmall &&
+                            styles.headerSmall,
+                        ]}
+                    >
+
+                        <Pressable
+                            style={
+                                styles.backButton
+                            }
+                            onPress={() =>
+                                router.back()
+                            }
+                            disabled={
+                                saving
+                            }
+                        >
+                            <Text
+                                style={
+                                    styles.backButtonText
+                                }
+                            >
+                                ‹
+                            </Text>
+                        </Pressable>
+
+
+                        <View
+                            style={
+                                styles.headerText
+                            }
+                        >
+
+                            <Text
+                                style={[
+                                    styles.title,
+
+                                    isSmall &&
+                                    styles.titleSmall,
+                                ]}
+                            >
+                                {title}
+                            </Text>
+
+                            <Text
+                                style={
+                                    styles.subtitle
+                                }
+                            >
+                                {subtitle}
+                            </Text>
+
+                        </View>
+
+                    </View>
+
+
+                    <ScrollView
+                        contentContainerStyle={[
+                            styles.content,
+
+                            isWide &&
+                            styles.contentWide,
+                        ]}
+                        showsVerticalScrollIndicator={
+                            false
+                        }
+                        keyboardShouldPersistTaps="handled"
+                    >
+
+                        {children}
+
+                    </ScrollView>
+
+                </View>
+
+            </KeyboardAvoidingView>
+
+        </SafeAreaView>
+    );
+}
+
+
+/* =========================================================
+   SHARED CONTROLS
+========================================================= */
+
+function SupplyPicker({
+    value,
+    onChange,
+    enabled,
+}: {
+    value: SupplyType;
+    onChange:
+    (value: SupplyType) =>
+        void;
+    enabled: boolean;
+}) {
+
+    return (
+
+        <View
+            style={
+                styles.formField
+            }
+        >
+
+            <Text
+                style={
+                    styles.label
+                }
+            >
+                SUPPLY
+            </Text>
+
+            <View
+                style={
+                    styles.pickerField
+                }
+            >
+
+                <Picker
+                    selectedValue={
+                        value
+                    }
+                    onValueChange={(
+                        next:
+                            SupplyType,
+                    ) =>
+                        onChange(
+                            next,
+                        )
+                    }
+                    enabled={
+                        enabled
+                    }
+                >
+
+                    <Picker.Item
+                        label="Within state (CGST + SGST)"
+                        value="WITHIN_STATE"
+                    />
+
+                    <Picker.Item
+                        label="Other State (IGST)"
+                        value="OTHER_STATE"
+                    />
+
+                </Picker>
+
+            </View>
+
+        </View>
+    );
+}
+
+
+function OptionalFields({
+    counterBranch,
+    setCounterBranch,
+    salesperson,
+    setSalesperson,
+    deliveryMethod,
+    setDeliveryMethod,
+    saving,
+}: {
+    counterBranch: string;
+    setCounterBranch:
+    (value: string) =>
+        void;
+
+    salesperson: string;
+    setSalesperson:
+    (value: string) =>
+        void;
+
+    deliveryMethod: string;
+    setDeliveryMethod:
+    (value: string) =>
+        void;
+
+    saving: boolean;
+}) {
+
+    return (
+
+        <>
+
+            <View
+                style={
+                    styles.formField
+                }
+            >
+
+                <Text
+                    style={
+                        styles.label
+                    }
+                >
+                    COUNTER OR BRANCH
+                </Text>
+
+                <TextInput
+                    value={
+                        counterBranch
+                    }
+                    onChangeText={
+                        setCounterBranch
+                    }
+                    placeholder="Counter or branch"
+                    placeholderTextColor={
+                        colors.mutedText
+                    }
+                    style={
+                        styles.input
+                    }
+                    editable={
+                        !saving
+                    }
+                />
+
+            </View>
+
+
+            <View
+                style={
+                    styles.formField
+                }
+            >
+
+                <Text
+                    style={
+                        styles.label
+                    }
+                >
+                    SALESPERSON
+                </Text>
+
+                <TextInput
+                    value={
+                        salesperson
+                    }
+                    onChangeText={
+                        setSalesperson
+                    }
+                    placeholder="Salesperson"
+                    placeholderTextColor={
+                        colors.mutedText
+                    }
+                    style={
+                        styles.input
+                    }
+                    editable={
+                        !saving
+                    }
+                />
+
+            </View>
+
+
+            <View
+                style={
+                    styles.formField
+                }
+            >
+
+                <Text
+                    style={
+                        styles.label
+                    }
+                >
+                    DELIVERY OR PICKUP
+                </Text>
+
+                <TextInput
+                    value={
+                        deliveryMethod
+                    }
+                    onChangeText={
+                        setDeliveryMethod
+                    }
+                    placeholder="Delivery or pickup"
+                    placeholderTextColor={
+                        colors.mutedText
+                    }
+                    style={
+                        styles.input
+                    }
+                    editable={
+                        !saving
+                    }
+                />
+
+            </View>
+
+        </>
+    );
+}
+
+
+function ProductPicker({
+    products,
+    selectedProductId,
+    setSelectedProductId,
+    enabled,
+}: {
+    products:
+    ProductOption[];
+
+    selectedProductId:
+    string;
+
+    setSelectedProductId:
+    (value: string) =>
+        void;
+
+    enabled:
+    boolean;
+}) {
+
+    return (
+
+        <>
+
+            <Text
+                style={
+                    styles.label
+                }
+            >
+                ITEM
+            </Text>
+
+            <View
+                style={
+                    styles.pickerField
+                }
+            >
+
+                <Picker
+                    selectedValue={
+                        selectedProductId
+                    }
+                    onValueChange={(
+                        value: string,
+                    ) =>
+                        setSelectedProductId(
+                            value,
+                        )
+                    }
+                    enabled={
+                        enabled
+                    }
+                >
+
+                    <Picker.Item
+                        label="Select product"
+                        value=""
+                    />
+
+                    {products.map(
+                        product => (
+
+                            <Picker.Item
+                                key={
+                                    product.id
+                                }
+                                label={
+                                    `${product.name} • ${formatCurrency(
+                                        product
+                                            .purchasePrice,
+                                    )}`
+                                }
+                                value={
+                                    product.id
+                                }
+                            />
+
+                        ),
+                    )}
+
+                </Picker>
+
+            </View>
+
+        </>
+    );
+}
+
+
+function NumberField({
+    label,
+    value,
+    onChange,
+}: {
+    label: string;
+    value: string;
+    onChange:
+    (value: string) =>
+        void;
+}) {
+
+    return (
+
+        <View
+            style={
+                styles.formRowField
+            }
+        >
+
+            <Text
+                style={
+                    styles.label
+                }
+            >
+                {label}
             </Text>
 
             <TextInput
-              value={notes}
-              onChangeText={setNotes}
-              placeholder="Add purchase notes..."
-              placeholderTextColor={
-                colors.mutedText
-              }
-              multiline
-              numberOfLines={4}
-              textAlignVertical="top"
-              style={[
-                styles.input,
-                styles.notesInput,
-              ]}
-            />
-          </View>
-
-          {/* Summary */}
-          <View
-            style={
-              styles.summaryCard
-            }
-          >
-            <Text
-              style={
-                styles.summaryTitle
-              }
-            >
-              Purchase Summary
-            </Text>
-
-            <View
-              style={
-                styles.summaryRow
-              }
-            >
-              <Text
-                style={
-                  styles.summaryLabel
+                value={
+                    value
                 }
-              >
-                Subtotal
-              </Text>
-
-              <Text
-                style={
-                  styles.summaryValue
+                onChangeText={
+                    next =>
+                        onChange(
+                            next.replace(
+                                /[^0-9.]/g,
+                                '',
+                            ),
+                        )
                 }
-              >
-                {formatCurrency(
-                  calculations.subtotal,
-                )}
-              </Text>
-            </View>
-
-            <View
-              style={
-                styles.summaryRow
-              }
-            >
-              <Text
-                style={
-                  styles.summaryLabel
+                keyboardType="decimal-pad"
+                placeholder="0"
+                placeholderTextColor={
+                    colors.mutedText
                 }
-              >
-                Discount
-              </Text>
-
-              <Text
                 style={
-                  styles.summaryValue
+                    styles.input
                 }
-              >
-                -{' '}
-                {formatCurrency(
-                  calculations.discount,
-                )}
-              </Text>
-            </View>
-
-            <View
-              style={
-                styles.summaryRow
-              }
-            >
-              <Text
-                style={
-                  styles.summaryLabel
-                }
-              >
-                GST
-              </Text>
-
-              <Text
-                style={
-                  styles.summaryValue
-                }
-              >
-                {formatCurrency(
-                  calculations.gstAmount,
-                )}
-              </Text>
-            </View>
-
-            <View
-              style={styles.divider}
             />
 
-            <View
-              style={
-                styles.summaryRow
-              }
-            >
-              <Text
-                style={
-                  styles.totalLabel
-                }
-              >
-                Total Purchase
-              </Text>
-
-              <Text
-                style={
-                  styles.totalValue
-                }
-              >
-                {formatCurrency(
-                  calculations.totalAmount,
-                )}
-              </Text>
-            </View>
-
-            <View
-              style={
-                styles.summaryRow
-              }
-            >
-              <Text
-                style={
-                  styles.summaryLabel
-                }
-              >
-                Paid
-              </Text>
-
-              <Text
-                style={
-                  styles.paidValue
-                }
-              >
-                {formatCurrency(
-                  calculations.paid,
-                )}
-              </Text>
-            </View>
-
-            <View
-              style={
-                styles.summaryRow
-              }
-            >
-              <Text
-                style={
-                  styles.summaryLabel
-                }
-              >
-                Due
-              </Text>
-
-              <Text
-                style={
-                  styles.dueValue
-                }
-              >
-                {formatCurrency(
-                  calculations.due,
-                )}
-              </Text>
-            </View>
-          </View>
-
-          {/* Save */}
-          <View
-            style={
-              styles.actionContainer
-            }
-          >
-            <Pressable
-              style={
-                styles.cancelButton
-              }
-              onPress={() =>
-                router.back()
-              }
-            >
-              <Text
-                style={
-                  styles.cancelButtonText
-                }
-              >
-                Cancel
-              </Text>
-            </Pressable>
-
-            <Pressable
-              style={[
-                styles.saveButton,
-                saving &&
-                  styles.saveButtonDisabled,
-              ]}
-              onPress={
-                handleSave
-              }
-              disabled={saving}
-            >
-              <Text
-                style={
-                  styles.saveButtonText
-                }
-              >
-                {saving
-                  ? 'Saving...'
-                  : 'Save Purchase'}
-              </Text>
-            </Pressable>
-          </View>
-
-          <View
-            style={
-              styles.bottomSpace
-            }
-          />
-        </ScrollView>
-      </View>
-    </SafeAreaView>
-  );
+        </View>
+    );
 }
 
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-
-  page: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-
-  header: {
-    minHeight: 76,
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    backgroundColor: colors.card,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-
-  backButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: colors.background,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-
-  backIcon: {
-    fontSize: 32,
-    lineHeight: 34,
-    color: colors.text,
-    marginTop: -3,
-  },
-
-  headerTitle: {
-    fontSize: 21,
-    fontWeight: '800',
-    color: colors.text,
-  },
-
-  headerSubtitle: {
-    marginTop: 2,
-    fontSize: 12,
-    color: colors.mutedText,
-  },
-
-  logoCircle: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: colors.gold,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  logoText: {
-    color: '#ffffff',
-    fontSize: 13,
-    fontWeight: '800',
-  },
-
-  content: {
-    width: '100%',
-    maxWidth: 1200,
-    alignSelf: 'center',
-    padding: 16,
-  },
-
-  contentWide: {
-    paddingHorizontal: 24,
-    paddingVertical: 24,
-  },
-
-  card: {
-    backgroundColor: colors.card,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 18,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    elevation: 2,
-  },
-
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: colors.text,
-  },
-
-  sectionSubtitle: {
-    marginTop: 4,
-    marginBottom: 18,
-    fontSize: 12,
-    color: colors.mutedText,
-  },
-
-  sectionHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: 12,
-    marginBottom: 2,
-  },
-
-  row: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-
-  field: {
-    marginBottom: 14,
-  },
-
-  halfField: {
-    flex: 1,
-  },
-
-  label: {
-    marginBottom: 7,
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.text,
-  },
-
-  required: {
-    color: colors.error,
-  },
-
-  input: {
-    minHeight: 46,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 10,
-    backgroundColor: '#ffffff',
-    paddingHorizontal: 13,
-    paddingVertical: 10,
-    color: colors.text,
-    fontSize: 14,
-  },
-
-  notesInput: {
-    minHeight: 100,
-    paddingTop: 12,
-  },
-
-  /* Vendor */
-
-  vendorContainer: {
-    position: 'relative',
-    zIndex: 20,
-  },
-
-  vendorSuggestions: {
-    position: 'absolute',
-    top: 51,
-    left: 0,
-    right: 0,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    backgroundColor: colors.card,
-    overflow: 'hidden',
-    zIndex: 50,
-    elevation: 8,
-  },
-
-  vendorSuggestion: {
-    minHeight: 64,
-    paddingHorizontal: 13,
-    paddingVertical: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-
-  vendorSuggestionAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.teal,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 10,
-  },
-
-  vendorSuggestionAvatarText: {
-    color: '#ffffff',
-    fontSize: 13,
-    fontWeight: '800',
-  },
-
-  vendorSuggestionMain: {
-    flex: 1,
-  },
-
-  vendorSuggestionName: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: colors.text,
-  },
-
-  vendorSuggestionMeta: {
-    marginTop: 3,
-    fontSize: 11,
-    color: colors.mutedText,
-  },
-
-  noVendorResult: {
-    padding: 16,
-    alignItems: 'center',
-  },
-
-  noVendorResultText: {
-    color: colors.mutedText,
-    fontSize: 12,
-  },
-
-  selectedVendorInfo: {
-    marginTop: 7,
-    paddingHorizontal: 3,
-  },
-
-  selectedVendorText: {
-    color: colors.teal,
-    fontSize: 11,
-    fontWeight: '800',
-  },
-
-  selectedVendorMeta: {
-    marginTop: 2,
-    color: colors.mutedText,
-    fontSize: 11,
-  },
-
-  loadingContainer: {
-    minHeight: 90,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  loadingText: {
-    marginTop: 8,
-    fontSize: 12,
-    color: colors.mutedText,
-  },
-
-  /* Search */
-
-  searchContainer: {
-    minHeight: 48,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    backgroundColor: colors.background,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 13,
-    marginBottom: 8,
-  },
-
-  searchIcon: {
-    fontSize: 23,
-    color: colors.mutedText,
-    marginRight: 8,
-  },
-
-  searchInput: {
-    flex: 1,
-    minHeight: 46,
-    color: colors.text,
-    fontSize: 14,
-  },
-
-  clearSearchButton: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  clearSearchText: {
-    color: colors.text,
-    fontSize: 18,
-    lineHeight: 20,
-  },
-
-  productSuggestions: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    backgroundColor: colors.card,
-    overflow: 'hidden',
-    marginBottom: 14,
-  },
-
-  productSuggestion: {
-    minHeight: 68,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-
-  productSuggestionMain: {
-    flex: 1,
-  },
-
-  productSuggestionName: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: colors.text,
-  },
-
-  productSuggestionMeta: {
-    marginTop: 4,
-    fontSize: 11,
-    color: colors.mutedText,
-  },
-
-  productSuggestionStock: {
-    marginTop: 4,
-    fontSize: 11,
-    color: colors.success,
-    fontWeight: '800',
-  },
-
-  productSuggestionRight: {
-    alignItems: 'flex-end',
-    marginLeft: 10,
-  },
-
-  productSuggestionAction: {
-    marginTop: 4,
-    fontSize: 11,
-    color: colors.teal,
-    fontWeight: '800',
-  },
-
-  productSuggestionPrice: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: colors.teal,
-  },
-
-  vendorRequiredBox: {
-    marginBottom: 14,
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.background,
-  },
-
-  vendorRequiredTitle: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: colors.text,
-  },
-
-  vendorRequiredText: {
-    marginTop: 4,
-    fontSize: 12,
-    lineHeight: 18,
-    color: colors.mutedText,
-  },
-
-  noProductResult: {
-    paddingVertical: 16,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    marginBottom: 14,
-  },
-
-  noProductResultText: {
-    fontSize: 13,
-    color: colors.mutedText,
-  },
-
-  /* Empty state */
-
-  emptyItems: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 32,
-    paddingHorizontal: 20,
-  },
-
-  emptyItemsIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.background,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 10,
-  },
-
-  emptyItemsIconText: {
-    fontSize: 26,
-    color: colors.teal,
-    fontWeight: '700',
-  },
-
-  emptyItemsTitle: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: colors.text,
-  },
-
-  emptyItemsText: {
-    marginTop: 5,
-    fontSize: 12,
-    color: colors.mutedText,
-    textAlign: 'center',
-    maxWidth: 360,
-  },
-
-  /* Cart */
-
-  itemsList: {
-    gap: 12,
-  },
-
-  cartItem: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 14,
-    backgroundColor: colors.background,
-    padding: 14,
-  },
-
-  cartItemHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-
-  cartItemNumber: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.gold,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 10,
-  },
-
-  cartItemNumberText: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: '800',
-  },
-
-  cartItemInfo: {
-    flex: 1,
-  },
-
-  cartItemName: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: colors.text,
-  },
-
-  cartItemMeta: {
-    marginTop: 4,
-    fontSize: 11,
-    color: colors.mutedText,
-  },
-
-  cartStockText: {
-    marginTop: 4,
-    fontSize: 11,
-    color: colors.success,
-    fontWeight: '800',
-  },
-
-  cartRemoveButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#fff1f0',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  cartRemoveText: {
-    color: colors.error,
-    fontSize: 22,
-    lineHeight: 24,
-    fontWeight: '600',
-  },
-
-  cartControls: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 12,
-    marginTop: 14,
-    paddingTop: 14,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-
-  cartControlsMobile: {
-    flexWrap: 'wrap',
-  },
-
-  cartControl: {
-    flex: 1,
-    minWidth: 150,
-  },
-
-  cartControlSmall: {
-    width: 80,
-  },
-
-  cartControlLabel: {
-    marginBottom: 6,
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.mutedText,
-  },
-
-  quantityControl: {
-    height: 44,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 9,
-    backgroundColor: colors.card,
-    flexDirection: 'row',
-    alignItems: 'center',
-    overflow: 'hidden',
-  },
-
-  quantityButton: {
-    width: 40,
-    height: 42,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.background,
-  },
-
-  quantityButtonText: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: colors.text,
-  },
-
-  quantityInput: {
-    flex: 1,
-    height: 42,
-    textAlign: 'center',
-    color: colors.text,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-
-  cartPriceInput: {
-    height: 44,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 9,
-    backgroundColor: colors.card,
-    paddingHorizontal: 12,
-    color: colors.text,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-
-  gstDisplay: {
-    height: 44,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 9,
-    backgroundColor: colors.card,
-    justifyContent: 'center',
-    paddingHorizontal: 12,
-  },
-
-  gstDisplayText: {
-    color: colors.text,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-
-  cartAmount: {
-    minWidth: 120,
-    alignItems: 'flex-end',
-  },
-
-  cartAmountMobile: {
-    alignItems: 'flex-start',
-  },
-
-  cartAmountValue: {
-    height: 44,
-    paddingTop: 11,
-    color: colors.teal,
-    fontSize: 15,
-    fontWeight: '900',
-  },
-
-  addMoreItemsButton: {
-    marginTop: 14,
-    minHeight: 46,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: colors.teal,
-    backgroundColor: '#f4fbfa',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 7,
-  },
-
-  addMoreItemsIcon: {
-    fontSize: 20,
-    color: colors.teal,
-    fontWeight: '700',
-  },
-
-  addMoreItemsText: {
-    fontSize: 13,
-    color: colors.teal,
-    fontWeight: '800',
-  },
-
-  /* Payment */
-
-  statusInput: {
-    minHeight: 46,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 10,
-    backgroundColor: colors.background,
-    justifyContent: 'center',
-    paddingHorizontal: 13,
-  },
-
-  statusText: {
-    fontSize: 13,
-    fontWeight: '800',
-  },
-
-  paidText: {
-    color: colors.success,
-  },
-
-  partialText: {
-    color: colors.warning,
-  },
-
-  unpaidText: {
-    color: colors.error,
-  },
-
-  /* Summary */
-
-  summaryCard: {
-    backgroundColor: colors.teal,
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 16,
-  },
-
-  summaryTitle: {
-    color: '#ffffff',
-    fontSize: 18,
-    fontWeight: '800',
-    marginBottom: 16,
-  },
-
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-
-  summaryLabel: {
-    color: '#dbe6ed',
-    fontSize: 13,
-  },
-
-  summaryValue: {
-    color: '#ffffff',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-
-  divider: {
-    height: 1,
-    backgroundColor:
-      'rgba(255,255,255,0.18)',
-    marginVertical: 8,
-  },
-
-  totalLabel: {
-    color: '#ffffff',
-    fontSize: 15,
-    fontWeight: '800',
-  },
-
-  totalValue: {
-    color: colors.gold,
-    fontSize: 20,
-    fontWeight: '900',
-  },
-
-  paidValue: {
-    color: '#8de0bd',
-    fontSize: 13,
-    fontWeight: '800',
-  },
-
-  dueValue: {
-    color: '#ffb4ae',
-    fontSize: 13,
-    fontWeight: '800',
-  },
-
-  /* Actions */
-
-  actionContainer: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 12,
-    marginBottom: 10,
-  },
-
-  cancelButton: {
-    minWidth: 110,
-    minHeight: 48,
-    borderRadius: 11,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.card,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 18,
-  },
-
-  cancelButtonText: {
-    color: colors.text,
-    fontSize: 14,
-    fontWeight: '800',
-  },
-
-  saveButton: {
-    minWidth: 150,
-    minHeight: 48,
-    borderRadius: 11,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 20,
-  },
-
-  saveButtonDisabled: {
-    opacity: 0.6,
-  },
-
-  saveButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '800',
-  },
-
-  bottomSpace: {
-    height: 30,
-  },
-});
+
+function TotalsCard({
+    supplyType,
+    taxableValue,
+    cgstAmount,
+    sgstAmount,
+    igstAmount,
+    totalAmount,
+    totalLabel,
+}: {
+    supplyType:
+    SupplyType;
+
+    taxableValue:
+    number;
+
+    cgstAmount:
+    number;
+
+    sgstAmount:
+    number;
+
+    igstAmount:
+    number;
+
+    totalAmount:
+    number;
+
+    totalLabel:
+    string;
+}) {
+
+    return (
+
+        <View
+            style={
+                styles.totalCard
+            }
+        >
+
+            <View
+                style={
+                    styles.totalRow
+                }
+            >
+
+                <Text
+                    style={
+                        styles.totalRowLabel
+                    }
+                >
+                    Taxable value
+                </Text>
+
+                <Text
+                    style={
+                        styles.totalRowValue
+                    }
+                >
+                    {formatCurrency(
+                        taxableValue,
+                    )}
+                </Text>
+
+            </View>
+
+
+            {supplyType ===
+                'WITHIN_STATE'
+                ? (
+
+                    <>
+
+                        <View
+                            style={
+                                styles.totalRow
+                            }
+                        >
+
+                            <Text
+                                style={
+                                    styles.totalRowLabel
+                                }
+                            >
+                                CGST
+                            </Text>
+
+                            <Text
+                                style={
+                                    styles.totalRowValue
+                                }
+                            >
+                                {formatCurrency(
+                                    cgstAmount,
+                                )}
+                            </Text>
+
+                        </View>
+
+
+                        <View
+                            style={
+                                styles.totalRow
+                            }
+                        >
+
+                            <Text
+                                style={
+                                    styles.totalRowLabel
+                                }
+                            >
+                                SGST
+                            </Text>
+
+                            <Text
+                                style={
+                                    styles.totalRowValue
+                                }
+                            >
+                                {formatCurrency(
+                                    sgstAmount,
+                                )}
+                            </Text>
+
+                        </View>
+
+                    </>
+
+                )
+                : (
+
+                    <View
+                        style={
+                            styles.totalRow
+                        }
+                    >
+
+                        <Text
+                            style={
+                                styles.totalRowLabel
+                            }
+                        >
+                            IGST
+                        </Text>
+
+                        <Text
+                            style={
+                                styles.totalRowValue
+                            }
+                        >
+                            {formatCurrency(
+                                igstAmount,
+                            )}
+                        </Text>
+
+                    </View>
+                )}
+
+
+            <View
+                style={
+                    styles.totalDivider
+                }
+            />
+
+
+            <View
+                style={
+                    styles.totalRow
+                }
+            >
+
+                <Text
+                    style={
+                        styles.grandTotalLabel
+                    }
+                >
+                    {totalLabel}
+                </Text>
+
+                <Text
+                    style={
+                        styles.grandTotalValue
+                    }
+                >
+                    {formatCurrency(
+                        totalAmount,
+                    )}
+                </Text>
+
+            </View>
+
+        </View>
+    );
+}
+
+
+function NotesField({
+    value,
+    onChange,
+    placeholder,
+    enabled,
+}: {
+    value: string;
+    onChange:
+    (value: string) =>
+        void;
+    placeholder:
+    string;
+    enabled:
+    boolean;
+}) {
+
+    return (
+
+        <View
+            style={
+                styles.formField
+            }
+        >
+
+            <Text
+                style={
+                    styles.label
+                }
+            >
+                NOTES
+            </Text>
+
+            <TextInput
+                value={
+                    value
+                }
+                onChangeText={
+                    onChange
+                }
+                placeholder={
+                    placeholder
+                }
+                placeholderTextColor={
+                    colors.mutedText
+                }
+                multiline
+                numberOfLines={4}
+                textAlignVertical="top"
+                style={[
+                    styles.input,
+                    styles.notesInput,
+                ]}
+                editable={
+                    enabled
+                }
+            />
+
+        </View>
+    );
+}
+
+
+function FormActions({
+    saving,
+    disabled,
+    saveLabel,
+    onSave,
+}: {
+    saving: boolean;
+    disabled: boolean;
+    saveLabel: string;
+    onSave:
+    () => void;
+}) {
+
+    return (
+
+        <View
+            style={
+                styles.formActions
+            }
+        >
+
+            <Pressable
+                style={[
+                    styles.cancelButton,
+
+                    saving &&
+                    styles.disabledButton,
+                ]}
+                onPress={() =>
+                    router.back()
+                }
+                disabled={
+                    saving
+                }
+            >
+
+                <Text
+                    style={
+                        styles.cancelButtonText
+                    }
+                >
+                    Cancel
+                </Text>
+
+            </Pressable>
+
+
+            <Pressable
+                style={[
+                    styles.saveButton,
+
+                    (
+                        saving ||
+                        disabled
+                    ) &&
+                    styles.disabledButton,
+                ]}
+                onPress={
+                    onSave
+                }
+                disabled={
+                    saving ||
+                    disabled
+                }
+            >
+
+                <Text
+                    style={
+                        styles.saveButtonText
+                    }
+                >
+                    {saving
+                        ? 'Saving...'
+                        : saveLabel}
+                </Text>
+
+            </Pressable>
+
+        </View>
+    );
+}
+
+
+/* =========================================================
+   MAIN ADD SCREEN
+========================================================= */
+
+export default function PurchaseAddScreen() {
+
+    const params =
+        useLocalSearchParams<{
+            type?:
+            string |
+            string[];
+
+            sourceType?:
+            string |
+            string[];
+
+            sourceId?:
+            string |
+            string[];
+        }>();
+
+
+    /* =====================================================
+       ROUTE PARAMS
+    ===================================================== */
+
+    const rawType =
+        Array.isArray(
+            params.type,
+        )
+            ? params.type[0]
+            : params.type;
+
+
+    const rawSourceType =
+        Array.isArray(
+            params.sourceType,
+        )
+            ? params.sourceType[0]
+            : params.sourceType;
+
+
+    const rawSourceId =
+        Array.isArray(
+            params.sourceId,
+        )
+            ? params.sourceId[0]
+            : params.sourceId;
+
+
+    const VALID_DOCUMENT_TYPES:
+        DocumentType[] = [
+            'REQUEST',
+            'RFQ',
+            'PO',
+            'GRN',
+            'PURCHASE',
+            'RETURN',
+        ];
+
+
+    const documentType:
+        DocumentType =
+        VALID_DOCUMENT_TYPES.includes(
+            rawType as DocumentType,
+        )
+            ? (
+                rawType as
+                DocumentType
+            )
+            : 'PURCHASE';
+
+
+    const sourceType:
+        DocumentType |
+        undefined =
+        VALID_DOCUMENT_TYPES.includes(
+            rawSourceType as
+            DocumentType,
+        )
+            ? (
+                rawSourceType as
+                DocumentType
+            )
+            : undefined;
+
+
+    const sourceId =
+        rawSourceId?.trim() ||
+        undefined;
+
+
+    /* =====================================================
+       FORM DATA
+    ===================================================== */
+
+    const [
+        vendors,
+        setVendors,
+    ] =
+        useState<VendorOption[]>(
+            [],
+        );
+
+
+    const [
+        products,
+        setProducts,
+    ] =
+        useState<ProductOption[]>(
+            [],
+        );
+
+    const [
+        sourceDocument,
+        setSourceDocument,
+    ] =
+        useState<
+            WorkflowDetail | null
+        >(
+            null,
+        );
+
+    const [
+        returnPurchases,
+        setReturnPurchases,
+    ] =
+        useState<
+            WorkflowDocument[]
+        >(
+            [],
+        );
+
+
+    /* =====================================================
+       LOAD FORM DATA
+    ===================================================== */
+
+    const loadFormData =
+        useCallback(
+            async () => {
+
+                try {
+
+                    /*
+                     * sourceType and sourceId must either
+                     * both exist or both be absent.
+                     */
+                    if (
+                        Boolean(
+                            sourceType,
+                        ) !==
+                        Boolean(
+                            sourceId,
+                        )
+                    ) {
+
+                        throw new Error(
+                            'The source document information is incomplete.',
+                        );
+                    }
+
+
+                    const [
+                        vendorData,
+                        productData,
+                        loadedSource,
+                        workflowData,
+                    ] =
+                        await Promise.all([
+
+                            loadVendors(),
+
+                            loadProducts(),
+
+                            sourceType &&
+                                sourceId
+                                ? loadPurchaseWorkflowDocument(
+                                    sourceType,
+                                    sourceId,
+                                )
+                                : Promise.resolve(
+                                    null,
+                                ),
+
+                            documentType ===
+                                'RETURN'
+                                ? loadPurchaseWorkflow()
+                                : Promise.resolve(
+                                    [],
+                                ),
+
+                        ]);
+                    if (
+                        documentType ===
+                        'RETURN' &&
+                        sourceType &&
+                        sourceType !==
+                        'PURCHASE'
+                    ) {
+
+                        throw new Error(
+                            'A Purchase Return must use a Purchase Bill as its original document.',
+                        );
+                    }
+
+
+                    /*
+                     * If conversion was requested,
+                     * the original document must exist.
+                     */
+                    if (
+                        sourceType &&
+                        sourceId &&
+                        !loadedSource
+                    ) {
+
+                        throw new Error(
+                            'The source purchase document could not be found.',
+                        );
+                    }
+
+
+                    /* =====================================
+                       SOURCE DOCUMENT
+                    ===================================== */
+
+                    setSourceDocument(
+                        loadedSource,
+                    );
+
+                    setReturnPurchases(
+
+                        workflowData
+                            .filter(
+                                document =>
+                                    document
+                                        .document_type ===
+                                    'PURCHASE',
+                            )
+                            .filter(
+                                document =>
+
+                                    (
+                                        document
+                                            .total_amount -
+                                        document
+                                            .return_amount
+                                    ) >
+                                    0.005,
+                            )
+
+                    );
+
+
+                    /* =====================================
+                       VENDORS
+                    ===================================== */
+
+                    setVendors(
+                        vendorData.map(
+                            vendor => ({
+
+                                id:
+                                    vendor.id,
+
+                                name:
+                                    vendor.name,
+
+                                state:
+                                    vendor.state,
+
+                                gstin:
+                                    vendor.gstin,
+
+                            }),
+                        ),
+                    );
+
+
+                    /* =====================================
+                       PRODUCTS
+                    ===================================== */
+
+                    setProducts(
+                        productData.map(
+                            product => ({
+
+                                id:
+                                    product.id,
+
+                                name:
+                                    product.name,
+
+                                hsn:
+                                    product.hsn,
+
+                                unit:
+                                    product.unit,
+
+                                purchasePrice:
+                                    product
+                                        .purchasePrice,
+
+                                gstRate:
+                                    product
+                                        .gstRate,
+
+                            }),
+                        ),
+                    );
+
+
+                } catch (error) {
+
+                    console.error(
+                        'Unable to load purchase form:',
+                        error,
+                    );
+
+
+                    Alert.alert(
+                        'Unable to load form',
+
+                        error instanceof Error
+                            ? error.message
+                            : 'Something went wrong while loading the purchase form.',
+                        [
+                            {
+                                text:
+                                    'Go back',
+
+                                onPress: () =>
+                                    router.back(),
+                            },
+                        ],
+                    );
+
+                }
+
+            },
+            [
+                documentType,
+                sourceType,
+                sourceId,
+            ],
+        );
+
+
+    /* =====================================================
+       INITIAL LOAD
+    ===================================================== */
+
+    useEffect(() => {
+
+        loadFormData();
+
+    }, [
+        loadFormData,
+    ]);
+
+
+    /* =====================================================
+       SCREEN
+    ===================================================== */
+
+    return (
+
+        <WorkflowForm
+            vendors={
+                vendors
+            }
+
+            products={
+                products
+            }
+
+            documentType={
+                documentType
+            }
+
+            sourceType={
+                sourceType
+            }
+
+            sourceId={
+                sourceId
+            }
+
+            sourceDocument={
+                sourceDocument
+            }
+
+            returnPurchases={
+                returnPurchases
+            }
+        />
+
+    );
+}
+
+
+/* =========================================================
+   STYLES
+========================================================= */
+
+const styles =
+    StyleSheet.create({
+
+        safeArea: {
+            flex: 1,
+
+            backgroundColor:
+                colors.background,
+        },
+
+
+        keyboard: {
+            flex: 1,
+        },
+
+
+        screen: {
+            flex: 1,
+
+            backgroundColor:
+                colors.background,
+        },
+
+
+        header: {
+            minHeight: 72,
+
+            paddingHorizontal: 16,
+
+            paddingVertical: 12,
+
+            backgroundColor:
+                colors.primary,
+
+            flexDirection:
+                'row',
+
+            alignItems:
+                'center',
+
+            gap: 12,
+        },
+
+
+        headerSmall: {
+            paddingHorizontal: 10,
+        },
+
+
+        backButton: {
+            width: 42,
+
+            height: 42,
+
+            borderRadius: 13,
+
+            backgroundColor:
+                'rgba(255,255,255,0.14)',
+
+            alignItems:
+                'center',
+
+            justifyContent:
+                'center',
+        },
+
+
+        backButtonText: {
+            color: '#FFFFFF',
+
+            fontSize: 32,
+
+            lineHeight: 34,
+
+            fontWeight: '400',
+        },
+
+
+        headerText: {
+            flex: 1,
+
+            minWidth: 0,
+        },
+
+
+        title: {
+            color: '#FFFFFF',
+
+            fontSize: 20,
+
+            fontWeight: '800',
+        },
+
+
+        titleSmall: {
+            fontSize: 18,
+        },
+
+
+        subtitle: {
+            color: '#DCE8ED',
+
+            fontSize: 11,
+
+            marginTop: 3,
+        },
+
+
+        content: {
+            width: '100%',
+
+            padding: 14,
+
+            paddingBottom: 60,
+
+            alignSelf: 'center',
+        },
+
+
+        contentWide: {
+            maxWidth: 900,
+
+            paddingHorizontal: 24,
+
+            paddingTop: 20,
+        },
+
+
+        infoBanner: {
+            backgroundColor:
+                '#EAF6F4',
+
+            borderWidth: 1,
+
+            borderColor:
+                '#B9DDD8',
+
+            borderRadius: 14,
+
+            padding: 12,
+
+            marginBottom: 14,
+        },
+
+
+        infoBannerText: {
+            color:
+                colors.text,
+
+            fontSize: 11,
+
+            lineHeight: 17,
+
+            fontWeight: '600',
+        },
+
+
+        formField: {
+            width: '100%',
+
+            marginBottom: 14,
+        },
+
+
+        label: {
+            color:
+                colors.text,
+
+            fontSize: 10,
+
+            fontWeight: '800',
+
+            marginBottom: 6,
+        },
+
+
+        input: {
+            width: '100%',
+
+            minHeight: 48,
+
+            borderWidth: 1,
+
+            borderColor:
+                colors.border,
+
+            borderRadius: 13,
+
+            backgroundColor:
+                colors.card,
+
+            color:
+                colors.text,
+
+            paddingHorizontal: 12,
+
+            fontSize: 13,
+        },
+
+
+        pickerField: {
+            width: '100%',
+
+            minHeight: 48,
+
+            borderWidth: 1,
+
+            borderColor:
+                colors.border,
+
+            borderRadius: 13,
+
+            backgroundColor:
+                colors.card,
+
+            overflow: 'hidden',
+
+            justifyContent:
+                'center',
+        },
+
+
+        helperText: {
+            color:
+                colors.mutedText,
+
+            fontSize: 10,
+
+            marginTop: 6,
+
+            lineHeight: 15,
+        },
+
+
+        formRow: {
+            width: '100%',
+
+            flexDirection:
+                'row',
+
+            gap: 12,
+
+            marginBottom: 14,
+        },
+
+
+        formColumn: {
+            flexDirection:
+                'column',
+
+            gap: 0,
+        },
+
+
+        formRowField: {
+            flex: 1,
+
+            minWidth: 0,
+
+            marginBottom: 10,
+        },
+
+
+        lineRow: {
+            marginTop: 12,
+
+            marginBottom: 4,
+        },
+
+
+        lineCard: {
+            width: '100%',
+
+            backgroundColor:
+                colors.card,
+
+            borderWidth: 1,
+
+            borderColor:
+                colors.border,
+
+            borderRadius: 18,
+
+            padding: 14,
+
+            marginBottom: 15,
+        },
+
+
+        lineCardSmall: {
+            padding: 11,
+        },
+
+
+        lineCardTitle: {
+            color:
+                colors.text,
+
+            fontSize: 15,
+
+            fontWeight: '800',
+
+            marginBottom: 13,
+        },
+
+
+        addLineButton: {
+            minHeight: 46,
+
+            backgroundColor:
+                '#E6F5F2',
+
+            borderRadius: 13,
+
+            alignItems:
+                'center',
+
+            justifyContent:
+                'center',
+
+            marginTop: 4,
+        },
+
+
+        addLineButtonText: {
+            color:
+                colors.teal,
+
+            fontSize: 12,
+
+            fontWeight: '900',
+        },
+
+
+        noLinesText: {
+            color:
+                colors.mutedText,
+
+            fontSize: 10,
+
+            textAlign: 'center',
+
+            paddingVertical: 18,
+        },
+
+
+        selectedItems: {
+            width: '100%',
+
+            gap: 8,
+
+            marginTop: 12,
+        },
+
+
+        itemCard: {
+            width: '100%',
+
+            borderWidth: 1,
+
+            borderColor:
+                colors.border,
+
+            borderRadius: 14,
+
+            padding: 11,
+
+            backgroundColor:
+                colors.background,
+        },
+
+
+        itemTop: {
+            width: '100%',
+
+            flexDirection:
+                'row',
+
+            alignItems:
+                'flex-start',
+
+            gap: 8,
+        },
+
+
+        itemName: {
+            color:
+                colors.text,
+
+            fontSize: 12,
+
+            fontWeight: '800',
+        },
+
+
+        itemMeta: {
+            color:
+                colors.mutedText,
+
+            fontSize: 9,
+
+            lineHeight: 14,
+
+            marginTop: 4,
+        },
+
+
+        removeButton: {
+            width: 32,
+
+            height: 32,
+
+            borderRadius: 10,
+
+            backgroundColor:
+                '#FCE8E8',
+
+            alignItems:
+                'center',
+
+            justifyContent:
+                'center',
+        },
+
+
+        removeButtonText: {
+            color:
+                '#B73B3B',
+
+            fontSize: 19,
+
+            fontWeight: '800',
+        },
+
+
+        itemBottom: {
+            width: '100%',
+
+            marginTop: 11,
+
+            flexDirection:
+                'row',
+
+            alignItems:
+                'center',
+
+            justifyContent:
+                'space-between',
+
+            gap: 12,
+        },
+
+
+        quantityEditor: {
+            flexDirection:
+                'row',
+
+            alignItems:
+                'center',
+
+            borderWidth: 1,
+
+            borderColor:
+                colors.border,
+
+            borderRadius: 12,
+
+            overflow: 'hidden',
+
+            backgroundColor:
+                colors.card,
+        },
+
+
+        quantityButton: {
+            width: 38,
+
+            height: 40,
+
+            alignItems:
+                'center',
+
+            justifyContent:
+                'center',
+
+            backgroundColor:
+                '#EFF6F5',
+        },
+
+
+        quantityButtonText: {
+            color:
+                colors.teal,
+
+            fontSize: 18,
+
+            fontWeight: '800',
+        },
+
+
+        quantityInput: {
+            width: 55,
+
+            height: 40,
+
+            color:
+                colors.text,
+
+            textAlign: 'center',
+
+            fontSize: 12,
+
+            fontWeight: '700',
+        },
+
+
+        itemTotal: {
+            color:
+                colors.text,
+
+            fontSize: 13,
+
+            fontWeight: '900',
+        },
+
+
+        totalCard: {
+            width: '100%',
+
+            backgroundColor:
+                colors.card,
+
+            borderWidth: 1,
+
+            borderColor:
+                colors.border,
+
+            borderRadius: 18,
+
+            padding: 14,
+
+            marginBottom: 15,
+        },
+
+
+        totalRow: {
+            width: '100%',
+
+            flexDirection:
+                'row',
+
+            alignItems:
+                'center',
+
+            justifyContent:
+                'space-between',
+
+            paddingVertical: 7,
+
+            gap: 12,
+        },
+
+
+        totalRowLabel: {
+            color:
+                colors.mutedText,
+
+            fontSize: 11,
+
+            fontWeight: '600',
+        },
+
+
+        totalRowValue: {
+            color:
+                colors.text,
+
+            fontSize: 12,
+
+            fontWeight: '800',
+        },
+
+
+        totalDivider: {
+            height: 1,
+
+            width: '100%',
+
+            backgroundColor:
+                colors.border,
+
+            marginVertical: 7,
+        },
+
+
+        grandTotalLabel: {
+            color:
+                colors.text,
+
+            fontSize: 14,
+
+            fontWeight: '900',
+        },
+
+
+        grandTotalValue: {
+            color:
+                colors.teal,
+
+            fontSize: 18,
+
+            fontWeight: '900',
+        },
+
+
+        notesInput: {
+            minHeight: 105,
+
+            paddingTop: 12,
+        },
+
+
+        formActions: {
+            width: '100%',
+
+            flexDirection:
+                'row',
+
+            gap: 10,
+
+            marginTop: 5,
+
+            marginBottom: 20,
+        },
+
+
+        cancelButton: {
+            flex: 1,
+
+            minHeight: 50,
+
+            borderWidth: 1,
+
+            borderColor:
+                colors.border,
+
+            borderRadius: 14,
+
+            backgroundColor:
+                colors.card,
+
+            alignItems:
+                'center',
+
+            justifyContent:
+                'center',
+        },
+
+
+        cancelButtonText: {
+            color:
+                colors.text,
+
+            fontSize: 12,
+
+            fontWeight: '800',
+        },
+
+
+        saveButton: {
+            flex: 1.5,
+
+            minHeight: 50,
+
+            borderRadius: 14,
+
+            backgroundColor:
+                colors.teal,
+
+            alignItems:
+                'center',
+
+            justifyContent:
+                'center',
+
+            paddingHorizontal: 10,
+        },
+
+
+        saveButtonText: {
+            color: '#FFFFFF',
+
+            fontSize: 12,
+
+            fontWeight: '900',
+
+            textAlign: 'center',
+        },
+
+
+        disabledButton: {
+            opacity: 0.45,
+        },
+
+    });

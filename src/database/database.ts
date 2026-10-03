@@ -1,8 +1,65 @@
 import * as SQLite from 'expo-sqlite';
+import { Platform } from 'react-native';
 
 const DATABASE_NAME = 'ca_ai_retail.db';
 
+// Share the initialization promise, not a half-initialized connection.
 let database: SQLite.SQLiteDatabase | null = null;
+let initialization: Promise<SQLite.SQLiteDatabase> | null = null;
+let writeQueue: Promise<void> = Promise.resolve();
+
+export function getDatabase(): Promise<SQLite.SQLiteDatabase> {
+  if (database) return Promise.resolve(database);
+  if (!initialization) {
+    initialization = initializeDatabase().then(db => {
+      database = db;
+      return db;
+    }).catch(error => {
+      initialization = null;
+      throw error;
+    });
+  }
+  return initialization;
+}
+
+/** All purchase-workflow writes use this queue and a transaction.
+ * Native: a separate connection prevents unrelated screen queries joining it.
+ * Web: callers using this helper are serialized; other repositories must also
+ * use the same helper to obtain the same isolation on web.
+ */
+export function withPurchaseTransaction<T>(
+  task: (db: SQLite.SQLiteDatabase) => Promise<T>,
+): Promise<T> {
+  const result = writeQueue.then(async () => {
+    const db = await getDatabase();
+    if (Platform.OS === 'web') {
+      let value!: T;
+      await db.withTransactionAsync(async () => { value = await task(db); });
+      return value;
+    }
+    const connection = await SQLite.openDatabaseAsync(DATABASE_NAME, {
+      useNewConnection: true,
+    });
+    let started = false;
+    try {
+      await connection.execAsync('PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
+      await connection.execAsync('BEGIN IMMEDIATE;');
+      started = true;
+      const value = await task(connection);
+      await connection.execAsync('COMMIT;');
+      started = false;
+      return value;
+    } catch (error) {
+      if (started) await connection.execAsync('ROLLBACK;').catch(() => undefined);
+      throw error;
+    } finally {
+      // A close failure must not turn a successful commit into a failed save.
+      await connection.closeAsync().catch(error => console.warn('Closing purchase connection', error));
+    }
+  });
+  writeQueue = result.then(() => undefined, () => undefined);
+  return result;
+}
 
 
 /* =========================================================
@@ -69,24 +126,18 @@ async function addColumnIfMissing(
    DATABASE
 ========================================================= */
 
-export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
-  if (database) {
-    return database;
-  }
-
-  database =
-    await SQLite.openDatabaseAsync(
-      DATABASE_NAME,
-    );
-
+async function initializeDatabase(): Promise<SQLite.SQLiteDatabase> {
+  const database = await SQLite.openDatabaseAsync(DATABASE_NAME);
+  try {
+    await database.execAsync('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
+    await database.execAsync('BEGIN IMMEDIATE;');
 
   /* =======================================================
      CREATE TABLES
   ======================================================= */
 
   await database.execAsync(`
-    PRAGMA journal_mode = WAL;
-    PRAGMA foreign_keys = ON;
+
 
 
     /* =====================================================
@@ -315,8 +366,112 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
     CREATE INDEX IF NOT EXISTS
       idx_purchase_items_product_id
       ON purchase_items (product_id);
+    
+        /* =====================================================
+       PURCHASE RFQS
+    ===================================================== */
+
+    CREATE TABLE IF NOT EXISTS purchase_rfqs (
+      id TEXT PRIMARY KEY NOT NULL,
+
+      business_id TEXT NOT NULL,
+
+      rfq_number TEXT NOT NULL DEFAULT '',
+
+      vendor_id TEXT,
+
+      rfq_date TEXT NOT NULL,
+
+      valid_until TEXT,
+
+      supply_type TEXT NOT NULL DEFAULT 'WITHIN_STATE',
+
+      counter_branch TEXT,
+
+      salesperson TEXT,
+
+      delivery_method TEXT,
+
+      subtotal REAL NOT NULL DEFAULT 0,
+
+      gst_amount REAL NOT NULL DEFAULT 0,
+
+      cgst_amount REAL NOT NULL DEFAULT 0,
+
+      sgst_amount REAL NOT NULL DEFAULT 0,
+
+      igst_amount REAL NOT NULL DEFAULT 0,
+
+      discount REAL NOT NULL DEFAULT 0,
+
+      total_amount REAL NOT NULL DEFAULT 0,
+
+      notes TEXT,
+
+      created_at TEXT NOT NULL,
+
+      updated_at TEXT NOT NULL
+    );
 
 
+    CREATE INDEX IF NOT EXISTS
+      idx_purchase_rfqs_business_id
+      ON purchase_rfqs (business_id);
+
+
+    CREATE INDEX IF NOT EXISTS
+      idx_purchase_rfqs_vendor_id
+      ON purchase_rfqs (vendor_id);
+
+
+    CREATE INDEX IF NOT EXISTS
+      idx_purchase_rfqs_date
+      ON purchase_rfqs (rfq_date);
+
+
+    /* =====================================================
+       PURCHASE RFQ ITEMS
+    ===================================================== */
+
+    CREATE TABLE IF NOT EXISTS purchase_rfq_items (
+      id TEXT PRIMARY KEY NOT NULL,
+
+      rfq_id TEXT NOT NULL,
+
+      product_id TEXT NOT NULL,
+
+      product_name TEXT NOT NULL DEFAULT '',
+
+      hsn TEXT,
+
+      unit TEXT,
+
+      quantity REAL NOT NULL DEFAULT 0,
+
+      unit_price REAL NOT NULL DEFAULT 0,
+
+      gst_rate REAL NOT NULL DEFAULT 0,
+
+      gst_amount REAL NOT NULL DEFAULT 0,
+
+      discount REAL NOT NULL DEFAULT 0,
+
+      total_amount REAL NOT NULL DEFAULT 0,
+
+      created_at TEXT NOT NULL
+    );
+
+
+    CREATE INDEX IF NOT EXISTS
+      idx_purchase_rfq_items_rfq_id
+      ON purchase_rfq_items (rfq_id);
+
+
+    CREATE INDEX IF NOT EXISTS
+      idx_purchase_rfq_items_product_id
+      ON purchase_rfq_items (product_id);
+
+      
     /* =====================================================
        INVENTORY MOVEMENTS
     ===================================================== */
@@ -563,6 +718,511 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
     'TEXT',
   );
 
+  /*
+ * PURCHASE RFQ HEADER FIELDS
+ *
+ * These migrations protect existing installations.
+ * CREATE TABLE IF NOT EXISTS does not add missing columns
+ * to a table that already exists.
+ */
+
+await addColumnIfMissing(
+  database,
+  'purchase_rfqs',
+  'rfq_number',
+  "TEXT NOT NULL DEFAULT ''",
+);
+
+await addColumnIfMissing(
+  database,
+  'purchase_rfqs',
+  'vendor_id',
+  'TEXT',
+);
+
+await addColumnIfMissing(
+  database,
+  'purchase_rfqs',
+  'rfq_date',
+  "TEXT NOT NULL DEFAULT ''",
+);
+
+await addColumnIfMissing(
+  database,
+  'purchase_rfqs',
+  'valid_until',
+  'TEXT',
+);
+
+await addColumnIfMissing(
+  database,
+  'purchase_rfqs',
+  'supply_type',
+  "TEXT NOT NULL DEFAULT 'WITHIN_STATE'",
+);
+
+await addColumnIfMissing(
+  database,
+  'purchase_rfqs',
+  'counter_branch',
+  'TEXT',
+);
+
+await addColumnIfMissing(
+  database,
+  'purchase_rfqs',
+  'salesperson',
+  'TEXT',
+);
+
+await addColumnIfMissing(
+  database,
+  'purchase_rfqs',
+  'delivery_method',
+  'TEXT',
+);
+
+await addColumnIfMissing(
+  database,
+  'purchase_rfqs',
+  'subtotal',
+  'REAL NOT NULL DEFAULT 0',
+);
+
+await addColumnIfMissing(
+  database,
+  'purchase_rfqs',
+  'gst_amount',
+  'REAL NOT NULL DEFAULT 0',
+);
+
+await addColumnIfMissing(
+  database,
+  'purchase_rfqs',
+  'cgst_amount',
+  'REAL NOT NULL DEFAULT 0',
+);
+
+await addColumnIfMissing(
+  database,
+  'purchase_rfqs',
+  'sgst_amount',
+  'REAL NOT NULL DEFAULT 0',
+);
+
+await addColumnIfMissing(
+  database,
+  'purchase_rfqs',
+  'igst_amount',
+  'REAL NOT NULL DEFAULT 0',
+);
+
+await addColumnIfMissing(
+  database,
+  'purchase_rfqs',
+  'discount',
+  'REAL NOT NULL DEFAULT 0',
+);
+
+await addColumnIfMissing(
+  database,
+  'purchase_rfqs',
+  'total_amount',
+  'REAL NOT NULL DEFAULT 0',
+);
+
+await addColumnIfMissing(
+  database,
+  'purchase_rfqs',
+  'notes',
+  'TEXT',
+);
+
+/*
+ * PURCHASE RFQ ITEM FIELDS
+ *
+ * Protect existing installations in case an older
+ * purchase_rfq_items table is missing newer columns.
+ */
+
+await addColumnIfMissing(
+  database,
+  'purchase_rfq_items',
+  'product_id',
+  "TEXT NOT NULL DEFAULT ''",
+);
+
+await addColumnIfMissing(
+  database,
+  'purchase_rfq_items',
+  'product_name',
+  "TEXT NOT NULL DEFAULT ''",
+);
+
+await addColumnIfMissing(
+  database,
+  'purchase_rfq_items',
+  'hsn',
+  'TEXT',
+);
+
+await addColumnIfMissing(
+  database,
+  'purchase_rfq_items',
+  'unit',
+  'TEXT',
+);
+
+await addColumnIfMissing(
+  database,
+  'purchase_rfq_items',
+  'quantity',
+  'REAL NOT NULL DEFAULT 0',
+);
+
+await addColumnIfMissing(
+  database,
+  'purchase_rfq_items',
+  'unit_price',
+  'REAL NOT NULL DEFAULT 0',
+);
+
+await addColumnIfMissing(
+  database,
+  'purchase_rfq_items',
+  'gst_rate',
+  'REAL NOT NULL DEFAULT 0',
+);
+
+await addColumnIfMissing(
+  database,
+  'purchase_rfq_items',
+  'gst_amount',
+  'REAL NOT NULL DEFAULT 0',
+);
+
+await addColumnIfMissing(
+  database,
+  'purchase_rfq_items',
+  'discount',
+  'REAL NOT NULL DEFAULT 0',
+);
+
+await addColumnIfMissing(
+  database,
+  'purchase_rfq_items',
+  'total_amount',
+  'REAL NOT NULL DEFAULT 0',
+);
+
+await addColumnIfMissing(
+  database,
+  'purchase_rfq_items',
+  'created_at',
+  "TEXT NOT NULL DEFAULT ''",
+);
+
+/*
+ * RFQ NUMBER UNIQUENESS
+ *
+ * Allow old blank RFQ numbers to remain untouched,
+ * but prevent two real RFQs in the same business
+ * from receiving the same RFQ number.
+ */
+
+await database.execAsync(`
+  CREATE UNIQUE INDEX IF NOT EXISTS
+    idx_purchase_rfqs_business_rfq_number
+    ON purchase_rfqs (
+      business_id,
+      rfq_number
+    )
+    WHERE rfq_number <> '';
+`);
+
+
+
+  /* PURCHASE WORKFLOW: new documents and audit records. */
+  await database.execAsync(`
+    CREATE TABLE IF NOT EXISTS purchase_document_sequences (
+      business_id TEXT NOT NULL,
+      document_type TEXT NOT NULL,
+      last_number INTEGER NOT NULL,
+      PRIMARY KEY (business_id, document_type)
+    );
+    CREATE TABLE IF NOT EXISTS purchase_document_links (
+      business_id TEXT NOT NULL,
+      source_type TEXT NOT NULL,
+      source_id TEXT NOT NULL,
+      target_type TEXT NOT NULL,
+      target_id TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (target_type, target_id)
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_purchase_single_conversion
+      ON purchase_document_links (business_id, source_type, source_id, target_type)
+      WHERE target_type <> 'RETURN';
+    CREATE INDEX IF NOT EXISTS idx_purchase_links_source
+      ON purchase_document_links (business_id, source_type, source_id);
+    CREATE TABLE IF NOT EXISTS purchase_payments (
+      id TEXT PRIMARY KEY NOT NULL,
+      business_id TEXT NOT NULL,
+      purchase_id TEXT NOT NULL,
+      direction TEXT NOT NULL CHECK (direction IN ('PAYMENT', 'REFUND')),
+      amount REAL NOT NULL CHECK (amount > 0),
+      payment_date TEXT NOT NULL,
+      payment_method TEXT NOT NULL,
+      notes TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_purchase_payments_purchase
+      ON purchase_payments (business_id, purchase_id);
+  `);
+
+  await database.execAsync(`
+    CREATE TABLE IF NOT EXISTS purchase_requests (
+      id TEXT PRIMARY KEY NOT NULL,
+      business_id TEXT NOT NULL,
+      document_number TEXT NOT NULL,
+      vendor_id TEXT NOT NULL,
+      document_date TEXT NOT NULL,
+      due_date TEXT,
+      supply_type TEXT NOT NULL,
+      counter_branch TEXT,
+      salesperson TEXT,
+      delivery_method TEXT,
+      invoice_number TEXT,
+      subtotal REAL NOT NULL DEFAULT 0,
+      gst_amount REAL NOT NULL DEFAULT 0,
+      cgst_amount REAL NOT NULL DEFAULT 0,
+      sgst_amount REAL NOT NULL DEFAULT 0,
+      igst_amount REAL NOT NULL DEFAULT 0,
+      discount REAL NOT NULL DEFAULT 0,
+      total_amount REAL NOT NULL DEFAULT 0,
+      refunded_amount REAL NOT NULL DEFAULT 0,
+      source_type TEXT,
+      source_id TEXT,
+      vendor_snapshot TEXT,
+      business_snapshot TEXT,
+      notes TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE (business_id, document_number)
+    );
+    CREATE INDEX IF NOT EXISTS idx_purchase_requests_business_date
+      ON purchase_requests (business_id, document_date);
+    CREATE TABLE IF NOT EXISTS purchase_request_items (
+      id TEXT PRIMARY KEY NOT NULL,
+      document_id TEXT NOT NULL,
+      product_id TEXT NOT NULL,
+      product_name TEXT NOT NULL,
+      hsn TEXT,
+      unit TEXT,
+      quantity REAL NOT NULL CHECK (quantity > 0),
+      unit_price REAL NOT NULL,
+      gst_rate REAL NOT NULL,
+      gst_amount REAL NOT NULL DEFAULT 0,
+      discount REAL NOT NULL DEFAULT 0,
+      total_amount REAL NOT NULL,
+      position INTEGER NOT NULL DEFAULT 0,
+      source_item_id TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_purchase_request_items_document
+      ON purchase_request_items (document_id);
+    CREATE INDEX IF NOT EXISTS idx_purchase_request_items_source
+      ON purchase_request_items (source_item_id);
+  `);
+
+  await database.execAsync(`
+    CREATE TABLE IF NOT EXISTS purchase_orders (
+      id TEXT PRIMARY KEY NOT NULL,
+      business_id TEXT NOT NULL,
+      document_number TEXT NOT NULL,
+      vendor_id TEXT NOT NULL,
+      document_date TEXT NOT NULL,
+      due_date TEXT,
+      supply_type TEXT NOT NULL,
+      counter_branch TEXT,
+      salesperson TEXT,
+      delivery_method TEXT,
+      invoice_number TEXT,
+      subtotal REAL NOT NULL DEFAULT 0,
+      gst_amount REAL NOT NULL DEFAULT 0,
+      cgst_amount REAL NOT NULL DEFAULT 0,
+      sgst_amount REAL NOT NULL DEFAULT 0,
+      igst_amount REAL NOT NULL DEFAULT 0,
+      discount REAL NOT NULL DEFAULT 0,
+      total_amount REAL NOT NULL DEFAULT 0,
+      refunded_amount REAL NOT NULL DEFAULT 0,
+      source_type TEXT,
+      source_id TEXT,
+      vendor_snapshot TEXT,
+      business_snapshot TEXT,
+      notes TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE (business_id, document_number)
+    );
+    CREATE INDEX IF NOT EXISTS idx_purchase_orders_business_date
+      ON purchase_orders (business_id, document_date);
+    CREATE TABLE IF NOT EXISTS purchase_order_items (
+      id TEXT PRIMARY KEY NOT NULL,
+      document_id TEXT NOT NULL,
+      product_id TEXT NOT NULL,
+      product_name TEXT NOT NULL,
+      hsn TEXT,
+      unit TEXT,
+      quantity REAL NOT NULL CHECK (quantity > 0),
+      unit_price REAL NOT NULL,
+      gst_rate REAL NOT NULL,
+      gst_amount REAL NOT NULL DEFAULT 0,
+      discount REAL NOT NULL DEFAULT 0,
+      total_amount REAL NOT NULL,
+      position INTEGER NOT NULL DEFAULT 0,
+      source_item_id TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_purchase_order_items_document
+      ON purchase_order_items (document_id);
+    CREATE INDEX IF NOT EXISTS idx_purchase_order_items_source
+      ON purchase_order_items (source_item_id);
+  `);
+
+  await database.execAsync(`
+    CREATE TABLE IF NOT EXISTS purchase_grns (
+      id TEXT PRIMARY KEY NOT NULL,
+      business_id TEXT NOT NULL,
+      document_number TEXT NOT NULL,
+      vendor_id TEXT NOT NULL,
+      document_date TEXT NOT NULL,
+      due_date TEXT,
+      supply_type TEXT NOT NULL,
+      counter_branch TEXT,
+      salesperson TEXT,
+      delivery_method TEXT,
+      invoice_number TEXT,
+      subtotal REAL NOT NULL DEFAULT 0,
+      gst_amount REAL NOT NULL DEFAULT 0,
+      cgst_amount REAL NOT NULL DEFAULT 0,
+      sgst_amount REAL NOT NULL DEFAULT 0,
+      igst_amount REAL NOT NULL DEFAULT 0,
+      discount REAL NOT NULL DEFAULT 0,
+      total_amount REAL NOT NULL DEFAULT 0,
+      refunded_amount REAL NOT NULL DEFAULT 0,
+      source_type TEXT,
+      source_id TEXT,
+      vendor_snapshot TEXT,
+      business_snapshot TEXT,
+      notes TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE (business_id, document_number)
+    );
+    CREATE INDEX IF NOT EXISTS idx_purchase_grns_business_date
+      ON purchase_grns (business_id, document_date);
+    CREATE TABLE IF NOT EXISTS purchase_grn_items (
+      id TEXT PRIMARY KEY NOT NULL,
+      document_id TEXT NOT NULL,
+      product_id TEXT NOT NULL,
+      product_name TEXT NOT NULL,
+      hsn TEXT,
+      unit TEXT,
+      quantity REAL NOT NULL CHECK (quantity > 0),
+      unit_price REAL NOT NULL,
+      gst_rate REAL NOT NULL,
+      gst_amount REAL NOT NULL DEFAULT 0,
+      discount REAL NOT NULL DEFAULT 0,
+      total_amount REAL NOT NULL,
+      position INTEGER NOT NULL DEFAULT 0,
+      source_item_id TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_purchase_grn_items_document
+      ON purchase_grn_items (document_id);
+    CREATE INDEX IF NOT EXISTS idx_purchase_grn_items_source
+      ON purchase_grn_items (source_item_id);
+  `);
+
+  await database.execAsync(`
+    CREATE TABLE IF NOT EXISTS purchase_returns (
+      id TEXT PRIMARY KEY NOT NULL,
+      business_id TEXT NOT NULL,
+      document_number TEXT NOT NULL,
+      vendor_id TEXT NOT NULL,
+      document_date TEXT NOT NULL,
+      due_date TEXT,
+      supply_type TEXT NOT NULL,
+      counter_branch TEXT,
+      salesperson TEXT,
+      delivery_method TEXT,
+      invoice_number TEXT,
+      subtotal REAL NOT NULL DEFAULT 0,
+      gst_amount REAL NOT NULL DEFAULT 0,
+      cgst_amount REAL NOT NULL DEFAULT 0,
+      sgst_amount REAL NOT NULL DEFAULT 0,
+      igst_amount REAL NOT NULL DEFAULT 0,
+      discount REAL NOT NULL DEFAULT 0,
+      total_amount REAL NOT NULL DEFAULT 0,
+      refunded_amount REAL NOT NULL DEFAULT 0,
+      source_type TEXT,
+      source_id TEXT,
+      vendor_snapshot TEXT,
+      business_snapshot TEXT,
+      notes TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE (business_id, document_number)
+    );
+    CREATE INDEX IF NOT EXISTS idx_purchase_returns_business_date
+      ON purchase_returns (business_id, document_date);
+    CREATE TABLE IF NOT EXISTS purchase_return_items (
+      id TEXT PRIMARY KEY NOT NULL,
+      document_id TEXT NOT NULL,
+      product_id TEXT NOT NULL,
+      product_name TEXT NOT NULL,
+      hsn TEXT,
+      unit TEXT,
+      quantity REAL NOT NULL CHECK (quantity > 0),
+      unit_price REAL NOT NULL,
+      gst_rate REAL NOT NULL,
+      gst_amount REAL NOT NULL DEFAULT 0,
+      discount REAL NOT NULL DEFAULT 0,
+      total_amount REAL NOT NULL,
+      position INTEGER NOT NULL DEFAULT 0,
+      source_item_id TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_purchase_return_items_document
+      ON purchase_return_items (document_id);
+    CREATE INDEX IF NOT EXISTS idx_purchase_return_items_source
+      ON purchase_return_items (source_item_id);
+  `);
+
+  // Extend old bills/RFQs without moving or recreating their existing records.
+  for (const table of ['purchases', 'purchase_rfqs']) {
+    for (const column of ['source_type', 'source_id', 'vendor_snapshot', 'business_snapshot']) {
+      await addColumnIfMissing(database, table, column, 'TEXT');
+    }
+  }
+  await addColumnIfMissing(database, 'purchases', 'return_amount', 'REAL NOT NULL DEFAULT 0');
+  await addColumnIfMissing(database, 'purchases', 'refunded_amount', 'REAL NOT NULL DEFAULT 0');
+  await addColumnIfMissing(database, 'purchases', 'vendor_credit', 'REAL NOT NULL DEFAULT 0');
+  await addColumnIfMissing(database, 'purchases', 'match_status', "TEXT NOT NULL DEFAULT 'NOT_CHECKED'");
+  for (const table of ['purchase_items', 'purchase_rfq_items']) {
+    await addColumnIfMissing(database, table, 'position', 'INTEGER NOT NULL DEFAULT 0');
+    await addColumnIfMissing(database, table, 'source_item_id', 'TEXT');
+  }
+  // Compatibility with the existing product-create repository, which may only
+  // supply opening_stock. This runs on INSERT only, never resets existing stock.
+  await database.execAsync(`
+    CREATE TRIGGER IF NOT EXISTS purchase_initial_product_stock
+    AFTER INSERT ON products
+    WHEN NEW.stock_quantity = 0 AND NEW.opening_stock <> 0
+    BEGIN
+      UPDATE products SET stock_quantity = NEW.opening_stock WHERE id = NEW.id;
+    END;
+  `);
 
   /* =======================================================
      RETAIL POC SEED DATA
@@ -724,24 +1384,7 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
   );
 
 
-  /*
-   * Keep older seeded vendor attached to
-   * the active business.
-   */
-
-  await database.runAsync(
-    `
-      UPDATE vendors
-      SET
-        business_id = ?,
-        updated_at = ?
-      WHERE id = 'vendor_sri_lakshmi'
-    `,
-    [
-      businessId,
-      now,
-    ],
-  );
+  // Existing seeded vendor ownership is deliberately not reassigned.
 
 
   /* =======================================================
@@ -930,28 +1573,7 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
   );
 
 
-  /*
-   * Make sure older seeded products belong
-   * to the active business.
-   */
-
-  await database.runAsync(
-    `
-      UPDATE products
-      SET
-        business_id = ?,
-        updated_at = ?
-      WHERE id IN (
-        'product_premium_rice_5kg',
-        'product_groundnut_oil_1l',
-        'product_bath_soap'
-      )
-    `,
-    [
-      businessId,
-      now,
-    ],
-  );
+  // Existing seeded product ownership is deliberately not reassigned.
 
 
   /* =======================================================
@@ -1059,5 +1681,11 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
   );
 
 
-  return database;
+    await database.execAsync('COMMIT;');
+    return database;
+  } catch (error) {
+    await database.execAsync('ROLLBACK;').catch(() => undefined);
+    await database.closeAsync().catch(() => undefined);
+    throw error;
+  }
 }

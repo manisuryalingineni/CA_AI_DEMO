@@ -988,7 +988,7 @@ export default function DashboardScreen() {
               title="Purchase"
               onPress={() =>
                 router.push(
-                  "/purchases",
+                  "/purchases/add",
                 )
               }
             />
@@ -1102,7 +1102,7 @@ export default function DashboardScreen() {
               description="Purchase bill and inward stock"
               onPress={() =>
                 router.push(
-                  "/purchases",
+                  "/purchases/add",
                 )
               }
             />
@@ -1207,7 +1207,7 @@ export default function DashboardScreen() {
               description="Purchase and inward stock"
               onPress={() =>
                 router.push(
-                  "/purchases",
+                  "/purchases/add",
                 )
               }
             />

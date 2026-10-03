@@ -4,7 +4,6 @@ import {
   Alert,
   FlatList,
   RefreshControl,
-  SafeAreaView,
   StyleSheet,
   Text,
   TextInput,
@@ -13,7 +12,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
-
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { loadSales } from '../../src/services/saleService';
 import { loadCustomers } from '../../src/services/customerService';
 import { colors } from '../../src/theme/colors';
