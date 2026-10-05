@@ -1,42 +1,34 @@
 import React, {
-  useEffect,
+  useCallback,
   useMemo,
   useRef,
   useState,
 } from "react";
 
 import {
+  ActivityIndicator,
   Alert,
-  Modal,
-  Platform,
+  Animated,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
 } from "react-native";
 
 import {
   router,
-  Stack,
+  useFocusEffect,
   useLocalSearchParams,
 } from "expo-router";
 
 import {
-  StatusBar,
-} from "expo-status-bar";
-
-import {
+  SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 
-import {
-  WebView,
-} from "react-native-webview";
-
-import {
-  Ionicons,
-} from "@expo/vector-icons";
-
+import { Ionicons } from "@expo/vector-icons";
 import * as Print from "expo-print";
 
 import {
@@ -51,57 +43,25 @@ import type {
   WorkflowDetail,
 } from "../src/repositories/purchaseRepository";
 
-/* =========================================================
-   COLORS
-========================================================= */
-
-const C = {
-  navy: "#08233D",
-
-  teal: "#07867D",
-
-  background: "#EDF4F6",
-
-  white: "#FFFFFF",
-
-  text: "#173042",
-
-  muted: "#68757D",
-
-  border: "#D7E2E7",
-
-  red: "#B33B34",
-};
-
-/* =========================================================
-   TYPES
-========================================================= */
+import { colors } from "../src/theme/colors";
 
 type BusinessIdentity = {
   id: string;
-
   name: string;
-
   gstin: string;
-
   businessType: string;
 };
 
-type PurchasePreview = {
-  html: string;
-
-  documentNumber: string;
-
-  businessId: string;
+type BusinessPreview = {
+  name: string;
+  address: string;
+  gstin: string;
+  pan: string;
+  phone: string;
+  email: string;
 };
 
-/* =========================================================
-   HELPERS
-========================================================= */
-
-function text(
-  value: unknown,
-): string {
+function text(value: unknown): string {
   return typeof value === "string"
     ? value.trim()
     : "";
@@ -112,10 +72,7 @@ function record(
 ): Record<string, unknown> {
   return value &&
     typeof value === "object"
-    ? (
-        value as
-          Record<string, unknown>
-      )
+    ? value as Record<string, unknown>
     : {};
 }
 
@@ -126,10 +83,7 @@ function businessIdentity(
     return null;
   }
 
-  const row =
-    record(
-      value,
-    );
+  const row = record(value);
 
   if (!text(row.id)) {
     throw new Error(
@@ -138,70 +92,38 @@ function businessIdentity(
   }
 
   return {
-    id:
-      text(
-        row.id,
-      ),
-
-    name:
-      text(
-        row.name,
-      ),
-
-    gstin:
-      text(
-        row.gstin,
-      ),
-
+    id: text(row.id),
+    name: text(row.name),
+    gstin: text(row.gstin),
     businessType:
-      text(
-        row.business_type,
-      ) ||
-      text(
-        row.businessType,
-      ),
+      text(row.business_type) ||
+      text(row.businessType),
   };
 }
 
 function number(
-  value:
-    | number
-    | null
-    | undefined,
+  value: number | null | undefined,
 ): number {
-  return typeof value ===
-      "number" &&
-    Number.isFinite(
-      value,
-    )
+  return typeof value === "number" &&
+    Number.isFinite(value)
     ? value
     : 0;
 }
 
 function money(
-  value:
-    | number
-    | null
-    | undefined,
+  value: number | null | undefined,
 ): string {
-  return `₹${number(
-    value,
-  ).toLocaleString(
+  return `₹${number(value).toLocaleString(
     "en-IN",
     {
       minimumFractionDigits: 2,
-
       maximumFractionDigits: 2,
     },
   )}`;
 }
 
-function quantity(
-  value: number,
-): string {
-  return number(
-    value,
-  ).toLocaleString(
+function quantity(value: number): string {
+  return number(value).toLocaleString(
     "en-IN",
     {
       maximumFractionDigits: 6,
@@ -212,63 +134,55 @@ function quantity(
 function escapeHtml(
   value: unknown,
 ): string {
-  return String(
-    value ?? "",
-  )
-    .replace(
-      /&/g,
-      "&amp;",
-    )
-    .replace(
-      /</g,
-      "&lt;",
-    )
-    .replace(
-      />/g,
-      "&gt;",
-    )
-    .replace(
-      /"/g,
-      "&quot;",
-    )
-    .replace(
-      /'/g,
-      "&#039;",
-    );
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }
 
 function multiline(
   value: string,
 ): string {
-  return escapeHtml(
-    value,
-  ).replace(
+  return escapeHtml(value).replace(
     /\r?\n/g,
     "<br>",
   );
 }
 
+function displayDate(
+  value: string,
+): string {
+  if (!value) {
+    return "";
+  }
+
+  const parts = value.split("-");
+
+  if (parts.length !== 3) {
+    return value;
+  }
+
+  return `${parts[2]}/${parts[1]}/${parts[0]}`;
+}
+
 function fiscalYear(
-  date: string,
+  value: string,
 ): string {
   const match =
     /^(\d{4})-(\d{2})-\d{2}$/.exec(
-      date,
+      value,
     );
 
   if (!match) {
     return "—";
   }
 
-  const year =
-    Number(
-      match[1],
-    );
+  const year = Number(match[1]);
 
   const start =
-    Number(
-      match[2],
-    ) >= 4
+    Number(match[2]) >= 4
       ? year
       : year - 1;
 
@@ -285,28 +199,25 @@ function errorText(
     : "Please try again.";
 }
 
-/* =========================================================
-   BUILD PURCHASE PDF HTML
-========================================================= */
-
 function buildPurchaseHtml(
   detail: WorkflowDetail,
   currentBusiness: BusinessIdentity,
-): PurchasePreview {
-  const d =
-    detail.document;
+): string {
+  const d = detail.document;
 
-  if (
-    d.business_id !==
-    currentBusiness.id
-  ) {
+  if (d.document_type !== "PURCHASE") {
+    throw new Error(
+      "This PDF template only supports Purchase Bills.",
+    );
+  }
+
+  if (d.business_id !== currentBusiness.id) {
     throw new Error(
       "The purchase bill does not belong to the active business.",
     );
   }
 
-  const business =
-    d.business;
+  const business = d.business;
 
   const businessName =
     business.name ||
@@ -315,31 +226,21 @@ function buildPurchaseHtml(
 
   const gstin =
     business.gstin ||
-    (
-      d.snapshot_is_current
-        ? currentBusiness.gstin
-        : ""
-    );
+    (d.snapshot_is_current
+      ? currentBusiness.gstin
+      : "");
 
   const address =
-    text(
-      business.address,
-    );
+    text(business.address);
 
   const pan =
-    text(
-      business.pan,
-    );
+    text(business.pan);
 
   const phone =
-    text(
-      business.mobile,
-    );
+    text(business.mobile);
 
   const email =
-    text(
-      business.email,
-    );
+    text(business.email);
 
   const vendorName =
     d.vendor_name ||
@@ -347,1418 +248,717 @@ function buildPurchaseHtml(
     "Vendor";
 
   const vendorGstin =
-    text(
-      d.vendor.gstin,
-    );
+    text(d.vendor.gstin);
 
   const vendorAddress =
-    text(
-      d.vendor.address,
-    );
+    text(d.vendor.address);
 
   const vendorState =
-    text(
-      d.vendor.state,
-    );
+    text(d.vendor.state);
 
   const paymentStatus =
     d.payment_status ||
-    (
-      d.due_amount > 0
-        ? "DUE"
-        : "PAID"
-    );
+    (d.due_amount > 0
+      ? "DUE"
+      : "PAID");
+
+  const contactLine = [
+    phone,
+    email,
+  ]
+    .filter(Boolean)
+    .map(escapeHtml)
+    .join(" • ");
+
+  const taxLine = [
+    gstin
+      ? `GSTIN ${escapeHtml(gstin)}`
+      : "",
+    pan
+      ? `PAN ${escapeHtml(pan)}`
+      : "",
+  ]
+    .filter(Boolean)
+    .join(" • ");
 
   const vendorDetails = [
     vendorGstin
       ? `GSTIN ${vendorGstin}`
       : "",
-
     vendorAddress,
-
     vendorState,
   ]
-    .filter(
-      Boolean,
-    )
-    .map(
-      line =>
-        escapeHtml(
-          line,
-        ),
-    )
-    .join(
-      "<br>",
-    );
+    .filter(Boolean)
+    .map(line => escapeHtml(line))
+    .join("<br>");
 
   const rows =
     detail.items
       .map(
-        line => {
-          const discount =
-            line.discount > 0
-              ? `
-                <div class="item-sub">
-                  Discount:
-                  ${escapeHtml(
-                    money(
-                      line.discount,
-                    ),
-                  )}
-                </div>
-              `
-              : "";
+        line => `
+          <tr>
+            <td class="item">
+              <strong>
+                ${escapeHtml(line.product_name)}
+              </strong>
+              ${
+                line.discount > 0
+                  ? `
+                    <div class="item-sub">
+                      Discount:
+                      ${escapeHtml(money(line.discount))}
+                    </div>
+                  `
+                  : ""
+              }
+            </td>
 
-          return `
-            <tr>
+            <td class="center">
+              ${escapeHtml(line.hsn || "-")}
+            </td>
 
-              <td>
+            <td class="center">
+              ${escapeHtml(quantity(line.quantity))}
+              ${
+                line.unit
+                  ? ` ${escapeHtml(line.unit)}`
+                  : ""
+              }
+            </td>
 
-                <div class="item-name">
-                  ${escapeHtml(
-                    line.product_name,
-                  )}
-                </div>
+            <td class="right">
+              ${escapeHtml(money(line.unit_price))}
+            </td>
 
-                <div class="item-sub">
-                  HSN:
-                  ${escapeHtml(
-                    line.hsn ||
-                      "—",
-                  )}
-                </div>
+            <td class="center">
+              ${escapeHtml(quantity(line.gst_rate))}%
+            </td>
 
-                ${discount}
-
-              </td>
-
-              <td class="center">
-
-                ${escapeHtml(
-                  quantity(
-                    line.quantity,
-                  ),
-                )}
-
-                ${
-                  line.unit
-                    ? escapeHtml(
-                        line.unit,
-                      )
-                    : ""
-                }
-
-              </td>
-
-              <td class="right">
-
-                ${escapeHtml(
-                  money(
-                    line.unit_price,
-                  ),
-                )}
-
-              </td>
-
-              <td class="center">
-
-                ${escapeHtml(
-                  quantity(
-                    line.gst_rate,
-                  ),
-                )}%
-
-              </td>
-
-              <td class="right strong">
-
-                ${escapeHtml(
-                  money(
-                    line.total_amount,
-                  ),
-                )}
-
-              </td>
-
-            </tr>
-          `;
-        },
+            <td class="right strong">
+              ${escapeHtml(money(line.total_amount))}
+            </td>
+          </tr>
+        `,
       )
       .join("");
 
   const taxLabel =
-    d.supply_type ===
-    "OTHER_STATE"
+    d.supply_type === "OTHER_STATE"
       ? "IGST"
       : "GST";
 
-  const noteHtml =
+  const notesHtml =
     d.notes
       ? `
-        <section class="business-note">
-
-          <b>
-            Business note
-          </b>
-
-          <div>
-            ${multiline(
-              d.notes,
-            )}
+        <div class="section">
+          <div class="section-title">
+            Notes
           </div>
 
-        </section>
+          <div class="section-body">
+            ${multiline(d.notes)}
+          </div>
+        </div>
       `
       : "";
 
-  const html = `
+  return `
 <!DOCTYPE html>
-
-<html lang="en">
-
+<html>
 <head>
-
-<meta charset="UTF-8" />
-
+<meta charset="utf-8">
 <meta
   name="viewport"
   content="width=device-width, initial-scale=1.0"
-/>
+>
 
 <style>
-
-@page {
-  size: A4 portrait;
-
-  margin: 8mm;
-}
-
-* {
-  box-sizing: border-box;
-}
-
-html,
-body {
-  margin: 0;
-
-  padding: 0;
-}
-
-body {
-  background: #edf4f6;
-
-  color: #173042;
-
-  font-family:
-    Arial,
-    Helvetica,
-    sans-serif;
-
-  font-size: 10px;
-
-  line-height: 1.35;
-}
-
-.preview-background {
-  width: 100%;
-
-  min-height: 100vh;
-
-  padding: 7px;
-}
-
-.paper {
-  width: 100%;
-
-  max-width: 820px;
-
-  margin: 0 auto;
-
-  background: #ffffff;
-
-  border: 1px solid #d7e2e7;
-
-  border-radius: 18px;
-
-  overflow: hidden;
-
-  box-shadow:
-    0 8px 26px
-    rgba(
-      8,
-      35,
-      61,
-      0.08
-    );
-}
-
-.paper-inner {
-  padding:
-    16px
-    18px
-    18px;
-}
-
-/* =======================================================
-   HEADER
-======================================================= */
-
-.top-row {
-  display: flex;
-
-  align-items:
-    flex-start;
-
-  justify-content:
-    space-between;
-
-  gap: 14px;
-}
-
-.business-block {
-  flex: 1;
-
-  min-width: 0;
-}
-
-.business-name {
-  margin: 0;
-
-  color: #123149;
-
-  font-size: 23px;
-
-  line-height: 1.08;
-
-  font-weight: 900;
-
-  overflow-wrap:
-    anywhere;
-}
-
-.business-contact {
-  margin-top: 8px;
-
-  color: #67747c;
-
-  font-size: 8px;
-
-  line-height: 1.4;
-
-  overflow-wrap:
-    anywhere;
-}
-
-.document-block {
-  flex-shrink: 0;
-
-  text-align: right;
-
-  padding-top: 2px;
-}
-
-.document-type {
-  color: #07867d;
-
-  font-size: 8px;
-
-  font-weight: 900;
-
-  letter-spacing:
-    0.8px;
-
-  text-transform:
-    uppercase;
-}
-
-.document-number {
-  margin-top: 3px;
-
-  color: #123149;
-
-  font-size: 17px;
-
-  line-height: 1.08;
-
-  font-weight: 900;
-
-  overflow-wrap:
-    anywhere;
-}
-
-.status-text {
-  margin-top: 3px;
-
-  color: #7a878e;
-
-  font-size: 7px;
-
-  font-weight: 800;
-
-  text-transform:
-    uppercase;
-}
-
-.teal-rule {
-  width: 100%;
-
-  height: 4px;
-
-  border-radius: 99px;
-
-  background: #0b9388;
-
-  margin:
-    16px
-    0
-    17px;
-}
-
-/* =======================================================
-   INFO
-======================================================= */
-
-.info-grid {
-  display: grid;
-
-  grid-template-columns:
-    1fr 1fr;
-
-  gap: 9px;
-
-  margin-bottom:
-    15px;
-}
-
-.info-card {
-  border:
-    1px solid
-    #bedbd7;
-
-  border-radius:
-    9px;
-
-  background:
-    #eef8f6;
-
-  padding:
-    10px 12px;
-
-  min-height:
-    92px;
-}
-
-.info-label {
-  color: #75848d;
-
-  font-size: 7px;
-
-  font-weight: 900;
-
-  letter-spacing:
-    0.6px;
-
-  text-transform:
-    uppercase;
-
-  margin-bottom:
-    6px;
-}
-
-.vendor-name {
-  color: #173042;
-
-  font-size: 11px;
-
-  font-weight: 900;
-
-  overflow-wrap:
-    anywhere;
-}
-
-.vendor-detail {
-  color: #68757d;
-
-  margin-top: 3px;
-
-  font-size: 8px;
-
-  line-height: 1.4;
-
-  overflow-wrap:
-    anywhere;
-}
-
-.detail-row {
-  margin:
-    4px 0;
-
-  color: #68757d;
-
-  font-size: 8px;
-}
-
-.detail-row b {
-  color: #213b4d;
-}
-
-/* =======================================================
-   TABLE
-======================================================= */
-
-.items-wrap {
-  border:
-    1px solid
-    #cdd8dd;
-
-  border-radius:
-    11px;
-
-  overflow: hidden;
-
-  margin-bottom:
-    16px;
-}
-
-table {
-  width: 100%;
-
-  border-collapse:
-    collapse;
-
-  table-layout:
-    fixed;
-}
-
-thead {
-  background:
-    #edf8f6;
-}
-
-th {
-  color: #294351;
-
-  font-size: 7px;
-
-  font-weight: 900;
-
-  padding:
-    8px 6px;
-
-  text-align: left;
-}
-
-td {
-  padding:
-    8px 6px;
-
-  border-top:
-    1px solid
-    #e1e8eb;
-
-  vertical-align:
-    middle;
-
-  color: #2b414f;
-
-  font-size: 8px;
-
-  overflow-wrap:
-    anywhere;
-}
-
-.center {
-  text-align:
-    center;
-}
-
-.right {
-  text-align:
-    right;
-}
-
-.strong {
-  font-weight:
-    900;
-}
-
-.item-name {
-  color: #203848;
-
-  font-weight: 900;
-
-  font-size: 8px;
-}
-
-.item-sub {
-  color: #7a878f;
-
-  font-size:
-    6.5px;
-
-  margin-top: 2px;
-}
-
-/* =======================================================
-   TOTALS
-======================================================= */
-
-.totals-card {
-  width: 100%;
-
-  border:
-    1px solid
-    #d7e0e4;
-
-  border-radius:
-    9px;
-
-  background:
-    #fbfdfd;
-
-  padding:
-    12px 14px;
-
-  margin-bottom:
-    17px;
-}
-
-.total-row {
-  display: flex;
-
-  justify-content:
-    space-between;
-
-  gap: 15px;
-
-  margin:
-    5px 0;
-
-  color: #68757d;
-
-  font-size: 8px;
-}
-
-.total-row b {
-  color: #233d4d;
-}
-
-.total-divider {
-  height: 1px;
-
-  width: 100%;
-
-  background:
-    #d7e0e4;
-
-  margin:
-    10px 0;
-}
-
-.grand-total {
-  display: flex;
-
-  align-items:
-    baseline;
-
-  justify-content:
-    space-between;
-
-  gap: 15px;
-
-  color: #123149;
-
-  font-size: 13px;
-
-  font-weight: 900;
-}
-
-.grand-amount {
-  font-size: 17px;
-
-  font-weight: 900;
-
-  color: #123149;
-}
-
-.settlement {
-  display: flex;
-
-  justify-content:
-    flex-end;
-
-  flex-wrap: wrap;
-
-  gap: 6px;
-
-  margin-top: 8px;
-
-  color: #68757d;
-
-  font-size: 7px;
-}
-
-.settlement b {
-  color: #233d4d;
-}
-
-.due-text {
-  color: #a46800;
-}
-
-/* =======================================================
-   PAYMENT
-======================================================= */
-
-.payment-grid {
-  display: grid;
-
-  grid-template-columns:
-    1fr 1fr;
-
-  gap: 9px;
-
-  margin-bottom:
-    17px;
-}
-
-.payment-card {
-  display: flex;
-
-  gap: 8px;
-
-  border:
-    1px solid
-    #cdd7dc;
-
-  border-radius:
-    9px;
-
-  padding: 10px;
-
-  min-height:
-    94px;
-
-  background:
-    #ffffff;
-}
-
-.payment-icon {
-  width: 28px;
-
-  height: 28px;
-
-  flex:
-    0 0 28px;
-
-  display: flex;
-
-  align-items:
-    center;
-
-  justify-content:
-    center;
-
-  border-radius:
-    9px;
-
-  background:
-    #e4f5f2;
-
-  color: #07867d;
-
-  font-size: 12px;
-}
-
-.payment-title {
-  color: #203848;
-
-  font-size: 8px;
-
-  font-weight: 900;
-
-  margin-bottom:
-    3px;
-}
-
-.payment-text {
-  color: #69767e;
-
-  font-size: 7px;
-
-  line-height: 1.4;
-}
-
-/* =======================================================
-   FOOTER
-======================================================= */
-
-.business-note {
-  margin-bottom:
-    12px;
-
-  color: #263f4f;
-
-  font-size: 8px;
-}
-
-.business-note div {
-  color: #69767e;
-
-  margin-top: 3px;
-}
-
-.terms-title {
-  color: #173042;
-
-  font-size: 8px;
-
-  font-weight: 900;
-}
-
-.terms-text {
-  margin-top: 4px;
-
-  color: #68757d;
-
-  line-height: 1.4;
-
-  font-size: 7px;
-}
-
-.thank-you {
-  color: #173042;
-
-  font-weight: 900;
-
-  margin-top: 16px;
-
-  font-size: 8px;
-}
-
-.signature {
-  text-align: right;
-
-  margin-top: 42px;
-
-  color: #173042;
-}
-
-.signature-name {
-  font-weight: 900;
-
-  font-size: 8px;
-}
-
-.signature-for {
-  color: #68757d;
-
-  margin-top: 2px;
-
-  font-size: 7px;
-}
-
-.footer-note {
-  color: #7d8990;
-
-  font-size: 6px;
-
-  margin-top: 14px;
-
-  text-align:
-    center;
-}
-
-@media print {
+  @page {
+    size: A4;
+    margin: 14mm;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
 
   body {
-    background:
-      #ffffff;
-
-    font-size:
-      8.5pt;
-  }
-
-  .preview-background {
+    margin: 0;
     padding: 0;
+    font-family:
+      -apple-system,
+      BlinkMacSystemFont,
+      "Segoe UI",
+      Arial,
+      Helvetica,
+      sans-serif;
+    color: #17212b;
+    font-size: 11px;
+    line-height: 1.45;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 
-  .paper {
-    max-width:
-      none;
-
-    border: 0;
-
-    border-radius:
-      0;
-
-    box-shadow:
-      none;
+  .invoice {
+    width: 100%;
   }
 
-  .paper-inner {
-    padding: 0;
+  .top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 14px;
+    gap: 16px;
   }
 
-  .info-card,
-  .totals-card,
-  .payment-card {
-    break-inside:
-      avoid;
+  .business-name {
+    font-size: 27px;
+    font-weight: 800;
+    color: #102a43;
+    letter-spacing: -0.4px;
+    margin-bottom: 7px;
+    overflow-wrap: anywhere;
+  }
 
-    page-break-inside:
-      avoid;
+  .business-details {
+    color: #52606d;
+    line-height: 1.55;
+    font-size: 10.5px;
+    overflow-wrap: anywhere;
+  }
+
+  .invoice-label {
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  .invoice-type {
+    color: #07877e;
+    text-transform: uppercase;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1.2px;
+  }
+
+  .invoice-number {
+    font-size: 18px;
+    font-weight: 800;
+    color: #102a43;
+    margin-top: 3px;
+    overflow-wrap: anywhere;
+  }
+
+  .accent-line {
+    width: 100%;
+    height: 3px;
+    background: #0b948b;
+    margin: 14px 0 18px 0;
+  }
+
+  .meta-grid {
+    width: 100%;
+    display: table;
+    table-layout: fixed;
+    margin-bottom: 17px;
+  }
+
+  .meta-box {
+    display: table-cell;
+    width: 50%;
+    vertical-align: top;
+    padding: 12px 14px;
+    background: #f3faf9;
+    border: 1px solid #c9e7e2;
+  }
+
+  .meta-box:first-child {
+    border-right: 0;
+  }
+
+  .label {
+    color: #60717d;
+    font-size: 8.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.7px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+
+  .value {
+    color: #17212b;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .small-value {
+    color: #46535d;
+    font-size: 10px;
+    margin-top: 3px;
+    overflow-wrap: anywhere;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 5px;
+    page-break-inside: auto;
+    table-layout: fixed;
   }
 
   thead {
-    display:
-      table-header-group;
+    display: table-header-group;
   }
 
-  tr,
+  tr {
+    page-break-inside: avoid;
+  }
+
+  th {
+    background: #eef7f6;
+    color: #243b53;
+    font-size: 9px;
+    font-weight: 800;
+    padding: 9px 7px;
+    border: 1px solid #b9c8ce;
+    text-align: left;
+  }
+
+  td {
+    color: #253642;
+    font-size: 9.5px;
+    padding: 10px 7px;
+    border: 1px solid #cbd5da;
+    vertical-align: middle;
+    overflow-wrap: anywhere;
+  }
+
+  td.item {
+    width: 31%;
+  }
+
+  .item-sub {
+    color: #7a878f;
+    font-size: 8px;
+    margin-top: 3px;
+  }
+
+  .center {
+    text-align: center;
+  }
+
+  .right {
+    text-align: right;
+  }
+
+  .strong {
+    font-weight: 700;
+  }
+
+  .summary-wrap {
+    width: 48%;
+    margin-left: auto;
+    margin-top: 18px;
+  }
+
+  .summary-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 5px 0;
+    color: #52606d;
+  }
+
+  .summary-row strong {
+    color: #17212b;
+    text-align: right;
+  }
+
+  .summary-divider {
+    height: 1px;
+    background: #ccd6dc;
+    margin: 7px 0;
+  }
+
+  .grand-total {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    color: #102a43;
+    font-size: 17px;
+    font-weight: 800;
+    padding-top: 3px;
+  }
+
+  .payment-status {
+    margin-top: 11px;
+    padding: 9px 11px;
+    background: #f7fafc;
+    border-radius: 6px;
+    color: #43515b;
+    font-size: 10px;
+  }
+
+  .due {
+    color: #9b6500;
+  }
+
+  .section {
+    margin-top: 19px;
+  }
+
+  .section-title {
+    color: #102a43;
+    font-size: 10px;
+    font-weight: 800;
+    margin-bottom: 5px;
+  }
+
+  .section-body {
+    color: #4b5963;
+    font-size: 10px;
+    line-height: 1.55;
+  }
+
+  .payment-grid {
+    display: table;
+    width: 100%;
+    table-layout: fixed;
+    margin-top: 18px;
+  }
+
+  .payment-box {
+    display: table-cell;
+    width: 50%;
+    vertical-align: top;
+    border: 1px solid #ccd6dc;
+    padding: 12px;
+    color: #43515b;
+    font-size: 9.5px;
+    line-height: 1.5;
+  }
+
+  .payment-box:first-child {
+    border-right: 0;
+  }
+
+  .payment-title {
+    color: #102a43;
+    font-size: 10px;
+    font-weight: 800;
+    margin-bottom: 4px;
+  }
+
+  .footer-area {
+    margin-top: 32px;
+    display: table;
+    width: 100%;
+    table-layout: fixed;
+  }
+
+  .footer-note {
+    display: table-cell;
+    width: 55%;
+    vertical-align: bottom;
+    color: #718096;
+    font-size: 8.5px;
+  }
+
   .signature {
-    break-inside:
-      avoid;
-
-    page-break-inside:
-      avoid;
+    display: table-cell;
+    width: 45%;
+    text-align: right;
+    vertical-align: bottom;
+    padding-top: 28px;
   }
-}
 
+  .signature-title {
+    color: #17212b;
+    font-weight: 800;
+    font-size: 10px;
+  }
+
+  .signature-business {
+    color: #52606d;
+    font-size: 9px;
+    margin-top: 3px;
+  }
+
+  @media print {
+    thead {
+      display: table-header-group;
+    }
+
+    tr,
+    .meta-box,
+    .payment-box,
+    .summary-wrap,
+    .signature {
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+  }
 </style>
-
 </head>
 
 <body>
 
-<div class="preview-background">
+<div class="invoice">
 
-<main class="paper">
+  <div class="top">
 
-<div class="paper-inner">
+    <div>
 
-  <!-- HEADER -->
+      <div class="business-name">
+        ${escapeHtml(businessName)}
+      </div>
 
-  <section class="top-row">
-
-    <div class="business-block">
-
-      <h1 class="business-name">
-        ${escapeHtml(
-          businessName,
-        )}
-      </h1>
-
-      <div class="business-contact">
-
-        ${
-          address
-            ? `${multiline(
-                address,
-              )}<br>`
-            : ""
-        }
-
-        GSTIN
-        ${escapeHtml(
-          gstin ||
-            "—",
-        )}
-
-        ${
-          pan
-            ? `
-              &bull;
-              PAN
-              ${escapeHtml(
-                pan,
-              )}
-            `
-            : ""
-        }
-
-        ${
-          phone ||
-          email
-            ? `
-              <br>
-
-              ${
-                phone
-                  ? escapeHtml(
-                      phone,
-                    )
-                  : ""
-              }
-
-              ${
-                phone &&
-                email
-                  ? " &bull; "
-                  : ""
-              }
-
-              ${
-                email
-                  ? escapeHtml(
-                      email,
-                    )
-                  : ""
-              }
-            `
-            : ""
-        }
-
+      <div class="business-details">
+        ${address ? `${multiline(address)}<br>` : ""}
+        ${taxLine ? `${taxLine}<br>` : ""}
+        ${contactLine || ""}
       </div>
 
     </div>
 
-    <div class="document-block">
+    <div class="invoice-label">
 
-      <div class="document-type">
-        PURCHASE BILL
+      <div class="invoice-type">
+        Purchase Bill
       </div>
 
-      <div class="document-number">
-        ${escapeHtml(
-          d.document_number,
-        )}
-      </div>
-
-      <div class="status-text">
-        ${escapeHtml(
-          paymentStatus,
-        )}
+      <div class="invoice-number">
+        ${escapeHtml(d.document_number)}
       </div>
 
     </div>
 
-  </section>
+  </div>
 
-  <div class="teal-rule"></div>
+  <div class="accent-line"></div>
 
-  <!-- VENDOR / DOCUMENT -->
+  <div class="meta-grid">
 
-  <section class="info-grid">
+    <div class="meta-box">
 
-    <div class="info-card">
-
-      <div class="info-label">
-        VENDOR
+      <div class="label">
+        Vendor
       </div>
 
-      <div class="vendor-name">
-        ${escapeHtml(
-          vendorName,
-        )}
+      <div class="value">
+        ${escapeHtml(vendorName)}
+      </div>
+
+      <div class="small-value">
+        ${vendorDetails || "Vendor / Supplier"}
+      </div>
+
+    </div>
+
+    <div class="meta-box">
+
+      <div class="label">
+        Purchase Details
+      </div>
+
+      <div class="small-value">
+        <strong>Date:</strong>
+        ${escapeHtml(displayDate(d.document_date))}
       </div>
 
       ${
-        vendorDetails
+        d.due_date
           ? `
-            <div class="vendor-detail">
-              ${vendorDetails}
-            </div>
-          `
-          : `
-            <div class="vendor-detail">
-              Vendor / supplier
-            </div>
-          `
-      }
-
-    </div>
-
-    <div class="info-card">
-
-      <div class="info-label">
-        DOCUMENT DETAILS
-      </div>
-
-      <div class="detail-row">
-
-        Date:
-
-        <b>
-          ${escapeHtml(
-            d.document_date,
-          )}
-        </b>
-
-      </div>
-
-      <div class="detail-row">
-
-        Due:
-
-        <b>
-          ${escapeHtml(
-            d.due_date ||
-              "—",
-          )}
-        </b>
-
-      </div>
-
-      ${
-        d.invoice_number
-          ? `
-            <div class="detail-row">
-
-              Invoice:
-
-              <b>
-                ${escapeHtml(
-                  d.invoice_number,
-                )}
-              </b>
-
+            <div class="small-value">
+              <strong>Due:</strong>
+              ${escapeHtml(displayDate(d.due_date))}
             </div>
           `
           : ""
       }
 
-      <div class="detail-row">
+      ${
+        d.invoice_number
+          ? `
+            <div class="small-value">
+              <strong>Supplier invoice:</strong>
+              ${escapeHtml(d.invoice_number)}
+            </div>
+          `
+          : ""
+      }
 
-        FY:
+      <div class="small-value">
+        <strong>Financial year:</strong>
+        ${escapeHtml(fiscalYear(d.document_date))}
+      </div>
 
-        <b>
-          ${escapeHtml(
-            fiscalYear(
-              d.document_date,
-            ),
-          )}
-        </b>
-
+      <div class="small-value">
+        <strong>Status:</strong>
+        ${escapeHtml(paymentStatus)}
       </div>
 
     </div>
 
-  </section>
+  </div>
 
-  <!-- ITEMS -->
+  <table>
 
-  <section class="items-wrap">
+    <colgroup>
+      <col style="width:31%">
+      <col style="width:13%">
+      <col style="width:11%">
+      <col style="width:15%">
+      <col style="width:10%">
+      <col style="width:20%">
+    </colgroup>
 
-    <table>
+    <thead>
 
-      <colgroup>
+      <tr>
+        <th>Item / Service</th>
+        <th class="center">HSN / SAC</th>
+        <th class="center">Qty</th>
+        <th class="right">Rate</th>
+        <th class="center">GST</th>
+        <th class="right">Total</th>
+      </tr>
 
-        <col style="width:40%" />
+    </thead>
 
-        <col style="width:13%" />
+    <tbody>
+      ${
+        rows ||
+        `
+          <tr>
+            <td colspan="6" class="center">
+              No saved item rows found.
+            </td>
+          </tr>
+        `
+      }
+    </tbody>
 
-        <col style="width:16%" />
+  </table>
 
-        <col style="width:11%" />
+  <div class="summary-wrap">
 
-        <col style="width:20%" />
-
-      </colgroup>
-
-      <thead>
-
-        <tr>
-
-          <th>
-            Item / Service
-          </th>
-
-          <th class="center">
-            Qty
-          </th>
-
-          <th class="right">
-            Rate
-          </th>
-
-          <th class="center">
-            GST
-          </th>
-
-          <th class="right">
-            Total
-          </th>
-
-        </tr>
-
-      </thead>
-
-      <tbody>
-
-        ${
-          rows ||
-          `
-            <tr>
-
-              <td
-                colspan="5"
-                class="center"
-              >
-                No saved item rows found.
-              </td>
-
-            </tr>
-          `
-        }
-
-      </tbody>
-
-    </table>
-
-  </section>
-
-  <!-- TOTALS -->
-
-  <section class="totals-card">
-
-    <div class="total-row">
-
-      <span>
-        Taxable value
-      </span>
-
-      <b>
-        ${escapeHtml(
-          money(
-            d.subtotal,
-          ),
-        )}
-      </b>
-
+    <div class="summary-row">
+      <span>Taxable value</span>
+      <strong>
+        ${escapeHtml(money(d.subtotal))}
+      </strong>
     </div>
 
     ${
       d.discount > 0
         ? `
-          <div class="total-row">
-
-            <span>
-              Discount
-            </span>
-
-            <b>
-              ${escapeHtml(
-                money(
-                  d.discount,
-                ),
-              )}
-            </b>
-
+          <div class="summary-row">
+            <span>Discount</span>
+            <strong>
+              ${escapeHtml(money(d.discount))}
+            </strong>
           </div>
         `
         : ""
     }
 
-    <div class="total-row">
-
-      <span>
-        ${taxLabel}
-      </span>
-
-      <b>
-        ${escapeHtml(
-          money(
-            d.gst_amount,
-          ),
-        )}
-      </b>
-
+    <div class="summary-row">
+      <span>${escapeHtml(taxLabel)}</span>
+      <strong>
+        ${escapeHtml(money(d.gst_amount))}
+      </strong>
     </div>
 
-    <div class="total-divider"></div>
+    <div class="summary-divider"></div>
 
     <div class="grand-total">
-
+      <span>Grand total</span>
       <span>
-        Grand total
+        ${escapeHtml(money(d.total_amount))}
       </span>
-
-      <span class="grand-amount">
-        ${escapeHtml(
-          money(
-            d.total_amount,
-          ),
-        )}
-      </span>
-
     </div>
 
-    <div class="settlement">
-
-      <span>
-
-        Paid
-
-        <b>
-          ${escapeHtml(
-            money(
-              d.paid_amount,
-            ),
-          )}
-        </b>
-
-      </span>
-
-      <span>
-        •
-      </span>
-
-      <span>
-
-        Due
-
-        <b class="${
-          d.due_amount > 0
-            ? "due-text"
-            : ""
-        }">
-          ${escapeHtml(
-            money(
-              d.due_amount,
-            ),
-          )}
-        </b>
-
-      </span>
-
+    <div class="payment-status">
+      Paid:
+      <strong>
+        ${escapeHtml(money(d.paid_amount))}
+      </strong>
+      &nbsp;&nbsp; | &nbsp;&nbsp;
+      Due:
+      <strong class="${d.due_amount > 0 ? "due" : ""}">
+        ${escapeHtml(money(d.due_amount))}
+      </strong>
     </div>
 
-  </section>
+  </div>
 
-  ${noteHtml}
+  ${notesHtml}
 
-  <!-- PAYMENT -->
+  <div class="payment-grid">
 
-  <section class="payment-grid">
-
-    <div class="payment-card">
-
-      <div class="payment-icon">
-        💳
+    <div class="payment-box">
+      <div class="payment-title">
+        Bank / UPI Payment
       </div>
-
-      <div>
-
-        <div class="payment-title">
-          Bank / UPI payment
-        </div>
-
-        <div class="payment-text">
-
-          Add your business bank
-          and UPI details from
-          business settings.
-
-        </div>
-
-      </div>
-
+      Add your business bank account and UPI details here.
     </div>
 
-    <div class="payment-card">
-
-      <div class="payment-icon">
-        📄
+    <div class="payment-box">
+      <div class="payment-title">
+        Cheque Information
       </div>
-
-      <div>
-
-        <div class="payment-title">
-          Cheque information
-        </div>
-
-        <div class="payment-text">
-
-          Account Payee only.
-
-          <br>
-
-          Mention document number
-          behind the cheque.
-
-        </div>
-
-      </div>
-
+      Payee: Account Payee only.
+      Mention purchase bill number behind the cheque.
     </div>
 
-  </section>
+  </div>
 
-  <!-- TERMS -->
+  <div class="section">
 
-  <section>
-
-    <div class="terms-title">
+    <div class="section-title">
       Terms &amp; Conditions
     </div>
 
-    <div class="terms-text">
-
+    <div class="section-body">
       Payment due as stated.
-
-      Goods once received are
-      subject to the stated
-      return policy.
-
-    </div>
-
-    <div class="thank-you">
+      Goods once received are subject to the stated return policy.
+      <br><br>
       Thank you for your business.
     </div>
 
-  </section>
+  </div>
 
-  <!-- SIGNATURE -->
+  <div class="footer-area">
 
-  <section class="signature">
-
-    <div class="signature-name">
-      Authorised Signatory
+    <div class="footer-note">
+      Computer-generated purchase bill.
+      Please verify GST, business, vendor and payment details before live use.
     </div>
 
-    <div class="signature-for">
-      For
-      ${escapeHtml(
-        businessName,
-      )}
+    <div class="signature">
+      <div class="signature-title">
+        Authorised Signatory
+      </div>
+
+      <div class="signature-business">
+        For ${escapeHtml(businessName)}
+      </div>
     </div>
 
-  </section>
-
-  <div class="footer-note">
-    Computer-generated document;
-    verify legal and tax details
-    before live use.
   </div>
 
 </div>
 
-</main>
-
-</div>
-
 </body>
-
 </html>
 `;
-
-  return {
-    html,
-
-    documentNumber:
-      d.document_number,
-
-    businessId:
-      d.business_id,
-  };
 }
 
-/* =========================================================
-   SCREEN
-========================================================= */
-
 export default function PurchasePreviewScreen() {
+  const { width } =
+    useWindowDimensions();
+
   const {
     purchaseId,
   } =
@@ -1769,11 +969,38 @@ export default function PurchasePreviewScreen() {
   const insets =
     useSafeAreaInsets();
 
+  const isSmall =
+    width < 380;
+
+  const isTablet =
+    width >= 768;
+
   const [
-    preview,
-    setPreview,
+    detail,
+    setDetail,
   ] =
-    useState<PurchasePreview | null>(
+    useState<WorkflowDetail | null>(
+      null,
+    );
+
+  const [
+    business,
+    setBusiness,
+  ] =
+    useState<BusinessPreview>({
+      name: "Business",
+      address: "",
+      gstin: "",
+      pan: "",
+      phone: "",
+      email: "",
+    });
+
+  const [
+    businessRecord,
+    setBusinessRecord,
+  ] =
+    useState<BusinessIdentity | null>(
       null,
     );
 
@@ -1784,320 +1011,294 @@ export default function PurchasePreviewScreen() {
     useState(true);
 
   const [
-    printing,
-    setPrinting,
+    saving,
+    setSaving,
   ] =
     useState(false);
 
   const [
-    previewReady,
-    setPreviewReady,
+    toastVisible,
+    setToastVisible,
   ] =
     useState(false);
 
-  const [
-    previewError,
-    setPreviewError,
-  ] =
-    useState<string | null>(
-      null,
-    );
+  const toastOpacity =
+    useRef(
+      new Animated.Value(0),
+    ).current;
 
-  const [
-    previewVersion,
-    setPreviewVersion,
-  ] =
-    useState(0);
+  const showSavedToast =
+    useCallback(() => {
+      toastOpacity.stopAnimation();
+      toastOpacity.setValue(0);
+      setToastVisible(true);
 
-  const iframe =
-    useRef<HTMLIFrameElement | null>(
-      null,
-    );
+      Animated.sequence([
+        Animated.timing(
+          toastOpacity,
+          {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: true,
+          },
+        ),
 
-  const printLock =
-    useRef(false);
+        Animated.delay(1800),
 
-  const alive =
-    useRef(true);
+        Animated.timing(
+          toastOpacity,
+          {
+            toValue: 0,
+            duration: 200,
+            useNativeDriver: true,
+          },
+        ),
+      ]).start(() => {
+        setToastVisible(false);
+      });
+    }, [
+      toastOpacity,
+    ]);
 
-  /* =======================================================
-     LIFECYCLE
-  ======================================================= */
-
-  useEffect(() => {
-    alive.current =
-      true;
-
-    return () => {
-      alive.current =
-        false;
-    };
-  }, []);
-
-  /* =======================================================
-     LOAD PURCHASE
-  ======================================================= */
-
-  useEffect(() => {
-    let active =
-      true;
-
-    async function load() {
+  const loadPurchase =
+    useCallback(async () => {
       if (!purchaseId) {
-        setLoading(
-          false,
-        );
-
         Alert.alert(
           "Purchase not found",
           "Purchase ID is missing.",
         );
 
+        setLoading(false);
         return;
       }
 
       try {
-        setLoading(
-          true,
-        );
+        setLoading(true);
 
-        setPreviewError(
-          null,
-        );
-
-        const business =
+        const currentBusiness =
           businessIdentity(
             await getBusiness(),
           );
 
-        if (!business) {
+        if (!currentBusiness) {
           throw new Error(
             "Business setup is required.",
           );
         }
 
-        const detail =
+        const loadedDetail =
           await loadPurchaseWorkflowDocument(
             "PURCHASE",
             purchaseId,
           );
 
-        if (!active) {
+        if (!loadedDetail) {
+          Alert.alert(
+            "Purchase not found",
+            "Unable to find this Purchase Bill.",
+          );
+
+          router.back();
           return;
         }
 
-        if (!detail) {
+        if (
+          loadedDetail.document.business_id !==
+          currentBusiness.id
+        ) {
           throw new Error(
-            "Purchase bill could not be found.",
+            "This Purchase Bill belongs to a different business.",
           );
         }
 
-        setPreview(
-          buildPurchaseHtml(
-            detail,
-            business,
-          ),
+        setDetail(
+          loadedDetail,
         );
-      } catch (error) {
-        if (!active) {
-          return;
-        }
 
+        setBusinessRecord(
+          currentBusiness,
+        );
+
+        const snapshot =
+          loadedDetail.document.business;
+
+        setBusiness({
+          name:
+            snapshot.name ||
+            currentBusiness.name ||
+            "Business",
+
+          address:
+            text(snapshot.address),
+
+          gstin:
+            snapshot.gstin ||
+            currentBusiness.gstin ||
+            "",
+
+          pan:
+            text(snapshot.pan),
+
+          phone:
+            text(snapshot.mobile),
+
+          email:
+            text(snapshot.email),
+        });
+      } catch (error) {
         Alert.alert(
-          "Unable to open purchase PDF",
-          errorText(
-            error,
-          ),
+          "Unable to load purchase",
+          errorText(error),
         );
       } finally {
-        if (
-          active
-        ) {
-          setLoading(
-            false,
-          );
-        }
+        setLoading(false);
       }
-    }
+    }, [
+      purchaseId,
+    ]);
 
-    void load();
+  useFocusEffect(
+    useCallback(() => {
+      void loadPurchase();
+    }, [
+      loadPurchase,
+    ]),
+  );
 
-    return () => {
-      active = false;
-    };
-  }, [
-    purchaseId,
-  ]);
-
-  /* =======================================================
-     WEBVIEW SOURCE
-  ======================================================= */
-
-  const source =
-    useMemo(
-      () => ({
-        html:
-          preview?.html ||
-          "",
-      }),
-      [
-        preview?.html,
-      ],
-    );
-
-  /* =======================================================
-     SAVE / PRINT
-  ======================================================= */
-
-  async function savePdf() {
-    if (
-      !preview ||
-      printLock.current ||
-      !previewReady ||
-      previewError
-    ) {
-      return;
-    }
-
-    printLock.current =
-      true;
-
-    setPrinting(
-      true,
-    );
-
-    try {
+  const purchaseHtml =
+    useMemo(() => {
       if (
-        Platform.OS ===
-        "web"
+        !detail ||
+        !businessRecord
       ) {
-        const frame =
-          iframe.current
-            ?.contentWindow;
+        return "";
+      }
 
-        if (!frame) {
-          throw new Error(
-            "The PDF preview is not available.",
-          );
-        }
+      return buildPurchaseHtml(
+        detail,
+        businessRecord,
+      );
+    }, [
+      detail,
+      businessRecord,
+    ]);
 
-        frame.focus();
-
-        frame.print();
-
+  const handleSavePdf =
+    async () => {
+      if (
+        !detail ||
+        !purchaseHtml
+      ) {
         return;
       }
 
-      await Print.printAsync({
-        html:
-          preview.html,
-      });
-    } catch (error) {
-      const message =
-        errorText(
-          error,
-        );
+      try {
+        setSaving(true);
 
-      if (
-        !/cancel/i.test(
-          message,
-        ) &&
-        alive.current
-      ) {
-        Alert.alert(
-          "Unable to save PDF",
-          message,
-        );
-      }
-    } finally {
-      printLock.current =
-        false;
+        await Print.printAsync({
+          html: purchaseHtml,
+        });
 
-      if (
-        alive.current
-      ) {
-        setPrinting(
-          false,
-        );
+        showSavedToast();
+      } catch (error) {
+        const message =
+          errorText(error);
+
+        if (!/cancel/i.test(message)) {
+          Alert.alert(
+            "Unable to save PDF",
+            message,
+          );
+        }
+      } finally {
+        setSaving(false);
       }
-    }
+    };
+
+  if (loading) {
+    return (
+      <SafeAreaView
+        style={
+          styles.loadingScreen
+        }
+      >
+        <ActivityIndicator
+          size="large"
+          color={
+            colors.teal
+          }
+        />
+
+        <Text
+          style={
+            styles.loadingText
+          }
+        >
+          Preparing purchase bill...
+        </Text>
+      </SafeAreaView>
+    );
   }
 
-  const saveDisabled =
-    loading ||
-    !preview ||
-    !previewReady ||
-    printing ||
-    Boolean(
-      previewError,
-    );
+  if (!detail) {
+    return null;
+  }
 
-  /* =======================================================
-     UI
-  ======================================================= */
+  const d =
+    detail.document;
+
+  const vendorName =
+    d.vendor_name ||
+    d.vendor.name ||
+    "Vendor";
+
+  const vendorDetails = [
+    text(d.vendor.gstin)
+      ? `GSTIN ${text(d.vendor.gstin)}`
+      : "",
+    text(d.vendor.address),
+    text(d.vendor.state),
+  ].filter(Boolean);
+
+  const paymentStatus =
+    d.payment_status ||
+    (d.due_amount > 0
+      ? "DUE"
+      : "PAID");
 
   return (
-    <View
+    <SafeAreaView
       style={
-        styles.screen
+        styles.safeArea
       }
+      edges={[
+        "top",
+        "bottom",
+      ]}
     >
-      <Stack.Screen
-        options={{
-          headerShown:
-            false,
-        }}
-      />
-
-      <StatusBar
-        style="light"
-      />
-
-      {/* =================================================
-          HEADER
-      ================================================= */}
-
       <View
         style={[
           styles.header,
-
-          {
-            paddingTop:
-              Math.max(
-                insets.top,
-                8,
-              ),
-          },
+          isSmall &&
+            styles.headerSmall,
         ]}
       >
-        {/* BACK */}
-
         <Pressable
           onPress={() =>
             router.back()
           }
-          disabled={
-            printing
-          }
-          style={({
-            pressed,
-          }) => [
-            styles.backButton,
-
+          style={({ pressed }) => [
+            styles.headerBackButton,
             pressed &&
-              styles.backButtonPressed,
+              styles.pressed,
           ]}
         >
           <Ionicons
             name="arrow-back"
             size={19}
-            color={
-              C.navy
-            }
+            color="#173042"
           />
         </Pressable>
-
-        {/* TITLE */}
 
         <View
           style={
@@ -2105,317 +1306,839 @@ export default function PurchasePreviewScreen() {
           }
         >
           <Text
-            style={
-              styles.headerTitle
-            }
-            numberOfLines={
-              1
-            }
+            style={[
+              styles.headerTitle,
+              isSmall &&
+                styles.headerTitleSmall,
+            ]}
           >
-            Purchase Bill
+            Purchase bill
           </Text>
 
           <Text
             style={
               styles.headerSubtitle
             }
-            numberOfLines={
-              1
-            }
+            numberOfLines={1}
           >
-            {preview
-              ?.documentNumber ||
-              "Loading purchase..."}
+            {d.document_number}
+            {" • "}
+            {vendorName}
           </Text>
         </View>
 
-        {/* SAVE */}
-
         <Pressable
-          onPress={() => {
-            void savePdf();
-          }}
           disabled={
-            saveDisabled
+            saving
           }
-          style={({
-            pressed,
-          }) => [
-            styles.saveButton,
-
-            saveDisabled &&
+          onPress={
+            handleSavePdf
+          }
+          style={({ pressed }) => [
+            styles.headerSaveButton,
+            saving &&
               styles.disabled,
-
             pressed &&
-              !saveDisabled &&
+              !saving &&
               styles.pressed,
           ]}
         >
           <Ionicons
-            name={
-              printing
-                ? "hourglass-outline"
-                : "download-outline"
-            }
-            size={17}
+            name="download-outline"
+            size={16}
             color="#FFFFFF"
+          />
+
+          {!isSmall && (
+            <Text
+              style={
+                styles.headerSaveText
+              }
+            >
+              {saving
+                ? "Preparing"
+                : "Save PDF"}
+            </Text>
+          )}
+        </Pressable>
+      </View>
+
+      <ScrollView
+        style={
+          styles.scroll
+        }
+        contentContainerStyle={[
+          styles.scrollContent,
+          isTablet &&
+            styles.scrollContentTablet,
+          {
+            paddingBottom:
+              28 +
+              insets.bottom,
+          },
+        ]}
+        showsVerticalScrollIndicator={
+          false
+        }
+      >
+        <View
+          style={
+            styles.infoBox
+          }
+        >
+          <Ionicons
+            name="document-text-outline"
+            size={16}
+            color="#267087"
           />
 
           <Text
             style={
-              styles.saveButtonText
+              styles.infoText
             }
           >
-            {printing
-              ? "Opening..."
-              : "Save PDF"}
+            Preview your purchase bill before saving it as PDF.
           </Text>
-        </Pressable>
-      </View>
+        </View>
 
-      {/* =================================================
-          CONTENT
-      ================================================= */}
-
-      <View
-        style={
-          styles.previewArea
-        }
-      >
-        {loading ? (
+        <View
+          style={
+            styles.paper
+          }
+        >
           <View
             style={
-              styles.loadingContainer
+              styles.businessHeader
             }
           >
-            <Ionicons
-              name="document-text-outline"
-              size={34}
-              color={
-                C.teal
-              }
-            />
-
-            <Text
+            <View
               style={
-                styles.loadingTitle
-              }
-            >
-              Loading purchase bill
-            </Text>
-
-            <Text
-              style={
-                styles.loadingSubtitle
-              }
-            >
-              Preparing the saved PDF preview...
-            </Text>
-          </View>
-        ) : !preview ? (
-          <View
-            style={
-              styles.loadingContainer
-            }
-          >
-            <Ionicons
-              name="alert-circle-outline"
-              size={34}
-              color={
-                C.red
-              }
-            />
-
-            <Text
-              style={
-                styles.loadingTitle
-              }
-            >
-              Purchase PDF unavailable
-            </Text>
-
-            <Pressable
-              style={
-                styles.returnButton
-              }
-              onPress={() =>
-                router.back()
+                styles.businessLeft
               }
             >
               <Text
                 style={
-                  styles.returnButtonText
+                  styles.businessName
                 }
               >
-                Go back
+                {business.name}
               </Text>
-            </Pressable>
+
+              {!!business.address && (
+                <Text
+                  style={
+                    styles.businessDetails
+                  }
+                >
+                  {business.address}
+                </Text>
+              )}
+
+              {(!!business.gstin ||
+                !!business.pan) && (
+                <Text
+                  style={
+                    styles.businessDetails
+                  }
+                >
+                  {business.gstin
+                    ? `GSTIN ${business.gstin}`
+                    : ""}
+
+                  {business.gstin &&
+                  business.pan
+                    ? " • "
+                    : ""}
+
+                  {business.pan
+                    ? `PAN ${business.pan}`
+                    : ""}
+                </Text>
+              )}
+
+              {(!!business.phone ||
+                !!business.email) && (
+                <Text
+                  style={
+                    styles.businessDetails
+                  }
+                >
+                  {business.phone}
+
+                  {business.phone &&
+                  business.email
+                    ? " • "
+                    : ""}
+
+                  {business.email}
+                </Text>
+              )}
+            </View>
+
+            <View
+              style={
+                styles.invoiceNumberArea
+              }
+            >
+              <Text
+                style={
+                  styles.invoiceType
+                }
+              >
+                PURCHASE BILL
+              </Text>
+
+              <Text
+                style={
+                  styles.invoiceNumber
+                }
+              >
+                {d.document_number}
+              </Text>
+            </View>
           </View>
-        ) : Platform.OS ===
-          "web" ? (
-          React.createElement(
-            "iframe",
-            {
-              key:
-                previewVersion,
 
-              ref:
-                iframe,
-
-              title:
-                `${preview.documentNumber} preview`,
-
-              srcDoc:
-                preview.html,
-
-              sandbox:
-                "allow-same-origin allow-modals",
-
-              onLoad:
-                () => {
-                  setPreviewError(
-                    null,
-                  );
-
-                  setPreviewReady(
-                    true,
-                  );
-                },
-
-              style: {
-                width:
-                  "100%",
-
-                height:
-                  "100%",
-
-                border:
-                  0,
-
-                background:
-                  C.background,
-              },
-            },
-          )
-        ) : (
-          <WebView
-            key={
-              previewVersion
-            }
-            source={
-              source
-            }
-            originWhitelist={[
-              "*",
-            ]}
+          <View
             style={
-              styles.webView
+              styles.accentLine
             }
-            javaScriptEnabled={
-              false
-            }
-            domStorageEnabled={
-              false
-            }
-            allowFileAccess={
-              false
-            }
-            mixedContentMode="never"
-            setSupportMultipleWindows={
-              false
-            }
-            textZoom={
-              100
-            }
-            overScrollMode="never"
-            showsVerticalScrollIndicator
-            showsHorizontalScrollIndicator={
-              false
-            }
-            onShouldStartLoadWithRequest={request =>
-              request.url ===
-                "about:blank" ||
-              request.url.startsWith(
-                "data:text/html",
-              )
-            }
-            onLoadStart={() => {
-              setPreviewReady(
-                false,
-              );
-
-              setPreviewError(
-                null,
-              );
-            }}
-            onLoadEnd={() => {
-              setPreviewReady(
-                true,
-              );
-            }}
-            onError={event => {
-              setPreviewReady(
-                false,
-              );
-
-              setPreviewError(
-                event.nativeEvent
-                  .description ||
-                  "The purchase PDF could not be rendered.",
-              );
-            }}
           />
-        )}
-      </View>
 
-      {/* =================================================
-          ERROR BAR
-      ================================================= */}
-
-      {previewError && (
-        <Pressable
-          style={
-            styles.errorBar
-          }
-          onPress={() => {
-            setPreviewReady(
-              false,
-            );
-
-            setPreviewError(
-              null,
-            );
-
-            setPreviewVersion(
-              value =>
-                value + 1,
-            );
-          }}
-        >
-          <Text
+          <View
             style={
-              styles.errorText
+              styles.metaGrid
             }
           >
-            {previewError}
-            {" Tap to retry."}
-          </Text>
-        </Pressable>
-      )}
+            <View
+              style={
+                styles.metaCard
+              }
+            >
+              <Text
+                style={
+                  styles.metaLabel
+                }
+              >
+                VENDOR
+              </Text>
 
-      {/* =================================================
-          BOTTOM ACTIONS
-      ================================================= */}
+              <Text
+                style={
+                  styles.metaValue
+                }
+              >
+                {vendorName}
+              </Text>
+
+              <Text
+                style={
+                  styles.metaSubtext
+                }
+              >
+                {vendorDetails.length > 0
+                  ? vendorDetails.join(" • ")
+                  : "Vendor / Supplier"}
+              </Text>
+            </View>
+
+            <View
+              style={
+                styles.metaCard
+              }
+            >
+              <Text
+                style={
+                  styles.metaLabel
+                }
+              >
+                PURCHASE DETAILS
+              </Text>
+
+              <Text
+                style={
+                  styles.metaSubtext
+                }
+              >
+                Date:{" "}
+                <Text
+                  style={
+                    styles.bold
+                  }
+                >
+                  {displayDate(
+                    d.document_date,
+                  )}
+                </Text>
+              </Text>
+
+              {!!d.due_date && (
+                <Text
+                  style={
+                    styles.metaSubtext
+                  }
+                >
+                  Due:{" "}
+                  <Text
+                    style={
+                      styles.bold
+                    }
+                  >
+                    {displayDate(
+                      d.due_date,
+                    )}
+                  </Text>
+                </Text>
+              )}
+
+              {!!d.invoice_number && (
+                <Text
+                  style={
+                    styles.metaSubtext
+                  }
+                >
+                  Supplier invoice:{" "}
+                  <Text
+                    style={
+                      styles.bold
+                    }
+                  >
+                    {d.invoice_number}
+                  </Text>
+                </Text>
+              )}
+
+              <Text
+                style={
+                  styles.metaSubtext
+                }
+              >
+                FY:{" "}
+                <Text
+                  style={
+                    styles.bold
+                  }
+                >
+                  {fiscalYear(
+                    d.document_date,
+                  )}
+                </Text>
+              </Text>
+
+              <Text
+                style={
+                  styles.metaSubtext
+                }
+              >
+                Status:{" "}
+                <Text
+                  style={
+                    styles.bold
+                  }
+                >
+                  {paymentStatus}
+                </Text>
+              </Text>
+            </View>
+          </View>
+
+          <View
+            style={
+              styles.table
+            }
+          >
+            <View
+              style={[
+                styles.tableRow,
+                styles.tableHeaderRow,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.tableHeaderText,
+                  styles.itemColumn,
+                ]}
+              >
+                Item / Service
+              </Text>
+
+              <Text
+                style={[
+                  styles.tableHeaderText,
+                  styles.qtyColumn,
+                ]}
+              >
+                Qty
+              </Text>
+
+              <Text
+                style={[
+                  styles.tableHeaderText,
+                  styles.rateColumn,
+                ]}
+              >
+                Rate
+              </Text>
+
+              <Text
+                style={[
+                  styles.tableHeaderText,
+                  styles.gstColumn,
+                ]}
+              >
+                GST
+              </Text>
+
+              <Text
+                style={[
+                  styles.tableHeaderText,
+                  styles.amountColumn,
+                ]}
+              >
+                Total
+              </Text>
+            </View>
+
+            {detail.items.map(
+              line => (
+                <View
+                  key={
+                    line.id
+                  }
+                  style={
+                    styles.tableRow
+                  }
+                >
+                  <View
+                    style={
+                      styles.itemColumn
+                    }
+                  >
+                    <Text
+                      style={
+                        styles.itemName
+                      }
+                      numberOfLines={2}
+                    >
+                      {line.product_name}
+                    </Text>
+
+                    {!!line.hsn && (
+                      <Text
+                        style={
+                          styles.itemHsn
+                        }
+                      >
+                        HSN:{" "}
+                        {line.hsn}
+                      </Text>
+                    )}
+                  </View>
+
+                  <Text
+                    style={[
+                      styles.tableValue,
+                      styles.qtyColumn,
+                    ]}
+                  >
+                    {quantity(
+                      line.quantity,
+                    )}
+                  </Text>
+
+                  <Text
+                    style={[
+                      styles.tableValue,
+                      styles.rateColumn,
+                    ]}
+                  >
+                    {money(
+                      line.unit_price,
+                    )}
+                  </Text>
+
+                  <Text
+                    style={[
+                      styles.tableValue,
+                      styles.gstColumn,
+                    ]}
+                  >
+                    {quantity(
+                      line.gst_rate,
+                    )}
+                    %
+                  </Text>
+
+                  <Text
+                    style={[
+                      styles.tableValueStrong,
+                      styles.amountColumn,
+                    ]}
+                  >
+                    {money(
+                      line.total_amount,
+                    )}
+                  </Text>
+                </View>
+              ),
+            )}
+          </View>
+
+          <View
+            style={
+              styles.summaryWrapper
+            }
+          >
+            <View
+              style={
+                styles.summaryRow
+              }
+            >
+              <Text
+                style={
+                  styles.summaryLabel
+                }
+              >
+                Taxable value
+              </Text>
+
+              <Text
+                style={
+                  styles.summaryValue
+                }
+              >
+                {money(
+                  d.subtotal,
+                )}
+              </Text>
+            </View>
+
+            {d.discount > 0 && (
+              <View
+                style={
+                  styles.summaryRow
+                }
+              >
+                <Text
+                  style={
+                    styles.summaryLabel
+                  }
+                >
+                  Discount
+                </Text>
+
+                <Text
+                  style={
+                    styles.summaryValue
+                  }
+                >
+                  {money(
+                    d.discount,
+                  )}
+                </Text>
+              </View>
+            )}
+
+            <View
+              style={
+                styles.summaryRow
+              }
+            >
+              <Text
+                style={
+                  styles.summaryLabel
+                }
+              >
+                {d.supply_type ===
+                "OTHER_STATE"
+                  ? "IGST"
+                  : "GST"}
+              </Text>
+
+              <Text
+                style={
+                  styles.summaryValue
+                }
+              >
+                {money(
+                  d.gst_amount,
+                )}
+              </Text>
+            </View>
+
+            <View
+              style={
+                styles.summaryDivider
+              }
+            />
+
+            <View
+              style={
+                styles.grandTotalRow
+              }
+            >
+              <Text
+                style={
+                  styles.grandTotalLabel
+                }
+              >
+                Grand total
+              </Text>
+
+              <Text
+                style={
+                  styles.grandTotalValue
+                }
+              >
+                {money(
+                  d.total_amount,
+                )}
+              </Text>
+            </View>
+
+            <View
+              style={
+                styles.paymentStatus
+              }
+            >
+              <Text
+                style={
+                  styles.paymentStatusText
+                }
+              >
+                Paid{" "}
+                <Text
+                  style={
+                    styles.bold
+                  }
+                >
+                  {money(
+                    d.paid_amount,
+                  )}
+                </Text>
+              </Text>
+
+              <Text
+                style={
+                  styles.paymentStatusDivider
+                }
+              >
+                •
+              </Text>
+
+              <Text
+                style={
+                  styles.paymentStatusText
+                }
+              >
+                Due{" "}
+                <Text
+                  style={
+                    d.due_amount > 0
+                      ? styles.dueText
+                      : styles.bold
+                  }
+                >
+                  {money(
+                    d.due_amount,
+                  )}
+                </Text>
+              </Text>
+            </View>
+          </View>
+
+          {!!d.notes && (
+            <View
+              style={
+                styles.section
+              }
+            >
+              <Text
+                style={
+                  styles.sectionTitle
+                }
+              >
+                Notes
+              </Text>
+
+              <Text
+                style={
+                  styles.sectionText
+                }
+              >
+                {d.notes}
+              </Text>
+            </View>
+          )}
+
+          <View
+            style={
+              styles.paymentCards
+            }
+          >
+            <View
+              style={
+                styles.paymentCard
+              }
+            >
+              <View
+                style={
+                  styles.paymentCardIcon
+                }
+              >
+                <Ionicons
+                  name="card-outline"
+                  size={16}
+                  color={
+                    colors.teal
+                  }
+                />
+              </View>
+
+              <View
+                style={
+                  styles.paymentCardContent
+                }
+              >
+                <Text
+                  style={
+                    styles.paymentCardTitle
+                  }
+                >
+                  Bank / UPI payment
+                </Text>
+
+                <Text
+                  style={
+                    styles.paymentCardText
+                  }
+                >
+                  Add your business bank account and UPI details here.
+                </Text>
+              </View>
+            </View>
+
+            <View
+              style={
+                styles.paymentCard
+              }
+            >
+              <View
+                style={
+                  styles.paymentCardIcon
+                }
+              >
+                <Ionicons
+                  name="document-text-outline"
+                  size={16}
+                  color={
+                    colors.teal
+                  }
+                />
+              </View>
+
+              <View
+                style={
+                  styles.paymentCardContent
+                }
+              >
+                <Text
+                  style={
+                    styles.paymentCardTitle
+                  }
+                >
+                  Cheque information
+                </Text>
+
+                <Text
+                  style={
+                    styles.paymentCardText
+                  }
+                >
+                  Payee: Account Payee only.
+                  Mention purchase bill number behind the cheque.
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          <View
+            style={
+              styles.section
+            }
+          >
+            <Text
+              style={
+                styles.sectionTitle
+              }
+            >
+              Terms & Conditions
+            </Text>
+
+            <Text
+              style={
+                styles.sectionText
+              }
+            >
+              Payment due as stated.
+              Goods once received are subject to the stated return policy.
+            </Text>
+
+            <Text
+              style={
+                styles.thankYou
+              }
+            >
+              Thank you for your business.
+            </Text>
+          </View>
+
+          <View
+            style={
+              styles.signatureSection
+            }
+          >
+            <Text
+              style={
+                styles.signatureTitle
+              }
+            >
+              Authorised Signatory
+            </Text>
+
+            <Text
+              style={
+                styles.signatureBusiness
+              }
+            >
+              For {business.name}
+            </Text>
+          </View>
+
+          <View
+            style={
+              styles.footerDivider
+            }
+          />
+
+          <Text
+            style={
+              styles.footerText
+            }
+          >
+            Computer-generated purchase bill.
+            Please verify GST, business, vendor and payment details before live use.
+          </Text>
+        </View>
+      </ScrollView>
 
       <View
         style={[
           styles.bottomBar,
-
           {
             paddingBottom:
               Math.max(
-                insets.bottom,
                 10,
+                insets.bottom,
               ),
           },
         ]}
@@ -2424,14 +2147,8 @@ export default function PurchasePreviewScreen() {
           onPress={() =>
             router.back()
           }
-          disabled={
-            printing
-          }
-          style={({
-            pressed,
-          }) => [
+          style={({ pressed }) => [
             styles.bottomBackButton,
-
             pressed &&
               styles.pressed,
           ]}
@@ -2440,7 +2157,7 @@ export default function PurchasePreviewScreen() {
             name="arrow-back"
             size={17}
             color={
-              C.teal
+              colors.teal
             }
           />
 
@@ -2454,31 +2171,23 @@ export default function PurchasePreviewScreen() {
         </Pressable>
 
         <Pressable
-          onPress={() => {
-            void savePdf();
-          }}
           disabled={
-            saveDisabled
+            saving
           }
-          style={({
-            pressed,
-          }) => [
+          onPress={
+            handleSavePdf
+          }
+          style={({ pressed }) => [
             styles.bottomSaveButton,
-
-            saveDisabled &&
+            saving &&
               styles.disabled,
-
             pressed &&
-              !saveDisabled &&
+              !saving &&
               styles.pressed,
           ]}
         >
           <Ionicons
-            name={
-              printing
-                ? "hourglass-outline"
-                : "download-outline"
-            }
+            name="download-outline"
             size={18}
             color="#FFFFFF"
           />
@@ -2488,425 +2197,724 @@ export default function PurchasePreviewScreen() {
               styles.bottomSaveText
             }
           >
-            {printing
-              ? "Opening..."
+            {saving
+              ? "Preparing..."
               : "Save PDF"}
           </Text>
         </Pressable>
       </View>
-    </View>
+
+      {toastVisible && (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.toast,
+            {
+              opacity:
+                toastOpacity,
+            },
+          ]}
+        >
+          <Ionicons
+            name="checkmark-circle"
+            size={18}
+            color="#FFFFFF"
+          />
+
+          <Text
+            style={
+              styles.toastText
+            }
+          >
+            Print dialog opened
+          </Text>
+        </Animated.View>
+      )}
+    </SafeAreaView>
   );
 }
 
-/* =========================================================
-   STYLES
-========================================================= */
-
 const styles =
   StyleSheet.create({
-    screen: {
+    safeArea: {
       flex: 1,
-
       backgroundColor:
-        C.background,
+        "#EDF4F6",
     },
 
-    /* =====================================================
-       HEADER
-    ===================================================== */
-
-    header: {
-      minHeight: 68,
-
-      flexDirection:
-        "row",
-
+    loadingScreen: {
+      flex: 1,
       alignItems:
         "center",
-
-      gap: 8,
-
-      paddingHorizontal:
-        11,
-
-      paddingBottom: 9,
-
-      backgroundColor:
-        C.navy,
-
-      borderBottomWidth:
-        1,
-
-      borderBottomColor:
-        "#143A55",
-
-      shadowColor:
-        "#000000",
-
-      shadowOffset: {
-        width: 0,
-
-        height: 2,
-      },
-
-      shadowOpacity:
-        0.16,
-
-      shadowRadius: 5,
-
-      elevation: 6,
-
-      zIndex: 20,
-    },
-
-    backButton: {
-      width: 34,
-
-      height: 34,
-
-      flexShrink: 0,
-
-      borderRadius: 10,
-
-      alignItems:
-        "center",
-
       justifyContent:
         "center",
-
       backgroundColor:
-        "#FFFFFF",
-
-      borderWidth: 1,
-
-      borderColor:
-        "#D9E3E7",
-
-      shadowColor:
-        "#000000",
-
-      shadowOffset: {
-        width: 0,
-
-        height: 1,
-      },
-
-      shadowOpacity:
-        0.15,
-
-      shadowRadius: 3,
-
-      elevation: 4,
+        "#EDF4F6",
     },
 
-    backButtonPressed: {
-      opacity: 0.7,
+    loadingText: {
+      color:
+        "#68757D",
+      fontSize: 11,
+      marginTop: 10,
+    },
 
-      transform: [
-        {
-          scale: 0.95,
-        },
-      ],
+    header: {
+      minHeight: 60,
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      gap: 9,
+      paddingHorizontal:
+        13,
+      paddingVertical:
+        11,
+      backgroundColor:
+        "#FFFFFF",
+      borderBottomWidth:
+        1,
+      borderBottomColor:
+        "#D9E3E6",
+    },
+
+    headerSmall: {
+      paddingHorizontal:
+        9,
+      gap: 7,
+    },
+
+    headerBackButton: {
+      width: 34,
+      height: 34,
+      borderRadius: 11,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      backgroundColor:
+        "#EDF3F5",
     },
 
     headerText: {
       flex: 1,
-
       minWidth: 0,
     },
 
     headerTitle: {
-      color:
-        "#FFFFFF",
-
-      fontSize: 15,
-
+      fontSize: 21,
+      lineHeight: 26,
       fontWeight:
-        "900",
+        "800",
+      color:
+        "#16313F",
+    },
+
+    headerTitleSmall: {
+      fontSize: 17,
+      lineHeight: 22,
     },
 
     headerSubtitle: {
       color:
-        "#D6E5EC",
+        "#808B90",
+      fontSize: 10,
+      marginTop: 3,
+    },
 
+    headerSaveButton: {
+      minHeight: 36,
+      minWidth: 85,
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      gap: 6,
+      paddingHorizontal:
+        10,
+      borderRadius: 12,
+      backgroundColor:
+        "#07998E",
+    },
+
+    headerSaveText: {
+      color:
+        "#FFFFFF",
+      fontSize: 11,
+      fontWeight:
+        "800",
+    },
+
+    scroll: {
+      flex: 1,
+      backgroundColor:
+        "#EDF4F6",
+    },
+
+    scrollContent: {
+      width: "100%",
+      paddingHorizontal: 10,
+      paddingTop: 10,
+      alignItems: "center",
+    },
+
+    scrollContentTablet: {
+      paddingHorizontal: 24,
+    },
+
+    infoBox: {
+      width: "100%",
+      maxWidth: 820,
+      minHeight: 44,
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      gap: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      borderWidth: 1,
+      borderColor:
+        "#C6E0EA",
+      borderRadius: 12,
+      backgroundColor:
+        "#EFF8FC",
+      marginBottom: 10,
+    },
+
+    infoText: {
+      flex: 1,
+      color:
+        "#42616F",
+      fontSize: 10,
+      lineHeight: 14,
+    },
+
+    paper: {
+      width: "100%",
+      maxWidth: 820,
+      backgroundColor:
+        "#FFFFFF",
+      borderWidth: 1,
+      borderColor:
+        "#D7E1E5",
+      borderRadius: 14,
+      paddingHorizontal: 14,
+      paddingVertical: 18,
+    },
+
+    businessHeader: {
+      flexDirection:
+        "row",
+      justifyContent:
+        "space-between",
+      alignItems:
+        "flex-start",
+      gap: 12,
+    },
+
+    businessLeft: {
+      flex: 1,
+      minWidth: 0,
+    },
+
+    businessName: {
+      color:
+        "#102A43",
+      fontSize: 21,
+      fontWeight:
+        "800",
+    },
+
+    businessDetails: {
+      color:
+        "#52606D",
+      fontSize: 9,
+      lineHeight: 14,
+      marginTop: 3,
+    },
+
+    invoiceNumberArea: {
+      flexShrink: 0,
+      alignItems:
+        "flex-end",
+      maxWidth: "44%",
+    },
+
+    invoiceType: {
+      color:
+        "#07877E",
+      fontSize: 8,
+      fontWeight:
+        "800",
+      letterSpacing: 0.8,
+    },
+
+    invoiceNumber: {
+      color:
+        "#102A43",
+      fontSize: 15,
+      fontWeight:
+        "800",
+      marginTop: 3,
+    },
+
+    accentLine: {
+      height: 3,
+      borderRadius: 99,
+      backgroundColor:
+        "#0B948B",
+      marginTop: 13,
+      marginBottom: 15,
+    },
+
+    metaGrid: {
+      flexDirection:
+        "row",
+      width: "100%",
+      marginBottom: 14,
+    },
+
+    metaCard: {
+      flex: 1,
+      minWidth: 0,
+      padding: 10,
+      backgroundColor:
+        "#F3FAF9",
+      borderWidth: 1,
+      borderColor:
+        "#C9E7E2",
+    },
+
+    metaLabel: {
+      color:
+        "#60717D",
+      fontSize: 8,
+      fontWeight:
+        "800",
+      letterSpacing: 0.6,
+      marginBottom: 4,
+    },
+
+    metaValue: {
+      color:
+        "#17212B",
+      fontSize: 10.5,
+      fontWeight:
+        "800",
+    },
+
+    metaSubtext: {
+      color:
+        "#46535D",
       fontSize: 8.5,
+      lineHeight: 13,
+      marginTop: 3,
+    },
 
+    bold: {
+      fontWeight:
+        "800",
+      color:
+        "#17212B",
+    },
+
+    table: {
+      width: "100%",
+      borderLeftWidth: 1,
+      borderTopWidth: 1,
+      borderColor:
+        "#CBD5DA",
+    },
+
+    tableRow: {
+      width: "100%",
+      flexDirection:
+        "row",
+      alignItems:
+        "stretch",
+      minHeight: 42,
+    },
+
+    tableHeaderRow: {
+      backgroundColor:
+        "#EEF7F6",
+      minHeight: 36,
+    },
+
+    tableHeaderText: {
+      color:
+        "#243B53",
+      fontSize: 8,
+      fontWeight:
+        "800",
+      paddingHorizontal: 4,
+      paddingVertical: 8,
+      borderRightWidth: 1,
+      borderBottomWidth: 1,
+      borderColor:
+        "#B9C8CE",
+      textAlign: "center",
+    },
+
+    tableValue: {
+      color:
+        "#253642",
+      fontSize: 8,
+      paddingHorizontal: 4,
+      paddingVertical: 10,
+      borderRightWidth: 1,
+      borderBottomWidth: 1,
+      borderColor:
+        "#CBD5DA",
+      textAlign: "center",
+    },
+
+    tableValueStrong: {
+      color:
+        "#253642",
+      fontSize: 8,
+      fontWeight:
+        "800",
+      paddingHorizontal: 4,
+      paddingVertical: 10,
+      borderRightWidth: 1,
+      borderBottomWidth: 1,
+      borderColor:
+        "#CBD5DA",
+      textAlign: "right",
+    },
+
+    itemColumn: {
+      width: "39%",
+      paddingHorizontal: 6,
+      paddingVertical: 8,
+      borderRightWidth: 1,
+      borderBottomWidth: 1,
+      borderColor:
+        "#CBD5DA",
+      justifyContent:
+        "center",
+    },
+
+    qtyColumn: {
+      width: "12%",
+    },
+
+    rateColumn: {
+      width: "18%",
+    },
+
+    gstColumn: {
+      width: "11%",
+    },
+
+    amountColumn: {
+      width: "20%",
+    },
+
+    itemName: {
+      color:
+        "#253642",
+      fontSize: 8.5,
+      fontWeight:
+        "700",
+    },
+
+    itemHsn: {
+      color:
+        "#7A878F",
+      fontSize: 7,
       marginTop: 2,
     },
 
-    saveButton: {
-      minHeight: 38,
+    summaryWrapper: {
+      width: "54%",
+      alignSelf:
+        "flex-end",
+      marginTop: 16,
+    },
 
-      flexShrink: 0,
-
+    summaryRow: {
       flexDirection:
         "row",
-
-      alignItems:
-        "center",
-
       justifyContent:
-        "center",
-
-      gap: 5,
-
-      paddingHorizontal:
-        11,
-
-      borderRadius: 10,
-
-      backgroundColor:
-        C.teal,
+        "space-between",
+      gap: 10,
+      paddingVertical: 4,
     },
 
-    saveButtonText: {
+    summaryLabel: {
       color:
-        "#FFFFFF",
+        "#52606D",
+      fontSize: 9,
+    },
 
-      fontSize: 9.5,
-
+    summaryValue: {
+      color:
+        "#17212B",
+      fontSize: 9,
       fontWeight:
-        "900",
+        "700",
+      textAlign:
+        "right",
     },
 
-    /* =====================================================
-       PREVIEW
-    ===================================================== */
-
-    previewArea: {
-      flex: 1,
-
-      width: "100%",
-
+    summaryDivider: {
+      height: 1,
       backgroundColor:
-        C.background,
+        "#CCD6DC",
+      marginVertical: 5,
     },
 
-    webView: {
-      flex: 1,
-
-      backgroundColor:
-        C.background,
-    },
-
-    /* =====================================================
-       LOADING
-    ===================================================== */
-
-    loadingContainer: {
-      flex: 1,
-
+    grandTotalRow: {
+      flexDirection:
+        "row",
+      justifyContent:
+        "space-between",
+      gap: 10,
       alignItems:
         "center",
-
-      justifyContent:
-        "center",
-
-      paddingHorizontal:
-        20,
     },
 
-    loadingTitle: {
+    grandTotalLabel: {
       color:
-        C.text,
-
+        "#102A43",
       fontSize: 14,
-
       fontWeight:
-        "900",
-
-      marginTop: 10,
-
-      textAlign:
-        "center",
+        "800",
     },
 
-    loadingSubtitle: {
+    grandTotalValue: {
       color:
-        C.muted,
-
-      fontSize: 9,
-
-      marginTop: 4,
-
-      textAlign:
-        "center",
-    },
-
-    returnButton: {
-      minHeight: 38,
-
-      marginTop: 14,
-
-      paddingHorizontal:
-        18,
-
-      borderRadius: 10,
-
-      backgroundColor:
-        C.teal,
-
-      alignItems:
-        "center",
-
-      justifyContent:
-        "center",
-    },
-
-    returnButtonText: {
-      color:
-        "#FFFFFF",
-
-      fontSize: 10,
-
+        "#102A43",
+      fontSize: 14,
       fontWeight:
-        "900",
-    },
-
-    /* =====================================================
-       ERROR
-    ===================================================== */
-
-    errorBar: {
-      backgroundColor:
-        "#FFF0EE",
-
-      borderTopWidth:
-        1,
-
-      borderColor:
-        "#F1C1BD",
-
-      paddingHorizontal:
-        14,
-
-      paddingVertical:
-        8,
-    },
-
-    errorText: {
-      color:
-        C.red,
-
-      fontSize: 9,
-
+        "800",
       textAlign:
-        "center",
+        "right",
     },
 
-    /* =====================================================
-       BOTTOM
-    ===================================================== */
-
-    bottomBar: {
-      minHeight: 64,
-
-      width: "100%",
-
+    paymentStatus: {
+      marginTop: 9,
+      paddingHorizontal: 8,
+      paddingVertical: 7,
       flexDirection:
         "row",
-
-      alignItems:
-        "center",
-
       justifyContent:
         "flex-end",
+      alignItems:
+        "center",
+      gap: 6,
+      backgroundColor:
+        "#F7FAFC",
+      borderRadius: 6,
+    },
 
+    paymentStatusText: {
+      color:
+        "#43515B",
+      fontSize: 8,
+    },
+
+    paymentStatusDivider: {
+      color:
+        "#9BA7AD",
+      fontSize: 8,
+    },
+
+    dueText: {
+      color:
+        "#9B6500",
+      fontWeight:
+        "800",
+    },
+
+    section: {
+      marginTop: 18,
+    },
+
+    sectionTitle: {
+      color:
+        "#102A43",
+      fontSize: 10,
+      fontWeight:
+        "800",
+      marginBottom: 5,
+    },
+
+    sectionText: {
+      color:
+        "#4B5963",
+      fontSize: 9,
+      lineHeight: 14,
+    },
+
+    thankYou: {
+      color:
+        "#102A43",
+      fontSize: 9,
+      fontWeight:
+        "800",
+      marginTop: 12,
+    },
+
+    paymentCards: {
+      width: "100%",
+      flexDirection:
+        "row",
       gap: 8,
+      marginTop: 18,
+    },
 
-      paddingTop: 8,
-
-      paddingHorizontal:
-        10,
-
+    paymentCard: {
+      flex: 1,
+      minWidth: 0,
+      minHeight: 92,
+      flexDirection:
+        "row",
+      gap: 7,
+      padding: 9,
+      borderWidth: 1,
+      borderColor:
+        "#CCD6DC",
+      borderRadius: 10,
       backgroundColor:
         "#FFFFFF",
+    },
 
-      borderTopWidth:
-        1,
+    paymentCardIcon: {
+      width: 28,
+      height: 28,
+      borderRadius: 8,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      backgroundColor:
+        "#E3F5F2",
+    },
 
+    paymentCardContent: {
+      flex: 1,
+      minWidth: 0,
+    },
+
+    paymentCardTitle: {
+      color:
+        "#203747",
+      fontSize: 8.5,
+      fontWeight:
+        "800",
+    },
+
+    paymentCardText: {
+      color:
+        "#68747C",
+      fontSize: 7.5,
+      lineHeight: 11,
+      marginTop: 3,
+    },
+
+    signatureSection: {
+      alignItems:
+        "flex-end",
+      marginTop: 42,
+    },
+
+    signatureTitle: {
+      color:
+        "#17212B",
+      fontSize: 9,
+      fontWeight:
+        "800",
+    },
+
+    signatureBusiness: {
+      color:
+        "#52606D",
+      fontSize: 8,
+      marginTop: 3,
+    },
+
+    footerDivider: {
+      height: 1,
+      backgroundColor:
+        "#E2E8EC",
+      marginTop: 18,
+      marginBottom: 8,
+    },
+
+    footerText: {
+      color:
+        "#718096",
+      fontSize: 7.5,
+      lineHeight: 11,
+    },
+
+    bottomBar: {
+      minHeight: 62,
+      width: "100%",
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      justifyContent:
+        "flex-end",
+      gap: 8,
+      paddingTop: 8,
+      paddingHorizontal: 10,
+      backgroundColor:
+        "#FFFFFF",
+      borderTopWidth: 1,
       borderTopColor:
         "#D9E3E8",
-
-      shadowColor:
-        C.navy,
-
-      shadowOffset: {
-        width: 0,
-
-        height: -3,
-      },
-
-      shadowOpacity:
-        0.1,
-
-      shadowRadius: 7,
-
-      elevation: 8,
     },
 
     bottomBackButton: {
       minHeight: 42,
-
       flexDirection:
         "row",
-
       alignItems:
         "center",
-
       justifyContent:
         "center",
-
       gap: 5,
-
-      paddingHorizontal:
-        15,
-
+      paddingHorizontal: 15,
       borderRadius: 11,
-
       backgroundColor:
         "#E6F5F2",
     },
 
     bottomBackText: {
       color:
-        C.teal,
-
+        colors.teal,
       fontSize: 10,
-
       fontWeight:
         "900",
     },
 
     bottomSaveButton: {
       minHeight: 42,
-
       flexDirection:
         "row",
-
       alignItems:
         "center",
-
       justifyContent:
         "center",
-
       gap: 5,
-
-      paddingHorizontal:
-        15,
-
+      paddingHorizontal: 15,
       borderRadius: 11,
-
       backgroundColor:
-        C.teal,
+        colors.teal,
     },
 
     bottomSaveText: {
       color:
         "#FFFFFF",
-
       fontSize: 10,
-
       fontWeight:
         "900",
     },
@@ -2917,11 +2925,38 @@ const styles =
 
     pressed: {
       opacity: 0.75,
-
       transform: [
         {
           scale: 0.97,
         },
       ],
+    },
+
+    toast: {
+      position:
+        "absolute",
+      left: 18,
+      right: 18,
+      bottom: 82,
+      minHeight: 44,
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      gap: 7,
+      paddingHorizontal: 14,
+      borderRadius: 12,
+      backgroundColor:
+        "#173042",
+    },
+
+    toastText: {
+      color:
+        "#FFFFFF",
+      fontSize: 10,
+      fontWeight:
+        "800",
     },
   });

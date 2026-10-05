@@ -239,20 +239,15 @@ const tools: ToolItem[] = [
 
     accent: "#E4B14A",
   },
-
-  {
-    id: "vault",
-
-    icon: "folder-outline",
-
-    title: "Document vault",
-
-    description: "Register accounting and tax evidence",
-
-    route: "/all-operations",
-
-    accent: "#F0B42D",
-  },
+  
+{
+  id: "vault",
+  icon: "folder-outline",
+  title: "Document vault",
+  description: "Register accounting and tax evidence",
+  route: "/more/document-vault",
+  accent: "#F0B42D",
+},
 
   {
     id: "approvals",
@@ -347,15 +342,13 @@ const tools: ToolItem[] = [
 
     description: "Who did what and when",
 
-    route: "/all-operations",
+    route: "/activity-audit",
 
     accent: "#65727D",
   },
 ];
 
-/*         =
-   TOOL CARD
-        = */
+/* = TOOL CARD  = */
 
 function ToolCard({
   item,

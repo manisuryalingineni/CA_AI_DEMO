@@ -346,11 +346,6 @@ function buildDocumentHtml(
         );
 
 
-    const isBill =
-        d.document_type ===
-        'PURCHASE';
-
-
     const isReturn =
         d.document_type ===
         'RETURN';
@@ -393,17 +388,7 @@ function buildDocumentHtml(
         'WORKFLOW';
 
 
-    if (isBill) {
-
-        documentStatus =
-            d.payment_status ||
-            (
-                d.due_amount > 0
-                    ? 'DUE'
-                    : 'PAID'
-            );
-
-    } else if (isReturn) {
+    if (isReturn) {
 
         documentStatus =
             'RETURN';
@@ -608,45 +593,7 @@ function buildDocumentHtml(
     `;
 
 
-    if (isBill) {
-
-        settlementHtml = `
-            <div class="settlement">
-
-                <span>
-                    Paid
-                    <b>
-                        ${escapeHtml(
-                            money(
-                                d.paid_amount,
-                            ),
-                        )}
-                    </b>
-                </span>
-
-                <span class="dot">
-                    &bull;
-                </span>
-
-                <span>
-                    Due
-                    <b class="${
-                        d.due_amount > 0
-                            ? 'due-text'
-                            : ''
-                    }">
-                        ${escapeHtml(
-                            money(
-                                d.due_amount,
-                            ),
-                        )}
-                    </b>
-                </span>
-
-            </div>
-        `;
-
-    } else if (isReturn) {
+    if (isReturn) {
 
         settlementHtml = `
             <div class="settlement">
@@ -2510,22 +2457,73 @@ export default function PurchasesScreen() {
 
     const openPdf = useCallback(async (document: WorkflowDocument) => {
         if (!business || documentLock.current) return;
+
+        if (document.document_type === 'PURCHASE') {
+            router.push({
+                pathname: '/purchase-preview',
+                params: {
+                    purchaseId: document.id,
+                },
+            });
+            return;
+        }
+
         documentLock.current = true;
         const request = ++previewRequest.current;
         setOpeningKey(documentKey(document));
+
         try {
-            const detail = await loadPurchaseWorkflowDocument(document.document_type, document.id);
-            const current = businessIdentity(await getBusiness());
-            if (!focused.current || request !== previewRequest.current) return;
-            if (!current || current.id !== business.id) throw new Error('The active business changed. Reopen the document.');
-            if (!detail) throw new Error('This purchase document could not be found.');
-            setPreview(buildDocumentHtml(detail, current));
+            const detail = await loadPurchaseWorkflowDocument(
+                document.document_type,
+                document.id,
+            );
+
+            const current = businessIdentity(
+                await getBusiness(),
+            );
+
+            if (
+                !focused.current ||
+                request !== previewRequest.current
+            ) {
+                return;
+            }
+
+            if (
+                !current ||
+                current.id !== business.id
+            ) {
+                throw new Error(
+                    'The active business changed. Reopen the document.',
+                );
+            }
+
+            if (!detail) {
+                throw new Error(
+                    'This purchase document could not be found.',
+                );
+            }
+
+            setPreview(
+                buildDocumentHtml(
+                    detail,
+                    current,
+                ),
+            );
         } catch (error) {
-            if (focused.current && request === previewRequest.current) {
-                notify('Unable to open PDF preview', errorText(error));
+            if (
+                focused.current &&
+                request === previewRequest.current
+            ) {
+                notify(
+                    'Unable to open PDF preview',
+                    errorText(error),
+                );
             }
         } finally {
-            if (request === previewRequest.current) {
+            if (
+                request === previewRequest.current
+            ) {
                 documentLock.current = false;
                 setOpeningKey(null);
             }
