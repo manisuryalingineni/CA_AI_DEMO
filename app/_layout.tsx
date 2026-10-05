@@ -10,10 +10,9 @@ export default function RootLayout() {
       <Stack.Screen
         name="index"
         options={{
-          headerShown: false,
+          headerShown: false, 
         }}
       />
-
       <Stack.Screen
         name="dashboard"
         options={{
@@ -29,14 +28,18 @@ export default function RootLayout() {
       />
 
       <Stack.Screen
+        name="activity-audit"
+        options={{
+          headerShown: false,
+        }}
+      />
+
+      <Stack.Screen
         name="invoice-preview"
         options={{
           headerShown: false,
-
           presentation: "transparentModal",
-
           animation: "fade",
-
           contentStyle: {
             backgroundColor: "transparent",
           },
@@ -44,4 +47,4 @@ export default function RootLayout() {
       />
     </Stack>
   );
-}
+} 

@@ -277,7 +277,7 @@ const tools: ToolItem[] = [
 
     description: "Accounts, tax, books, payroll and P&L",
 
-    route: "/sales",
+    route: "/reports",
 
     accent: "#2F80ED",
   },
@@ -291,7 +291,7 @@ const tools: ToolItem[] = [
 
     description: "Documents and reports ready to share",
 
-    route: "/sales",
+    route: "/reports",
 
     accent: "#607D8B",
   },
@@ -347,7 +347,7 @@ const tools: ToolItem[] = [
 
     description: "Who did what and when",
 
-    route: "/all-operations",
+    route: "/activity-audit",
 
     accent: "#65727D",
   },
