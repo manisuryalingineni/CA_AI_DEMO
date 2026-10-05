@@ -1,7 +1,7 @@
-import * as SQLite from 'expo-sqlite';
-import { Platform } from 'react-native';
+import * as SQLite from "expo-sqlite";
+import { Platform } from "react-native";
 
-const DATABASE_NAME = 'ca_ai_retail.db';
+const DATABASE_NAME = "ca_ai_retail.db";
 
 let database: SQLite.SQLiteDatabase | null = null;
 
@@ -12,7 +12,6 @@ let database: SQLite.SQLiteDatabase | null = null;
 ========================================================= */
 
 type TableInfoRow = {
-
   cid: number;
 
   name: string;
@@ -24,7 +23,6 @@ type TableInfoRow = {
   dflt_value: unknown;
 
   pk: number;
-
 };
 
 // Share the initialization promise, not a half-initialized connection.
@@ -34,29 +32,23 @@ let initialization: Promise<SQLite.SQLiteDatabase> | null = null;
 let writeQueue: Promise<void> = Promise.resolve();
 
 export function getDatabase(): Promise<SQLite.SQLiteDatabase> {
-
   if (database) return Promise.resolve(database);
 
   if (!initialization) {
+    initialization = initializeDatabase()
+      .then((db) => {
+        database = db;
 
-    initialization = initializeDatabase().then(db => {
+        return db;
+      })
+      .catch((error) => {
+        initialization = null;
 
-      database = db;
-
-      return db;
-
-    }).catch(error => {
-
-      initialization = null;
-
-      throw error;
-
-    });
-
+        throw error;
+      });
   }
 
   return initialization;
-
 }
 
 /** All purchase-workflow writes use this queue and a transaction.
@@ -70,69 +62,63 @@ export function getDatabase(): Promise<SQLite.SQLiteDatabase> {
  */
 
 export function withPurchaseTransaction<T>(
-
   task: (db: SQLite.SQLiteDatabase) => Promise<T>,
-
 ): Promise<T> {
-
   const result = writeQueue.then(async () => {
-
     const db = await getDatabase();
 
-    if (Platform.OS === 'web') {
-
+    if (Platform.OS === "web") {
       let value!: T;
 
-      await db.withTransactionAsync(async () => { value = await task(db); });
+      await db.withTransactionAsync(async () => {
+        value = await task(db);
+      });
 
       return value;
-
     }
 
     const connection = await SQLite.openDatabaseAsync(DATABASE_NAME, {
-
       useNewConnection: true,
-
     });
 
     let started = false;
 
     try {
+      await connection.execAsync(
+        "PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;",
+      );
 
-      await connection.execAsync('PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
-
-      await connection.execAsync('BEGIN IMMEDIATE;');
+      await connection.execAsync("BEGIN IMMEDIATE;");
 
       started = true;
 
       const value = await task(connection);
 
-      await connection.execAsync('COMMIT;');
+      await connection.execAsync("COMMIT;");
 
       started = false;
 
       return value;
-
     } catch (error) {
-
-      if (started) await connection.execAsync('ROLLBACK;').catch(() => undefined);
+      if (started)
+        await connection.execAsync("ROLLBACK;").catch(() => undefined);
 
       throw error;
-
     } finally {
-
       // A close failure must not turn a successful commit into a failed save.
 
-      await connection.closeAsync().catch(error => console.warn('Closing purchase connection', error));
-
+      await connection
+        .closeAsync()
+        .catch((error) => console.warn("Closing purchase connection", error));
     }
-
   });
 
-  writeQueue = result.then(() => undefined, () => undefined);
+  writeQueue = result.then(
+    () => undefined,
+    () => undefined,
+  );
 
   return result;
-
 }
 
 /* =========================================================
@@ -155,33 +141,20 @@ export function withSalesTransaction<T>(
 ========================================================= */
 
 async function hasColumn(
-
   db: SQLite.SQLiteDatabase,
 
   tableName: string,
 
   columnName: string,
-
 ): Promise<boolean> {
-
-  const rows =
-
-    await db.getAllAsync<TableInfoRow>(
-
-      `PRAGMA table_info(${tableName});`,
-
-    );
-
-  return rows.some(
-
-    row => row.name === columnName,
-
+  const rows = await db.getAllAsync<TableInfoRow>(
+    `PRAGMA table_info(${tableName});`,
   );
 
+  return rows.some((row) => row.name === columnName);
 }
 
 async function addColumnIfMissing(
-
   db: SQLite.SQLiteDatabase,
 
   tableName: string,
@@ -189,25 +162,17 @@ async function addColumnIfMissing(
   columnName: string,
 
   definition: string,
-
 ): Promise<boolean> {
+  const exists = await hasColumn(
+    db,
 
-  const exists =
+    tableName,
 
-    await hasColumn(
-
-      db,
-
-      tableName,
-
-      columnName,
-
-    );
+    columnName,
+  );
 
   if (exists) {
-
     return false;
-
   }
 
   await db.execAsync(`
@@ -219,7 +184,6 @@ async function addColumnIfMissing(
   `);
 
   return true;
-
 }
 
 /* =========================================================
@@ -229,22 +193,22 @@ async function addColumnIfMissing(
 ========================================================= */
 
 async function initializeDatabase(): Promise<SQLite.SQLiteDatabase> {
-
   const database = await SQLite.openDatabaseAsync(DATABASE_NAME);
 
   try {
+    await database.execAsync(
+      "PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;",
+    );
 
-    await database.execAsync('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
+    await database.execAsync("BEGIN IMMEDIATE;");
 
-    await database.execAsync('BEGIN IMMEDIATE;');
-
-  /* =======================================================
+    /* =======================================================
 
      CREATE TABLES
 
   ======================================================= */
 
-  await database.execAsync(`
+    await database.execAsync(`
 
     /* =====================================================
 
@@ -886,35 +850,101 @@ async function initializeDatabase(): Promise<SQLite.SQLiteDatabase> {
 
       ON payments (created_at);
 
+    /* =====================================================
+
+       ACTIVITY AUDIT
+
+    ===================================================== */
+
+    CREATE TABLE IF NOT EXISTS activity_audit (
+
+      id TEXT PRIMARY KEY NOT NULL,
+
+      business_id TEXT NOT NULL,
+
+      module TEXT NOT NULL,
+
+      action TEXT NOT NULL,
+
+      title TEXT NOT NULL,
+
+      details TEXT,
+
+      actor_name TEXT NOT NULL DEFAULT 'Business Owner',
+
+      actor_role TEXT NOT NULL DEFAULT 'Business owner',
+
+      entity_type TEXT,
+
+      entity_id TEXT,
+
+      metadata_json TEXT,
+
+      created_at TEXT NOT NULL,
+
+      FOREIGN KEY (business_id)
+
+        REFERENCES businesses(id)
+
+        ON DELETE CASCADE
+
+    );
+
+    CREATE INDEX IF NOT EXISTS
+
+      idx_activity_audit_business_id
+
+      ON activity_audit (business_id);
+
+    CREATE INDEX IF NOT EXISTS
+
+      idx_activity_audit_created_at
+
+      ON activity_audit (created_at DESC);
+
+    CREATE INDEX IF NOT EXISTS
+
+      idx_activity_audit_module
+
+      ON activity_audit (business_id, module, created_at DESC);
+
+    CREATE INDEX IF NOT EXISTS
+
+      idx_activity_audit_action
+
+      ON activity_audit (business_id, action, created_at DESC);
+
+    CREATE INDEX IF NOT EXISTS
+
+      idx_activity_audit_entity
+
+      ON activity_audit (business_id, entity_type, entity_id);
+
   `);
 
-  /* =======================================================
+    /* =======================================================
 
      MIGRATIONS FOR EXISTING INSTALLS
 
   ======================================================= */
 
-  /*
+    /*
 
    * PRODUCT CURRENT STOCK
 
    */
 
-  const stockQuantityAdded =
-
-    await addColumnIfMissing(
-
+    const stockQuantityAdded = await addColumnIfMissing(
       database,
 
-      'products',
+      "products",
 
-      'stock_quantity',
+      "stock_quantity",
 
-      'REAL NOT NULL DEFAULT 0',
-
+      "REAL NOT NULL DEFAULT 0",
     );
 
-  /*
+    /*
 
    * Older installs only had opening_stock.
 
@@ -926,175 +956,149 @@ async function initializeDatabase(): Promise<SQLite.SQLiteDatabase> {
 
    */
 
-  if (stockQuantityAdded) {
-
-    await database.execAsync(`
+    if (stockQuantityAdded) {
+      await database.execAsync(`
 
       UPDATE products
 
       SET stock_quantity = opening_stock;
 
     `);
+    }
 
-  }
-
-  /*
+    /*
 
    * PURCHASE HEADER FIELDS
 
    */
 
-  await addColumnIfMissing(
+    await addColumnIfMissing(
+      database,
 
-    database,
+      "purchases",
 
-    'purchases',
+      "purchase_number",
 
-    'purchase_number',
+      "TEXT NOT NULL DEFAULT ''",
+    );
 
-    "TEXT NOT NULL DEFAULT ''",
+    await addColumnIfMissing(
+      database,
 
-  );
+      "purchases",
 
-  await addColumnIfMissing(
+      "due_date",
 
-    database,
+      "TEXT",
+    );
 
-    'purchases',
+    await addColumnIfMissing(
+      database,
 
-    'due_date',
+      "purchases",
 
-    'TEXT',
+      "supply_type",
 
-  );
+      "TEXT NOT NULL DEFAULT 'WITHIN_STATE'",
+    );
 
-  await addColumnIfMissing(
+    await addColumnIfMissing(
+      database,
 
-    database,
+      "purchases",
 
-    'purchases',
+      "counter_branch",
 
-    'supply_type',
+      "TEXT",
+    );
 
-    "TEXT NOT NULL DEFAULT 'WITHIN_STATE'",
+    await addColumnIfMissing(
+      database,
 
-  );
+      "purchases",
 
-  await addColumnIfMissing(
+      "salesperson",
 
-    database,
+      "TEXT",
+    );
 
-    'purchases',
+    await addColumnIfMissing(
+      database,
 
-    'counter_branch',
+      "purchases",
 
-    'TEXT',
+      "delivery_method",
 
-  );
+      "TEXT",
+    );
 
-  await addColumnIfMissing(
+    await addColumnIfMissing(
+      database,
 
-    database,
+      "purchases",
 
-    'purchases',
+      "cgst_amount",
 
-    'salesperson',
+      "REAL NOT NULL DEFAULT 0",
+    );
 
-    'TEXT',
+    await addColumnIfMissing(
+      database,
 
-  );
+      "purchases",
 
-  await addColumnIfMissing(
+      "sgst_amount",
 
-    database,
+      "REAL NOT NULL DEFAULT 0",
+    );
 
-    'purchases',
+    await addColumnIfMissing(
+      database,
 
-    'delivery_method',
+      "purchases",
 
-    'TEXT',
+      "igst_amount",
 
-  );
+      "REAL NOT NULL DEFAULT 0",
+    );
 
-  await addColumnIfMissing(
-
-    database,
-
-    'purchases',
-
-    'cgst_amount',
-
-    'REAL NOT NULL DEFAULT 0',
-
-  );
-
-  await addColumnIfMissing(
-
-    database,
-
-    'purchases',
-
-    'sgst_amount',
-
-    'REAL NOT NULL DEFAULT 0',
-
-  );
-
-  await addColumnIfMissing(
-
-    database,
-
-    'purchases',
-
-    'igst_amount',
-
-    'REAL NOT NULL DEFAULT 0',
-
-  );
-
-  /*
+    /*
 
    * PURCHASE ITEM SNAPSHOTS
 
    */
 
-  await addColumnIfMissing(
+    await addColumnIfMissing(
+      database,
 
-    database,
+      "purchase_items",
 
-    'purchase_items',
+      "product_name",
 
-    'product_name',
+      "TEXT NOT NULL DEFAULT ''",
+    );
 
-    "TEXT NOT NULL DEFAULT ''",
+    await addColumnIfMissing(
+      database,
 
-  );
+      "purchase_items",
 
-  await addColumnIfMissing(
+      "hsn",
 
-    database,
+      "TEXT",
+    );
 
-    'purchase_items',
+    await addColumnIfMissing(
+      database,
 
-    'hsn',
+      "purchase_items",
 
-    'TEXT',
+      "unit",
 
-  );
+      "TEXT",
+    );
 
-  await addColumnIfMissing(
-
-    database,
-
-    'purchase_items',
-
-    'unit',
-
-    'TEXT',
-
-  );
-
-  /*
+    /*
 
  * PURCHASE RFQ HEADER FIELDS
 
@@ -1108,199 +1112,167 @@ async function initializeDatabase(): Promise<SQLite.SQLiteDatabase> {
 
  */
 
-await addColumnIfMissing(
+    await addColumnIfMissing(
+      database,
 
-  database,
+      "purchase_rfqs",
 
-  'purchase_rfqs',
+      "rfq_number",
 
-  'rfq_number',
+      "TEXT NOT NULL DEFAULT ''",
+    );
 
-  "TEXT NOT NULL DEFAULT ''",
+    await addColumnIfMissing(
+      database,
 
-);
+      "purchase_rfqs",
 
-await addColumnIfMissing(
+      "vendor_id",
 
-  database,
+      "TEXT",
+    );
 
-  'purchase_rfqs',
+    await addColumnIfMissing(
+      database,
 
-  'vendor_id',
+      "purchase_rfqs",
 
-  'TEXT',
+      "rfq_date",
 
-);
+      "TEXT NOT NULL DEFAULT ''",
+    );
 
-await addColumnIfMissing(
+    await addColumnIfMissing(
+      database,
 
-  database,
+      "purchase_rfqs",
 
-  'purchase_rfqs',
+      "valid_until",
 
-  'rfq_date',
+      "TEXT",
+    );
 
-  "TEXT NOT NULL DEFAULT ''",
+    await addColumnIfMissing(
+      database,
 
-);
+      "purchase_rfqs",
 
-await addColumnIfMissing(
+      "supply_type",
 
-  database,
+      "TEXT NOT NULL DEFAULT 'WITHIN_STATE'",
+    );
 
-  'purchase_rfqs',
+    await addColumnIfMissing(
+      database,
 
-  'valid_until',
+      "purchase_rfqs",
 
-  'TEXT',
+      "counter_branch",
 
-);
+      "TEXT",
+    );
 
-await addColumnIfMissing(
+    await addColumnIfMissing(
+      database,
 
-  database,
+      "purchase_rfqs",
 
-  'purchase_rfqs',
+      "salesperson",
 
-  'supply_type',
+      "TEXT",
+    );
 
-  "TEXT NOT NULL DEFAULT 'WITHIN_STATE'",
+    await addColumnIfMissing(
+      database,
 
-);
+      "purchase_rfqs",
 
-await addColumnIfMissing(
+      "delivery_method",
 
-  database,
+      "TEXT",
+    );
 
-  'purchase_rfqs',
+    await addColumnIfMissing(
+      database,
 
-  'counter_branch',
+      "purchase_rfqs",
 
-  'TEXT',
+      "subtotal",
 
-);
+      "REAL NOT NULL DEFAULT 0",
+    );
 
-await addColumnIfMissing(
+    await addColumnIfMissing(
+      database,
 
-  database,
+      "purchase_rfqs",
 
-  'purchase_rfqs',
+      "gst_amount",
 
-  'salesperson',
+      "REAL NOT NULL DEFAULT 0",
+    );
 
-  'TEXT',
+    await addColumnIfMissing(
+      database,
 
-);
+      "purchase_rfqs",
 
-await addColumnIfMissing(
+      "cgst_amount",
 
-  database,
+      "REAL NOT NULL DEFAULT 0",
+    );
 
-  'purchase_rfqs',
+    await addColumnIfMissing(
+      database,
 
-  'delivery_method',
+      "purchase_rfqs",
 
-  'TEXT',
+      "sgst_amount",
 
-);
+      "REAL NOT NULL DEFAULT 0",
+    );
 
-await addColumnIfMissing(
+    await addColumnIfMissing(
+      database,
 
-  database,
+      "purchase_rfqs",
 
-  'purchase_rfqs',
+      "igst_amount",
 
-  'subtotal',
+      "REAL NOT NULL DEFAULT 0",
+    );
 
-  'REAL NOT NULL DEFAULT 0',
+    await addColumnIfMissing(
+      database,
 
-);
+      "purchase_rfqs",
 
-await addColumnIfMissing(
+      "discount",
 
-  database,
+      "REAL NOT NULL DEFAULT 0",
+    );
 
-  'purchase_rfqs',
+    await addColumnIfMissing(
+      database,
 
-  'gst_amount',
+      "purchase_rfqs",
 
-  'REAL NOT NULL DEFAULT 0',
+      "total_amount",
 
-);
+      "REAL NOT NULL DEFAULT 0",
+    );
 
-await addColumnIfMissing(
+    await addColumnIfMissing(
+      database,
 
-  database,
+      "purchase_rfqs",
 
-  'purchase_rfqs',
+      "notes",
 
-  'cgst_amount',
+      "TEXT",
+    );
 
-  'REAL NOT NULL DEFAULT 0',
-
-);
-
-await addColumnIfMissing(
-
-  database,
-
-  'purchase_rfqs',
-
-  'sgst_amount',
-
-  'REAL NOT NULL DEFAULT 0',
-
-);
-
-await addColumnIfMissing(
-
-  database,
-
-  'purchase_rfqs',
-
-  'igst_amount',
-
-  'REAL NOT NULL DEFAULT 0',
-
-);
-
-await addColumnIfMissing(
-
-  database,
-
-  'purchase_rfqs',
-
-  'discount',
-
-  'REAL NOT NULL DEFAULT 0',
-
-);
-
-await addColumnIfMissing(
-
-  database,
-
-  'purchase_rfqs',
-
-  'total_amount',
-
-  'REAL NOT NULL DEFAULT 0',
-
-);
-
-await addColumnIfMissing(
-
-  database,
-
-  'purchase_rfqs',
-
-  'notes',
-
-  'TEXT',
-
-);
-
-/*
+    /*
 
  * PURCHASE RFQ ITEM FIELDS
 
@@ -1312,139 +1284,117 @@ await addColumnIfMissing(
 
  */
 
-await addColumnIfMissing(
+    await addColumnIfMissing(
+      database,
 
-  database,
+      "purchase_rfq_items",
 
-  'purchase_rfq_items',
+      "product_id",
 
-  'product_id',
+      "TEXT NOT NULL DEFAULT ''",
+    );
 
-  "TEXT NOT NULL DEFAULT ''",
+    await addColumnIfMissing(
+      database,
 
-);
+      "purchase_rfq_items",
 
-await addColumnIfMissing(
+      "product_name",
 
-  database,
+      "TEXT NOT NULL DEFAULT ''",
+    );
 
-  'purchase_rfq_items',
+    await addColumnIfMissing(
+      database,
 
-  'product_name',
+      "purchase_rfq_items",
 
-  "TEXT NOT NULL DEFAULT ''",
+      "hsn",
 
-);
+      "TEXT",
+    );
 
-await addColumnIfMissing(
+    await addColumnIfMissing(
+      database,
 
-  database,
+      "purchase_rfq_items",
 
-  'purchase_rfq_items',
+      "unit",
 
-  'hsn',
+      "TEXT",
+    );
 
-  'TEXT',
+    await addColumnIfMissing(
+      database,
 
-);
+      "purchase_rfq_items",
 
-await addColumnIfMissing(
+      "quantity",
 
-  database,
+      "REAL NOT NULL DEFAULT 0",
+    );
 
-  'purchase_rfq_items',
+    await addColumnIfMissing(
+      database,
 
-  'unit',
+      "purchase_rfq_items",
 
-  'TEXT',
+      "unit_price",
 
-);
+      "REAL NOT NULL DEFAULT 0",
+    );
 
-await addColumnIfMissing(
+    await addColumnIfMissing(
+      database,
 
-  database,
+      "purchase_rfq_items",
 
-  'purchase_rfq_items',
+      "gst_rate",
 
-  'quantity',
+      "REAL NOT NULL DEFAULT 0",
+    );
 
-  'REAL NOT NULL DEFAULT 0',
+    await addColumnIfMissing(
+      database,
 
-);
+      "purchase_rfq_items",
 
-await addColumnIfMissing(
+      "gst_amount",
 
-  database,
+      "REAL NOT NULL DEFAULT 0",
+    );
 
-  'purchase_rfq_items',
+    await addColumnIfMissing(
+      database,
 
-  'unit_price',
+      "purchase_rfq_items",
 
-  'REAL NOT NULL DEFAULT 0',
+      "discount",
 
-);
+      "REAL NOT NULL DEFAULT 0",
+    );
 
-await addColumnIfMissing(
+    await addColumnIfMissing(
+      database,
 
-  database,
+      "purchase_rfq_items",
 
-  'purchase_rfq_items',
+      "total_amount",
 
-  'gst_rate',
+      "REAL NOT NULL DEFAULT 0",
+    );
 
-  'REAL NOT NULL DEFAULT 0',
+    await addColumnIfMissing(
+      database,
 
-);
+      "purchase_rfq_items",
 
-await addColumnIfMissing(
+      "created_at",
 
-  database,
+      "TEXT NOT NULL DEFAULT ''",
+    );
 
-  'purchase_rfq_items',
-
-  'gst_amount',
-
-  'REAL NOT NULL DEFAULT 0',
-
-);
-
-await addColumnIfMissing(
-
-  database,
-
-  'purchase_rfq_items',
-
-  'discount',
-
-  'REAL NOT NULL DEFAULT 0',
-
-);
-
-await addColumnIfMissing(
-
-  database,
-
-  'purchase_rfq_items',
-
-  'total_amount',
-
-  'REAL NOT NULL DEFAULT 0',
-
-);
-
-await addColumnIfMissing(
-
-  database,
-
-  'purchase_rfq_items',
-
-  'created_at',
-
-  "TEXT NOT NULL DEFAULT ''",
-
-);
-
-/*
+    /*
 
  * RFQ NUMBER UNIQUENESS
 
@@ -1458,7 +1408,7 @@ await addColumnIfMissing(
 
  */
 
-await database.execAsync(`
+    await database.execAsync(`
 
   CREATE UNIQUE INDEX IF NOT EXISTS
 
@@ -1476,9 +1426,9 @@ await database.execAsync(`
 
 `);
 
-  /* PURCHASE WORKFLOW: new documents and audit records. */
+    /* PURCHASE WORKFLOW: new documents and audit records. */
 
-  await database.execAsync(`
+    await database.execAsync(`
 
     CREATE TABLE IF NOT EXISTS purchase_document_sequences (
 
@@ -1548,7 +1498,7 @@ await database.execAsync(`
 
   `);
 
-  await database.execAsync(`
+    await database.execAsync(`
 
     CREATE TABLE IF NOT EXISTS purchase_requests (
 
@@ -1656,7 +1606,7 @@ await database.execAsync(`
 
   `);
 
-  await database.execAsync(`
+    await database.execAsync(`
 
     CREATE TABLE IF NOT EXISTS purchase_orders (
 
@@ -1764,7 +1714,7 @@ await database.execAsync(`
 
   `);
 
-  await database.execAsync(`
+    await database.execAsync(`
 
     CREATE TABLE IF NOT EXISTS purchase_grns (
 
@@ -1872,7 +1822,7 @@ await database.execAsync(`
 
   `);
 
-  await database.execAsync(`
+    await database.execAsync(`
 
     CREATE TABLE IF NOT EXISTS purchase_returns (
 
@@ -1980,39 +1930,63 @@ await database.execAsync(`
 
   `);
 
-  // Extend old bills/RFQs without moving or recreating their existing records.
+    // Extend old bills/RFQs without moving or recreating their existing records.
 
-  for (const table of ['purchases', 'purchase_rfqs']) {
-
-    for (const column of ['source_type', 'source_id', 'vendor_snapshot', 'business_snapshot']) {
-
-      await addColumnIfMissing(database, table, column, 'TEXT');
-
+    for (const table of ["purchases", "purchase_rfqs"]) {
+      for (const column of [
+        "source_type",
+        "source_id",
+        "vendor_snapshot",
+        "business_snapshot",
+      ]) {
+        await addColumnIfMissing(database, table, column, "TEXT");
+      }
     }
 
-  }
+    await addColumnIfMissing(
+      database,
+      "purchases",
+      "return_amount",
+      "REAL NOT NULL DEFAULT 0",
+    );
 
-  await addColumnIfMissing(database, 'purchases', 'return_amount', 'REAL NOT NULL DEFAULT 0');
+    await addColumnIfMissing(
+      database,
+      "purchases",
+      "refunded_amount",
+      "REAL NOT NULL DEFAULT 0",
+    );
 
-  await addColumnIfMissing(database, 'purchases', 'refunded_amount', 'REAL NOT NULL DEFAULT 0');
+    await addColumnIfMissing(
+      database,
+      "purchases",
+      "vendor_credit",
+      "REAL NOT NULL DEFAULT 0",
+    );
 
-  await addColumnIfMissing(database, 'purchases', 'vendor_credit', 'REAL NOT NULL DEFAULT 0');
+    await addColumnIfMissing(
+      database,
+      "purchases",
+      "match_status",
+      "TEXT NOT NULL DEFAULT 'NOT_CHECKED'",
+    );
 
-  await addColumnIfMissing(database, 'purchases', 'match_status', "TEXT NOT NULL DEFAULT 'NOT_CHECKED'");
+    for (const table of ["purchase_items", "purchase_rfq_items"]) {
+      await addColumnIfMissing(
+        database,
+        table,
+        "position",
+        "INTEGER NOT NULL DEFAULT 0",
+      );
 
-  for (const table of ['purchase_items', 'purchase_rfq_items']) {
+      await addColumnIfMissing(database, table, "source_item_id", "TEXT");
+    }
 
-    await addColumnIfMissing(database, table, 'position', 'INTEGER NOT NULL DEFAULT 0');
+    // Compatibility with the existing product-create repository, which may only
 
-    await addColumnIfMissing(database, table, 'source_item_id', 'TEXT');
+    // supply opening_stock. This runs on INSERT only, never resets existing stock.
 
-  }
-
-  // Compatibility with the existing product-create repository, which may only
-
-  // supply opening_stock. This runs on INSERT only, never resets existing stock.
-
-  await database.execAsync(`
+    await database.execAsync(`
 
     CREATE TRIGGER IF NOT EXISTS purchase_initial_product_stock
 
@@ -2028,36 +2002,29 @@ await database.execAsync(`
 
   `);
 
-  /* SALES WORKFLOW: additive upgrade; existing invoices and stock stay intact. */
-  await migrateSalesWorkflow(database);
-  await migrateSalesWorkflowPatchV11(database);
+    /* SALES WORKFLOW: additive upgrade; existing invoices and stock stay intact. */
+    await migrateSalesWorkflow(database);
+    await migrateSalesWorkflowPatchV11(database);
 
-  /* =======================================================
+    /* =======================================================
 
      RETAIL POC SEED DATA
 
   ======================================================= */
 
-  const now =
+    const now = new Date().toISOString();
 
-    new Date().toISOString();
-
-  /* =======================================================
+    /* =======================================================
 
      FIND / CREATE BUSINESS
 
   ======================================================= */
 
-  let businessId: string;
+    let businessId: string;
 
-  const existingBusiness =
-
-    await database.getFirstAsync<{
-
+    const existingBusiness = await database.getFirstAsync<{
       id: string;
-
     }>(
-
       `
 
         SELECT id
@@ -2069,24 +2036,15 @@ await database.execAsync(`
         LIMIT 1
 
       `,
-
     );
 
-  if (existingBusiness) {
+    if (existingBusiness) {
+      businessId = existingBusiness.id;
+    } else {
+      businessId = "business_retail_poc";
 
-    businessId =
-
-      existingBusiness.id;
-
-  } else {
-
-    businessId =
-
-      'business_retail_poc';
-
-    await database.runAsync(
-
-      `
+      await database.runAsync(
+        `
 
         INSERT OR IGNORE INTO businesses (
 
@@ -2108,35 +2066,18 @@ await database.execAsync(`
 
       `,
 
-      [
+        [businessId, "Retail Shop", "", "RETAIL", now, now],
+      );
+    }
 
-        businessId,
-
-        'Retail Shop',
-
-        '',
-
-        'RETAIL',
-
-        now,
-
-        now,
-
-      ],
-
-    );
-
-  }
-
-  /* =======================================================
+    /* =======================================================
 
      WALK-IN CUSTOMER
 
   ======================================================= */
 
-  await database.runAsync(
-
-    `
+    await database.runAsync(
+      `
 
       INSERT OR IGNORE INTO customers (
 
@@ -2170,45 +2111,41 @@ await database.execAsync(`
 
     `,
 
-    [
+      [
+        "customer_walk_in",
 
-      'customer_walk_in',
+        businessId,
 
-      businessId,
+        "Walk-in Customer",
 
-      'Walk-in Customer',
+        "",
 
-      '',
+        "",
 
-      '',
+        "Andhra Pradesh",
 
-      'Andhra Pradesh',
+        "",
 
-      '',
+        0,
 
-      0,
+        0,
 
-      0,
+        "Retail counter customer",
 
-      'Retail counter customer',
+        now,
 
-      now,
+        now,
+      ],
+    );
 
-      now,
-
-    ],
-
-  );
-
-  /* =======================================================
+    /* =======================================================
 
      SAMPLE VENDOR
 
   ======================================================= */
 
-  await database.runAsync(
-
-    `
+    await database.runAsync(
+      `
 
       INSERT OR IGNORE INTO vendors (
 
@@ -2242,47 +2179,43 @@ await database.execAsync(`
 
     `,
 
-    [
+      [
+        "vendor_sri_lakshmi",
 
-      'vendor_sri_lakshmi',
+        businessId,
 
-      businessId,
+        "Sri Lakshmi Distributors",
 
-      'Sri Lakshmi Distributors',
+        "9876543210",
 
-      '9876543210',
+        "",
 
-      '',
+        "Andhra Pradesh",
 
-      'Andhra Pradesh',
+        "",
 
-      '',
+        15,
 
-      15,
+        0,
 
-      0,
+        "Retail stock supplier",
 
-      'Retail stock supplier',
+        now,
 
-      now,
+        now,
+      ],
+    );
 
-      now,
+    // Existing seeded vendor ownership is deliberately not reassigned.
 
-    ],
-
-  );
-
-  // Existing seeded vendor ownership is deliberately not reassigned.
-
-  /* =======================================================
+    /* =======================================================
 
      SAMPLE PRODUCT 1
 
   ======================================================= */
 
-  await database.runAsync(
-
-    `
+    await database.runAsync(
+      `
 
       INSERT OR IGNORE INTO products (
 
@@ -2328,51 +2261,47 @@ await database.execAsync(`
 
     `,
 
-    [
+      [
+        "product_premium_rice_5kg",
 
-      'product_premium_rice_5kg',
+        businessId,
 
-      businessId,
+        "Premium Rice 5kg",
 
-      'Premium Rice 5kg',
+        "100630",
 
-      '100630',
+        "Bag",
 
-      'Bag',
+        650,
 
-      650,
+        570,
 
-      570,
+        5,
 
-      5,
+        24,
 
-      24,
+        24,
 
-      24,
+        "",
 
-      '',
+        "",
 
-      '',
+        "A1",
 
-      'A1',
+        now,
 
-      now,
+        now,
+      ],
+    );
 
-      now,
-
-    ],
-
-  );
-
-  /* =======================================================
+    /* =======================================================
 
      SAMPLE PRODUCT 2
 
   ======================================================= */
 
-  await database.runAsync(
-
-    `
+    await database.runAsync(
+      `
 
       INSERT OR IGNORE INTO products (
 
@@ -2418,51 +2347,47 @@ await database.execAsync(`
 
     `,
 
-    [
+      [
+        "product_groundnut_oil_1l",
 
-      'product_groundnut_oil_1l',
+        businessId,
 
-      businessId,
+        "Groundnut Oil 1L",
 
-      'Groundnut Oil 1L',
+        "151550",
 
-      '151550',
+        "Bottle",
 
-      'Bottle',
+        190,
 
-      190,
+        168,
 
-      168,
+        5,
 
-      5,
+        36,
 
-      36,
+        36,
 
-      36,
+        "",
 
-      '',
+        "",
 
-      '',
+        "A2",
 
-      'A2',
+        now,
 
-      now,
+        now,
+      ],
+    );
 
-      now,
-
-    ],
-
-  );
-
-  /* =======================================================
+    /* =======================================================
 
      SAMPLE PRODUCT 3
 
   ======================================================= */
 
-  await database.runAsync(
-
-    `
+    await database.runAsync(
+      `
 
       INSERT OR IGNORE INTO products (
 
@@ -2508,53 +2433,49 @@ await database.execAsync(`
 
     `,
 
-    [
+      [
+        "product_bath_soap",
 
-      'product_bath_soap',
+        businessId,
 
-      businessId,
+        "Bath Soap",
 
-      'Bath Soap',
+        "340111",
 
-      '340111',
+        "Piece",
 
-      'Piece',
+        42,
 
-      42,
+        34,
 
-      34,
+        18,
 
-      18,
+        60,
 
-      60,
+        60,
 
-      60,
+        "",
 
-      '',
+        "",
 
-      '',
+        "A3",
 
-      'A3',
+        now,
 
-      now,
+        now,
+      ],
+    );
 
-      now,
+    // Existing seeded product ownership is deliberately not reassigned.
 
-    ],
-
-  );
-
-  // Existing seeded product ownership is deliberately not reassigned.
-
-  /* =======================================================
+    /* =======================================================
 
      VENDOR → PRODUCT RELATIONSHIP 1
 
   ======================================================= */
 
-  await database.runAsync(
-
-    `
+    await database.runAsync(
+      `
 
       INSERT OR IGNORE INTO vendor_products (
 
@@ -2578,35 +2499,31 @@ await database.execAsync(`
 
     `,
 
-    [
+      [
+        "vendor_product_rice",
 
-      'vendor_product_rice',
+        "vendor_sri_lakshmi",
 
-      'vendor_sri_lakshmi',
+        "product_premium_rice_5kg",
 
-      'product_premium_rice_5kg',
+        570,
 
-      570,
+        24,
 
-      24,
+        now,
 
-      now,
+        now,
+      ],
+    );
 
-      now,
-
-    ],
-
-  );
-
-  /* =======================================================
+    /* =======================================================
 
      VENDOR → PRODUCT RELATIONSHIP 2
 
   ======================================================= */
 
-  await database.runAsync(
-
-    `
+    await database.runAsync(
+      `
 
       INSERT OR IGNORE INTO vendor_products (
 
@@ -2630,35 +2547,31 @@ await database.execAsync(`
 
     `,
 
-    [
+      [
+        "vendor_product_oil",
 
-      'vendor_product_oil',
+        "vendor_sri_lakshmi",
 
-      'vendor_sri_lakshmi',
+        "product_groundnut_oil_1l",
 
-      'product_groundnut_oil_1l',
+        168,
 
-      168,
+        36,
 
-      36,
+        now,
 
-      now,
+        now,
+      ],
+    );
 
-      now,
-
-    ],
-
-  );
-
-  /* =======================================================
+    /* =======================================================
 
      VENDOR → PRODUCT RELATIONSHIP 3
 
   ======================================================= */
 
-  await database.runAsync(
-
-    `
+    await database.runAsync(
+      `
 
       INSERT OR IGNORE INTO vendor_products (
 
@@ -2682,43 +2595,34 @@ await database.execAsync(`
 
     `,
 
-    [
+      [
+        "vendor_product_soap",
 
-      'vendor_product_soap',
+        "vendor_sri_lakshmi",
 
-      'vendor_sri_lakshmi',
+        "product_bath_soap",
 
-      'product_bath_soap',
+        34,
 
-      34,
+        60,
 
-      60,
+        now,
 
-      now,
+        now,
+      ],
+    );
 
-      now,
-
-    ],
-
-  );
-
-    await database.execAsync('COMMIT;');
+    await database.execAsync("COMMIT;");
 
     return database;
-
   } catch (error) {
-
-    await database.execAsync('ROLLBACK;').catch(() => undefined);
+    await database.execAsync("ROLLBACK;").catch(() => undefined);
 
     await database.closeAsync().catch(() => undefined);
 
     throw error;
-
   }
-
 }
-
-
 
 /* =========================================================
    SALES WORKFLOW V1.1 - SALE ITEM BUSINESS OWNERSHIP PATCH
@@ -2732,21 +2636,16 @@ await database.execAsync(`
 async function migrateSalesWorkflowPatchV11(
   db: SQLite.SQLiteDatabase,
 ): Promise<void> {
-  const migrationId = 'sales-workflow-v1.1-sale-item-business';
+  const migrationId = "sales-workflow-v1.1-sale-item-business";
 
   const applied = await db.getFirstAsync<{ migration_id: string }>(
-    'SELECT migration_id FROM sales_schema_migrations WHERE migration_id = ?',
+    "SELECT migration_id FROM sales_schema_migrations WHERE migration_id = ?",
     migrationId,
   );
 
   if (applied) return;
 
-  await addColumnIfMissing(
-    db,
-    'sale_items',
-    'business_id',
-    'TEXT',
-  );
+  await addColumnIfMissing(db, "sale_items", "business_id", "TEXT");
 
   // Existing rows inherit ownership from their parent invoice.
   // No item values, quantities, tax, stock, or invoice numbers are changed.
@@ -2777,7 +2676,9 @@ async function migrateSalesWorkflowPatchV11(
   `);
 
   if ((orphan?.count ?? 0) > 0) {
-    throw new Error('Sales migration found invoice items without a valid business owner.');
+    throw new Error(
+      "Sales migration found invoice items without a valid business owner.",
+    );
   }
 
   // Legacy POS inserts do not provide business_id. Populate it from the
@@ -2807,7 +2708,7 @@ async function migrateSalesWorkflowPatchV11(
   `);
 
   await db.runAsync(
-    'INSERT INTO sales_schema_migrations (migration_id, applied_at) VALUES (?, ?)',
+    "INSERT INTO sales_schema_migrations (migration_id, applied_at) VALUES (?, ?)",
     migrationId,
     new Date().toISOString(),
   );
@@ -2823,63 +2724,65 @@ async function migrateSalesWorkflowPatchV11(
 ========================================================= */
 
 type SalesSchemaTable = {
-  documentType: 'QUOTATION' | 'SALES_ORDER' | 'DELIVERY_CHALLAN' | 'SALES_RETURN';
+  documentType:
+    | "QUOTATION"
+    | "SALES_ORDER"
+    | "DELIVERY_CHALLAN"
+    | "SALES_RETURN";
   table: string;
   items: string;
   prefix: string;
   sourceType: string | null;
   sourceTable: string | null;
   sourceItems: string | null;
-  sourceItemDocumentKey: 'document_id' | 'sale_id';
+  sourceItemDocumentKey: "document_id" | "sale_id";
 };
 
 // SQL identifiers below are fixed application constants, never user input.
 const SALES_SCHEMA_TABLES: readonly SalesSchemaTable[] = [
   {
-    documentType: 'QUOTATION',
-    table: 'sales_quotations',
-    items: 'sales_quotation_items',
-    prefix: 'QT',
+    documentType: "QUOTATION",
+    table: "sales_quotations",
+    items: "sales_quotation_items",
+    prefix: "QT",
     sourceType: null,
     sourceTable: null,
     sourceItems: null,
-    sourceItemDocumentKey: 'document_id',
+    sourceItemDocumentKey: "document_id",
   },
   {
-    documentType: 'SALES_ORDER',
-    table: 'sales_orders',
-    items: 'sales_order_items',
-    prefix: 'SO',
-    sourceType: 'QUOTATION',
-    sourceTable: 'sales_quotations',
-    sourceItems: 'sales_quotation_items',
-    sourceItemDocumentKey: 'document_id',
+    documentType: "SALES_ORDER",
+    table: "sales_orders",
+    items: "sales_order_items",
+    prefix: "SO",
+    sourceType: "QUOTATION",
+    sourceTable: "sales_quotations",
+    sourceItems: "sales_quotation_items",
+    sourceItemDocumentKey: "document_id",
   },
   {
-    documentType: 'DELIVERY_CHALLAN',
-    table: 'sales_delivery_challans',
-    items: 'sales_delivery_challan_items',
-    prefix: 'DC',
-    sourceType: 'SALES_ORDER',
-    sourceTable: 'sales_orders',
-    sourceItems: 'sales_order_items',
-    sourceItemDocumentKey: 'document_id',
+    documentType: "DELIVERY_CHALLAN",
+    table: "sales_delivery_challans",
+    items: "sales_delivery_challan_items",
+    prefix: "DC",
+    sourceType: "SALES_ORDER",
+    sourceTable: "sales_orders",
+    sourceItems: "sales_order_items",
+    sourceItemDocumentKey: "document_id",
   },
   {
-    documentType: 'SALES_RETURN',
-    table: 'sales_returns',
-    items: 'sales_return_items',
-    prefix: 'SR',
-    sourceType: 'SALES_INVOICE',
-    sourceTable: 'sales',
-    sourceItems: 'sale_items',
-    sourceItemDocumentKey: 'sale_id',
+    documentType: "SALES_RETURN",
+    table: "sales_returns",
+    items: "sales_return_items",
+    prefix: "SR",
+    sourceType: "SALES_INVOICE",
+    sourceTable: "sales",
+    sourceItems: "sale_items",
+    sourceItemDocumentKey: "sale_id",
   },
 ];
 
-async function migrateSalesWorkflow(
-  db: SQLite.SQLiteDatabase,
-): Promise<void> {
+async function migrateSalesWorkflow(db: SQLite.SQLiteDatabase): Promise<void> {
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS sales_schema_migrations (
       migration_id TEXT PRIMARY KEY NOT NULL,
@@ -2887,9 +2790,9 @@ async function migrateSalesWorkflow(
     );
   `);
 
-  const migrationId = 'sales-workflow-v1';
+  const migrationId = "sales-workflow-v1";
   const applied = await db.getFirstAsync<{ migration_id: string }>(
-    'SELECT migration_id FROM sales_schema_migrations WHERE migration_id = ?',
+    "SELECT migration_id FROM sales_schema_migrations WHERE migration_id = ?",
     migrationId,
   );
 
@@ -2900,54 +2803,69 @@ async function migrateSalesWorkflow(
    */
   await addColumnIfMissing(
     db,
-    'products',
-    'item_kind',
+    "products",
+    "item_kind",
     "TEXT CHECK (item_kind IN ('PRODUCT', 'SERVICE'))",
   );
 
   const invoiceColumns: ReadonlyArray<readonly [string, string]> = [
-    ['due_date', 'TEXT'],
-    ['reference_number', 'TEXT'],
-    ['supply_type', "TEXT CHECK (supply_type IN ('WITHIN_STATE', 'OTHER_STATE'))"],
-    ['cgst_amount', 'REAL CHECK (cgst_amount >= 0)'],
-    ['sgst_amount', 'REAL CHECK (sgst_amount >= 0)'],
-    ['igst_amount', 'REAL CHECK (igst_amount >= 0)'],
-    ['return_amount', 'REAL NOT NULL DEFAULT 0 CHECK (return_amount >= 0)'],
-    ['refunded_amount', 'REAL NOT NULL DEFAULT 0 CHECK (refunded_amount >= 0)'],
-    ['customer_credit', 'REAL NOT NULL DEFAULT 0 CHECK (customer_credit >= 0)'],
-    ['source_type', "TEXT CHECK (source_type = 'DELIVERY_CHALLAN')"],
-    ['source_id', 'TEXT'],
-    ['custom_fields', "TEXT NOT NULL DEFAULT '[]'"],
-    ['business_snapshot', 'TEXT'],
-    ['customer_snapshot', 'TEXT'],
-    ['pdf_settings_snapshot', 'TEXT'],
-    ['document_state', "TEXT NOT NULL DEFAULT 'ISSUED' CHECK (document_state IN ('ISSUED', 'PART_PAID', 'PAID'))"],
-    ['snapshot_status', "TEXT NOT NULL DEFAULT 'LEGACY_FALLBACK' CHECK (snapshot_status IN ('SAVED', 'LEGACY_FALLBACK'))"],
-    ['inventory_posting_status', "TEXT NOT NULL DEFAULT 'LEGACY_UNVERIFIED' CHECK (inventory_posting_status IN ('POSTED', 'NOT_APPLICABLE', 'LEGACY_UNVERIFIED'))"],
-    ['request_fingerprint', 'TEXT'],
+    ["due_date", "TEXT"],
+    ["reference_number", "TEXT"],
+    [
+      "supply_type",
+      "TEXT CHECK (supply_type IN ('WITHIN_STATE', 'OTHER_STATE'))",
+    ],
+    ["cgst_amount", "REAL CHECK (cgst_amount >= 0)"],
+    ["sgst_amount", "REAL CHECK (sgst_amount >= 0)"],
+    ["igst_amount", "REAL CHECK (igst_amount >= 0)"],
+    ["return_amount", "REAL NOT NULL DEFAULT 0 CHECK (return_amount >= 0)"],
+    ["refunded_amount", "REAL NOT NULL DEFAULT 0 CHECK (refunded_amount >= 0)"],
+    ["customer_credit", "REAL NOT NULL DEFAULT 0 CHECK (customer_credit >= 0)"],
+    ["source_type", "TEXT CHECK (source_type = 'DELIVERY_CHALLAN')"],
+    ["source_id", "TEXT"],
+    ["custom_fields", "TEXT NOT NULL DEFAULT '[]'"],
+    ["business_snapshot", "TEXT"],
+    ["customer_snapshot", "TEXT"],
+    ["pdf_settings_snapshot", "TEXT"],
+    [
+      "document_state",
+      "TEXT NOT NULL DEFAULT 'ISSUED' CHECK (document_state IN ('ISSUED', 'PART_PAID', 'PAID'))",
+    ],
+    [
+      "snapshot_status",
+      "TEXT NOT NULL DEFAULT 'LEGACY_FALLBACK' CHECK (snapshot_status IN ('SAVED', 'LEGACY_FALLBACK'))",
+    ],
+    [
+      "inventory_posting_status",
+      "TEXT NOT NULL DEFAULT 'LEGACY_UNVERIFIED' CHECK (inventory_posting_status IN ('POSTED', 'NOT_APPLICABLE', 'LEGACY_UNVERIFIED'))",
+    ],
+    ["request_fingerprint", "TEXT"],
   ];
 
   for (const [name, definition] of invoiceColumns) {
-    await addColumnIfMissing(db, 'sales', name, definition);
+    await addColumnIfMissing(db, "sales", name, definition);
   }
 
   const itemColumns: ReadonlyArray<readonly [string, string]> = [
-    ['product_name', 'TEXT'],
-    ['hsn', 'TEXT'],
-    ['unit', 'TEXT'],
-    ['item_kind', "TEXT CHECK (item_kind IN ('PRODUCT', 'SERVICE'))"],
-    ['taxable_amount', 'REAL CHECK (taxable_amount >= 0)'],
-    ['cgst_amount', 'REAL CHECK (cgst_amount >= 0)'],
-    ['sgst_amount', 'REAL CHECK (sgst_amount >= 0)'],
-    ['igst_amount', 'REAL CHECK (igst_amount >= 0)'],
-    ['position', 'INTEGER NOT NULL DEFAULT 0 CHECK (position >= 0)'],
-    ['source_document_id', 'TEXT'],
-    ['source_item_id', 'TEXT'],
-    ['snapshot_status', "TEXT NOT NULL DEFAULT 'LEGACY_FALLBACK' CHECK (snapshot_status IN ('SAVED', 'LEGACY_FALLBACK'))"],
+    ["product_name", "TEXT"],
+    ["hsn", "TEXT"],
+    ["unit", "TEXT"],
+    ["item_kind", "TEXT CHECK (item_kind IN ('PRODUCT', 'SERVICE'))"],
+    ["taxable_amount", "REAL CHECK (taxable_amount >= 0)"],
+    ["cgst_amount", "REAL CHECK (cgst_amount >= 0)"],
+    ["sgst_amount", "REAL CHECK (sgst_amount >= 0)"],
+    ["igst_amount", "REAL CHECK (igst_amount >= 0)"],
+    ["position", "INTEGER NOT NULL DEFAULT 0 CHECK (position >= 0)"],
+    ["source_document_id", "TEXT"],
+    ["source_item_id", "TEXT"],
+    [
+      "snapshot_status",
+      "TEXT NOT NULL DEFAULT 'LEGACY_FALLBACK' CHECK (snapshot_status IN ('SAVED', 'LEGACY_FALLBACK'))",
+    ],
   ];
 
   for (const [name, definition] of itemColumns) {
-    await addColumnIfMissing(db, 'sale_items', name, definition);
+    await addColumnIfMissing(db, "sale_items", name, definition);
   }
 
   // These redundant-by-ID unique indexes provide explicit composite FK targets.
@@ -3062,7 +2980,7 @@ async function migrateSalesWorkflow(
   // Mark applied LAST. initializeDatabase commits the whole upgrade, or rolls
   // it all back. Do not independently BEGIN/COMMIT inside this migration.
   await db.runAsync(
-    'INSERT INTO sales_schema_migrations (migration_id, applied_at) VALUES (?, ?)',
+    "INSERT INTO sales_schema_migrations (migration_id, applied_at) VALUES (?, ?)",
     migrationId,
     new Date().toISOString(),
   );
@@ -3072,13 +2990,14 @@ async function createSalesWorkflowTables(
   db: SQLite.SQLiteDatabase,
   entry: SalesSchemaTable,
 ): Promise<void> {
-  const isReturn = entry.documentType === 'SALES_RETURN';
-  const sourceRequired = isReturn ? 'NOT NULL' : '';
+  const isReturn = entry.documentType === "SALES_RETURN";
+  const sourceRequired = isReturn ? "NOT NULL" : "";
 
-  const sourceCheck = entry.sourceType === null
-    ? 'source_type IS NULL AND source_id IS NULL'
-    : `(
-        ${isReturn ? '' : '(source_type IS NULL AND source_id IS NULL) OR'}
+  const sourceCheck =
+    entry.sourceType === null
+      ? "source_type IS NULL AND source_id IS NULL"
+      : `(
+        ${isReturn ? "" : "(source_type IS NULL AND source_id IS NULL) OR"}
         (source_type IS NOT NULL AND source_id IS NOT NULL
           AND source_type = '${entry.sourceType}'
           AND length(trim(source_id)) > 0)
@@ -3087,7 +3006,7 @@ async function createSalesWorkflowTables(
   const sourceForeignKey = entry.sourceTable
     ? `, FOREIGN KEY (business_id, source_id)
         REFERENCES ${entry.sourceTable}(business_id, id) ON DELETE RESTRICT`
-    : '';
+    : "";
 
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS ${entry.table} (
@@ -3116,8 +3035,8 @@ async function createSalesWorkflowTables(
       pdf_settings_snapshot TEXT,
       snapshot_status TEXT NOT NULL DEFAULT 'SAVED'
         CHECK (snapshot_status = 'SAVED'),
-      document_state TEXT NOT NULL DEFAULT '${isReturn ? 'ISSUED' : 'WORKFLOW'}'
-        CHECK (document_state = '${isReturn ? 'ISSUED' : 'WORKFLOW'}'),
+      document_state TEXT NOT NULL DEFAULT '${isReturn ? "ISSUED" : "WORKFLOW"}'
+        CHECK (document_state = '${isReturn ? "ISSUED" : "WORKFLOW"}'),
       inventory_posting_status TEXT NOT NULL DEFAULT 'NOT_APPLICABLE'
         CHECK (inventory_posting_status IN (
           ${isReturn ? "'POSTED', 'NOT_APPLICABLE'" : "'NOT_APPLICABLE'"}
@@ -3131,7 +3050,7 @@ async function createSalesWorkflowTables(
       UNIQUE (business_id, id, source_id),
       UNIQUE (business_id, source_id, id),
       CHECK (${sourceCheck}),
-      CHECK (${isReturn ? 'total_amount > 0' : 'refunded_amount = 0'}),
+      CHECK (${isReturn ? "total_amount > 0" : "refunded_amount = 0"}),
       FOREIGN KEY (business_id) REFERENCES businesses(id) ON DELETE RESTRICT,
       FOREIGN KEY (business_id, customer_id)
         REFERENCES customers(business_id, id) ON DELETE RESTRICT
@@ -3153,10 +3072,11 @@ async function createSalesWorkflowTables(
     `);
   }
 
-  const sourceItemCheck = entry.sourceItems === null
-    ? 'source_document_id IS NULL AND source_item_id IS NULL'
-    : `(
-        ${isReturn ? '' : '(source_document_id IS NULL AND source_item_id IS NULL) OR'}
+  const sourceItemCheck =
+    entry.sourceItems === null
+      ? "source_document_id IS NULL AND source_item_id IS NULL"
+      : `(
+        ${isReturn ? "" : "(source_document_id IS NULL AND source_item_id IS NULL) OR"}
         (source_document_id IS NOT NULL AND source_item_id IS NOT NULL
           AND length(trim(source_document_id)) > 0
           AND length(trim(source_item_id)) > 0)
@@ -3166,7 +3086,7 @@ async function createSalesWorkflowTables(
     ? `, FOREIGN KEY (source_document_id, source_item_id, product_id)
         REFERENCES ${entry.sourceItems}(${entry.sourceItemDocumentKey}, id, product_id)
         ON DELETE RESTRICT`
-    : '';
+    : "";
 
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS ${entry.items} (
@@ -3308,7 +3228,7 @@ async function addSalesWorkflowGuards(
     ) THEN RAISE(ABORT, 'Invoice line does not match its source delivery line.') END;
   `;
 
-  for (const operation of ['INSERT', 'UPDATE'] as const) {
+  for (const operation of ["INSERT", "UPDATE"] as const) {
     await db.execAsync(`
       CREATE TRIGGER IF NOT EXISTS sales_invoice_workflow_${operation.toLowerCase()}
       BEFORE ${operation} ON sales WHEN NEW.snapshot_status = 'SAVED'
@@ -3326,13 +3246,39 @@ async function addSalesWorkflowGuards(
 
   // Each source/target pairing must exist and agree with the target header.
   const conversionChecks = [
-    { source: 'sales_quotations', target: 'sales_orders', from: 'QUOTATION', to: 'SALES_ORDER', date: 'document_date' },
-    { source: 'sales_orders', target: 'sales_delivery_challans', from: 'SALES_ORDER', to: 'DELIVERY_CHALLAN', date: 'document_date' },
-    { source: 'sales_delivery_challans', target: 'sales', from: 'DELIVERY_CHALLAN', to: 'SALES_INVOICE', date: 'sale_date' },
-    { source: 'sales', target: 'sales_returns', from: 'SALES_INVOICE', to: 'SALES_RETURN', date: 'document_date' },
+    {
+      source: "sales_quotations",
+      target: "sales_orders",
+      from: "QUOTATION",
+      to: "SALES_ORDER",
+      date: "document_date",
+    },
+    {
+      source: "sales_orders",
+      target: "sales_delivery_challans",
+      from: "SALES_ORDER",
+      to: "DELIVERY_CHALLAN",
+      date: "document_date",
+    },
+    {
+      source: "sales_delivery_challans",
+      target: "sales",
+      from: "DELIVERY_CHALLAN",
+      to: "SALES_INVOICE",
+      date: "sale_date",
+    },
+    {
+      source: "sales",
+      target: "sales_returns",
+      from: "SALES_INVOICE",
+      to: "SALES_RETURN",
+      date: "document_date",
+    },
   ];
 
-  const existingPair = conversionChecks.map(pair => `
+  const existingPair = conversionChecks
+    .map(
+      (pair) => `
     SELECT 1 FROM ${pair.source} s JOIN ${pair.target} t
       ON t.business_id = s.business_id
     WHERE NEW.source_type = '${pair.from}' AND NEW.target_type = '${pair.to}'
@@ -3340,8 +3286,10 @@ async function addSalesWorkflowGuards(
       AND s.id = NEW.source_id AND t.id = NEW.target_id
       AND t.source_type = NEW.source_type AND t.source_id = NEW.source_id
       AND t.customer_id IS s.customer_id
-      AND t.${pair.date} >= s.${pair.source === 'sales' ? 'sale_date' : 'document_date'}
-  `).join(' UNION ALL ');
+      AND t.${pair.date} >= s.${pair.source === "sales" ? "sale_date" : "document_date"}
+  `,
+    )
+    .join(" UNION ALL ");
 
   await db.execAsync(`
     CREATE TRIGGER IF NOT EXISTS sales_document_link_insert
@@ -3363,24 +3311,32 @@ async function seedSalesDocumentSequences(
   db: SQLite.SQLiteDatabase,
 ): Promise<void> {
   const definitions = [
-    { documentType: 'SALES_INVOICE', table: 'sales', numberColumn: 'invoice_number', prefix: 'INV' },
-    ...SALES_SCHEMA_TABLES.map(entry => ({
+    {
+      documentType: "SALES_INVOICE",
+      table: "sales",
+      numberColumn: "invoice_number",
+      prefix: "INV",
+    },
+    ...SALES_SCHEMA_TABLES.map((entry) => ({
       documentType: entry.documentType,
       table: entry.table,
-      numberColumn: 'document_number',
+      numberColumn: "document_number",
       prefix: entry.prefix,
     })),
   ];
 
   for (const entry of definitions) {
-    const rows = await db.getAllAsync<{ business_id: string; saved_number: string }>(`
+    const rows = await db.getAllAsync<{
+      business_id: string;
+      saved_number: string;
+    }>(`
       SELECT d.business_id, d.${entry.numberColumn} AS saved_number
       FROM ${entry.table} d JOIN businesses b ON b.id = d.business_id
       WHERE length(trim(COALESCE(d.${entry.numberColumn}, ''))) > 0
     `);
 
     const maximumByBusiness = new Map<string, number>();
-    const expression = new RegExp(`^${entry.prefix}-(\\d+)$`, 'i');
+    const expression = new RegExp(`^${entry.prefix}-(\\d+)$`, "i");
 
     for (const row of rows) {
       const match = expression.exec(row.saved_number.trim());
@@ -3409,7 +3365,6 @@ async function seedSalesDocumentSequences(
       );
     }
   }
-
   // The repository must still allocate inside withSalesTransaction and check
   // live numbers. A legacy POS writer may add invoices after this migration.
 }
